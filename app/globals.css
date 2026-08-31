@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens do projeto (Especificação Pilar 1, v1.2):
+ * Azul petróleo | Verde menta | Branco neve | Cinza claro | Preto suave
+ */
+:root {
+  --background: #f7ffff;
+  --foreground: #1a1a1a;
+  --color-teal: #0b4d52;
+  --color-green: #83b692;
+  --color-offwhite: #f7ffff;
+  --color-gray: #e7ecef;
+  --color-black: #1a1a1a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-teal: var(--color-teal);
+  --color-green: var(--color-green);
+  --color-offwhite: var(--color-offwhite);
+  --color-gray: var(--color-gray);
+  --color-black: var(--color-black);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-gray-300 px-4 py-3 text-base
+           focus:outline-none focus:ring-2 focus:ring-teal;
+  }
+}
