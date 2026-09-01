@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { Search, Star } from "lucide-react";
 import type { ServiceCategory } from "@/types/database";
 import { UseMyLocationButton } from "@/components/shared/use-my-location-button";
+import { SearchFiltersForm } from "@/components/search/search-filters-form";
+import { FavoriteButton } from "@/components/search/favorite-button";
 import { haversineKm } from "@/lib/geo";
+import { averageRating } from "@/lib/domain/professional-reputation";
 
 const CATEGORY_LABEL: Record<ServiceCategory, string> = {
   pet_sitter: "Pet sitter / cuidador",
@@ -23,18 +26,48 @@ function isServiceCategory(value: string): value is ServiceCategory {
 export default async function BuscarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string; lat?: string; lng?: string }>;
+  searchParams: Promise<{
+    categoria?: string;
+    lat?: string;
+    lng?: string;
+    precoMin?: string;
+    precoMax?: string;
+    notaMin?: string;
+    subcategoria?: string;
+    especie?: string;
+    favoritos?: string;
+  }>;
 }) {
-  const { categoria, lat, lng } = await searchParams;
+  const { categoria, lat, lng, precoMin, precoMax, notaMin, subcategoria, especie, favoritos } =
+    await searchParams;
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   let query = supabase
     .from("professional_services")
-    .select("id, category, base_price, pricing_model, professional_id, profiles(id, full_name)")
+    .select(
+      "id, category, subcategory, base_price, pricing_model, professional_id, species_accepted, profiles(id, full_name)"
+    )
     .eq("active", true);
 
   if (categoria && isServiceCategory(categoria)) {
     query = query.eq("category", categoria);
+  }
+  if (subcategoria) {
+    query = query.eq("subcategory", subcategoria);
+  }
+  if (precoMin) {
+    query = query.gte("base_price", Number(precoMin));
+  }
+  if (precoMax) {
+    query = query.lte("base_price", Number(precoMax));
+  }
+  if (especie) {
+    // Vazio em species_accepted = atende qualquer espécie (seção 12.1).
+    query = query.or(`species_accepted.cs.{${especie}},species_accepted.eq.{}`);
   }
 
   const { data: services } = await query.limit(60);
@@ -64,13 +97,57 @@ export default async function BuscarPage({
     filteredServices = filteredServices.filter((s) => withinRange.has(s.professional_id));
   }
 
+  // Nota mínima (seção 12.1) — agrega avaliações por profissional; quem
+  // ainda não tem nenhuma avaliação não atende a um filtro de nota mínima
+  // explícito (não dá pra confirmar que atinge o mínimo pedido).
+  if (notaMin && filteredServices.length > 0) {
+    const professionalIds = [...new Set(filteredServices.map((s) => s.professional_id))];
+    const { data: reviews } = await supabase
+      .from("reviews")
+      .select("reviewee_id, rating")
+      .in("reviewee_id", professionalIds);
+
+    const reviewsByProfessional = new Map<string, { rating: unknown }[]>();
+    (reviews ?? []).forEach((r) => {
+      const list = reviewsByProfessional.get(r.reviewee_id) ?? [];
+      list.push({ rating: r.rating });
+      reviewsByProfessional.set(r.reviewee_id, list);
+    });
+
+    const minRating = Number(notaMin);
+    const meetsMinRating = new Set<string>();
+    professionalIds.forEach((id) => {
+      const avg = averageRating(reviewsByProfessional.get(id) ?? []);
+      if (avg !== null && avg >= minRating) meetsMinRating.add(id);
+    });
+
+    filteredServices = filteredServices.filter((s) => meetsMinRating.has(s.professional_id));
+  }
+
+  // Favoritos do Tutor logado (seção 12.1) — precisa vir antes do filtro
+  // "somente favoritos" e também alimenta o coração preenchido/vazio de
+  // cada card.
+  let favoriteProfessionalIds = new Set<string>();
+  if (user) {
+    const { data: favoriteRows } = await supabase
+      .from("tutor_favorites")
+      .select("professional_id")
+      .eq("tutor_profile_id", user.id);
+    favoriteProfessionalIds = new Set((favoriteRows ?? []).map((f) => f.professional_id));
+  }
+
+  if (favoritos === "1") {
+    filteredServices = filteredServices.filter((s) => favoriteProfessionalIds.has(s.professional_id));
+  }
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
         <h1 className="text-2xl font-bold text-teal mb-4">Buscar profissional</h1>
 
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap gap-2 items-center">
           <UseMyLocationButton />
+          <SearchFiltersForm isTutorLoggedIn={!!user} />
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
@@ -89,9 +166,11 @@ export default async function BuscarPage({
           <div className="text-center py-16 text-gray-500">
             <Search size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-sm">
-              {userLat !== null
-                ? "Nenhum profissional atende sua região nessa categoria ainda."
-                : "Nenhum profissional encontrado nessa categoria ainda."}
+              {favoritos === "1"
+                ? "Você ainda não favoritou nenhum profissional nessa busca."
+                : userLat !== null
+                  ? "Nenhum profissional atende sua região com esses filtros ainda."
+                  : "Nenhum profissional encontrado com esses filtros ainda."}
             </p>
           </div>
         ) : (
@@ -108,18 +187,29 @@ export default async function BuscarPage({
                       <p className="font-semibold text-black">
                         {service.profiles?.full_name ?? "Profissional"}
                       </p>
-                      <p className="text-xs text-gray-500">{CATEGORY_LABEL[service.category]}</p>
+                      <p className="text-xs text-gray-500">
+                        {CATEGORY_LABEL[service.category]}
+                        {service.subcategory ? ` · ${service.subcategory}` : ""}
+                      </p>
                       {dist !== undefined && (
                         <p className="text-xs text-teal">{dist.toFixed(1)} km de você</p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-teal">
-                        {service.base_price ? `R$ ${service.base_price}` : "Sob consulta"}
-                      </p>
-                      <div className="flex items-center gap-1 justify-end text-xs text-gray-400">
-                        <Star size={12} /> novo
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-teal">
+                          {service.base_price ? `R$ ${service.base_price}` : "Sob consulta"}
+                        </p>
+                        <div className="flex items-center gap-1 justify-end text-xs text-gray-400">
+                          <Star size={12} /> novo
+                        </div>
                       </div>
+                      {user && (
+                        <FavoriteButton
+                          professionalId={service.professional_id}
+                          initialFavorited={favoriteProfessionalIds.has(service.professional_id)}
+                        />
+                      )}
                     </div>
                   </Link>
                 </li>

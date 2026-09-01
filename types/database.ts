@@ -1552,6 +1552,39 @@ export type Database = {
           },
         ]
       }
+      tutor_favorites: {
+        Row: {
+          created_at: string
+          professional_id: string
+          tutor_profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          professional_id: string
+          tutor_profile_id: string
+        }
+        Update: {
+          created_at?: string
+          professional_id?: string
+          tutor_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutor_favorites_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutor_favorites_tutor_profile_id_fkey"
+            columns: ["tutor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

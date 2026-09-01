@@ -7,6 +7,7 @@ import {
   averageRating,
   PROFESSIONAL_LEVEL_LABEL,
 } from "@/lib/domain/professional-reputation";
+import { FavoriteButton } from "@/components/search/favorite-button";
 
 const CATEGORY_LABEL: Record<string, string> = {
   pet_sitter: "Pet sitter / cuidador",
@@ -24,6 +25,10 @@ export default async function ProfissionalPage({
 }) {
   const { profissionalId } = await params;
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -55,7 +60,7 @@ export default async function ProfissionalPage({
     .eq("profile_id", profissionalId)
     .maybeSingle();
 
-  const [{ count: completedCount }, { count: approvedCertCount }] = await Promise.all([
+  const [{ count: completedCount }, { count: approvedCertCount }, { data: favoriteRow }] = await Promise.all([
     supabase
       .from("requests")
       .select("id", { count: "exact", head: true })
@@ -66,6 +71,14 @@ export default async function ProfissionalPage({
       .select("id", { count: "exact", head: true })
       .eq("professional_id", profissionalId)
       .eq("status", "aprovado"),
+    user
+      ? supabase
+          .from("tutor_favorites")
+          .select("professional_id")
+          .eq("tutor_profile_id", user.id)
+          .eq("professional_id", profissionalId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const level = computeProfessionalLevel(completedCount ?? 0, averageRating(reviews ?? []));
@@ -89,7 +102,7 @@ export default async function ProfissionalPage({
               <UserRound size={28} className="text-gray-400" />
             )}
           </div>
-          <div>
+          <div className="flex-1">
             <div className="flex flex-wrap items-center gap-2 text-xs text-teal font-semibold mb-1">
               <span className="flex items-center gap-1">
                 <ShieldCheck size={14} /> Conta verificada
@@ -105,6 +118,13 @@ export default async function ProfissionalPage({
             </div>
             <h1 className="text-xl font-bold text-black">{profile.full_name}</h1>
           </div>
+          {user && (
+            <FavoriteButton
+              professionalId={profissionalId}
+              initialFavorited={!!favoriteRow}
+              size={22}
+            />
+          )}
         </div>
 
         {professionalProfile?.bio && (
