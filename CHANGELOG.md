@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Especificação Funcional v2.0 (substitui a v1.2)
+
+**Contexto:** perguntado se existia uma especificação com escopo fechado e atualizada do Pilar 1. Resposta honesta: não — a v1.2 (`.docx`) estava desatualizada (não refletia a decisão de adotar o plano 100% nem nada entregue na Onda 1), e o `PETLYS_PILAR1_PLANO_100_PERCENT.md` não é um documento fechado (tem ~16 decisões de produto/negócio ainda em aberto na própria seção 7 dele, e é estruturado como plano evolutivo, não especificação congelada). Pedido do usuário: consolidar tudo em um único documento — a v2.0 — como fonte de verdade única a partir de agora.
+
+**Entrega:** `Especificacao_Pilar_1_Jornadas_v2.docx`, salvo em `PetApp/Novo/` ao lado da v1.1 e da v1.2 (mantidas intactas, regra de versionamento do projeto). 29 páginas.
+
+- Seções 1–10 (núcleo de marketplace) preservadas com a **mesma numeração da v1.2** — dezenas de comentários no código (migrations, actions) referenciam "seção X.Y" diretamente; renumerar quebraria essa rastreabilidade. Conteúdo atualizado só onde a implementação real trouxe uma decisão mais específica (termos versionados, requisitos dinâmicos do prontuário, consentimento por solicitação, habilitação por categoria regulamentada, selos/nível de carreira).
+- **Seção 11 (nova):** ledger de implementação — cada tópico das seções 1–10 marcado como Implementado / Especificado-não implementado / Não implementado, sem eufemismo.
+- **Seção 12 (nova):** absorve o escopo do plano 100% (Espaços, seguro, backup, retenção do profissional, operação regional, qualidade/segurança) organizado pelas mesmas Ondas 2–7 já em uso neste changelog.
+- **Seção 14:** consolida as decisões pendentes da v1.2 (§13.3) com as da seção 7 do plano 100% — uma lista única, todas explicitamente marcadas como não resolvidas.
+- **Seção 16 (nova):** histórico executivo de como o escopo evoluiu (v1 → v1.1 → v1.2 → reconciliação → decisão de escopo integral → Onda 1), resumindo este `CHANGELOG.md` em nível de produto, não o substituindo.
+
+**Processo:** conteúdo redigido em Markdown, convertido para `.docx` via `pandoc` (skill `docx`), renderizado para PDF via LibreOffice e conferido visualmente página por página antes da entrega — não só gerado e assumido correto.
+
+**Não incluído:** revisão jurídica do texto de Termos/Privacidade (placeholder, já sinalizado dentro do próprio documento); as ~16 decisões da seção 14 continuam sem dono nem prazo — a v2.0 as lista, não as resolve.
+
+---
+
 ## 2026-09-02 — Onda 1: fechamento (termos, requisitos por categoria, upload real, habilitações e selos)
 
 **Entrega:** últimas quatro histórias da Onda 1, encerrando a onda — termos versionados (6.1), requisitos dinâmicos do prontuário + consentimento de compartilhamento (6.2/6.4), upload real de arquivo (6.1/6.2/6.3) e habilitações/selos do profissional (6.3). Migration única `0018_terms_consent_documents_certifications.sql`.
