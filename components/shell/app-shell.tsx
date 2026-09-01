@@ -43,7 +43,11 @@ export function AppShell({
       {/* Sidebar — computador (Matriz_Responsiva: "barra lateral ou superior") */}
       <aside className="hidden md:flex md:w-60 md:shrink-0 md:flex-col bg-teal text-white">
         <Link href={items[0]?.href ?? "/"} className="flex items-center gap-2 px-5 py-6">
-          <Image src="/logo-petlys.png" alt="Petlys" width={34} height={40} />
+          {/* O logo é escuro (paw quase na mesma cor do fundo da sidebar) —
+              precisa de um fundo claro por trás pra não "sumir". */}
+          <span className="flex items-center justify-center rounded-lg bg-white p-1 shrink-0">
+            <Image src="/logo-petlys.png" alt="Petlys" width={28} height={33} />
+          </span>
           <span>
             <span className="block font-bold tracking-widest text-sm">PETLYS</span>
             <span className="block text-xs text-white/70">{ROLE_LABEL[role]}</span>

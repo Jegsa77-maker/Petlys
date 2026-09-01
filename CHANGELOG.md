@@ -4,6 +4,16 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Correção: logo sumindo na sidebar (contraste)
+
+**Achado do usuário:** o logo ficava "esquisito" na sidebar do shell (M-002). Confirmado com dados: decodifiquei o PNG pixel a pixel e a pata do logo é `rgb(~0-6, 45-102, 61-117)` — quase idêntica ao teal da sidebar (`#0b4d52` = `rgb(11,77,82)`). A pata ficava praticamente invisível contra o próprio fundo, sobrando só o contorno verde com o coração branco recortado flutuando. O cabeçalho mobile não tinha esse problema (fundo branco, contraste já bom).
+
+- `components/shell/app-shell.tsx`: logo da sidebar ganhou um chip branco arredondado por trás (`bg-white rounded-lg p-1`) — só ali, o cabeçalho mobile continua sem chip por já ter contraste correto.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos. Confirmado visualmente ao vivo no Profissional (desktop, 1280px).
+
+---
+
 ## 2026-09-01 — Iniciativa de CX: M-001 (sistema responsivo) + M-002 (logo) — shell compartilhado nas 4 visões
 
 **Contexto:** usuário trouxe um protótipo de CX-alvo (`.html`) e uma paleta de cores, pedindo pra evoluir a experiência de Tutor e principalmente Profissional sem reconstruir a plataforma. Antes de mexer em qualquer coisa, foi feita uma auditoria comparando o protótipo com o código real, e depois com a planilha de inventário (`Inventario_Pilar_1_CHANGELOG5.xlsx`, atualizada a partir deste próprio CHANGELOG) — que já vem com uma aba `Mapa_Melhorias` classificando cada área como Manter/Ajustar/Adicionar. Conclusão: só 4 itens de CX estavam pendentes, todos P0, todos "Ajustar" (sem construção nova) — **M-001, M-002, M-013 (hierarquia da tela de detalhe da solicitação) e M-007 (hierarquia do perfil + preço "a partir de")**. Esta entrada fecha os dois primeiros.
