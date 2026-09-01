@@ -4,6 +4,22 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 4, item 6: "Contratar novamente" — Onda 4 completa
+
+**Entrega:** sexto e último item da Onda 4 (seção 12.3) — reaproveitar categoria, pets, endereço e respostas por categoria de um atendimento concluído anterior, sem precisar preencher tudo de novo.
+
+- `app/(tutor)/solicitacoes/[requestId]/page.tsx`: link "Contratar novamente" pro Tutor quando o status é `concluido` ou `avaliacao`, levando pra `/solicitacoes/nova?profissional=...&repetir=<requestId>`.
+- `app/(tutor)/solicitacoes/nova/page.tsx`: quando `repetir` vem preenchido, busca a solicitação original no servidor — só reaproveita se ela é mesmo do Tutor logado e desse mesmo profissional (nunca confia só no que vem pela URL) — e pré-preenche categoria, pets e endereço/respostas.
+- `components/requests/new-request-form.tsx`: novos props `initialCategory/initialPetIds/initialAddress/initialCategoryAnswers`. Data do atendimento e consentimento de compartilhar a ficha **nunca** vêm pré-preenchidos — são específicos de cada pedido novo.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos. Testado ao vivo: a partir de uma solicitação concluída, clicar em "Contratar novamente" abre o formulário com a mensagem "Trouxemos os dados do atendimento anterior", categoria e pet já marcados corretamente.
+
+**Achado à parte (infraestrutura, não é bug do app):** o dev server (Turbopack) travou com um erro de cache do Windows/OneDrive (`EBUSY`/arquivo `.sst` em uso) no meio da sessão — resolvido apagando `.next/` e reiniciando. Não tem relação com nenhuma mudança de código desta entrega.
+
+**Com este item, a Onda 4 (execução, segurança e reputação) está completa** — pipelines por categoria, botão "Preciso de ajuda", disputas e apelação, moderação, nota média agregada e "contratar novamente".
+
+---
+
 ## 2026-09-01 — Onda 4, item 5: nota média agregada no perfil e na busca
 
 **Entrega:** quinto item da Onda 4 (seção 12.3). `averageRating()` já existia (Onda 1) mas só alimentava o cálculo do **nível** (Novo/Experiente/Top) — o número de verdade nunca era mostrado em lugar nenhum. Achado mais grave: o card de cada profissional em `/buscar` mostrava **"★ novo" fixo pra todo mundo**, mesmo profissional com dezenas de avaliações 5 estrelas — não era só uma ausência, era uma informação errada na tela.

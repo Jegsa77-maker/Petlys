@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { ChatPanel } from "@/components/requests/chat-panel";
@@ -182,6 +183,14 @@ export default async function SolicitacaoDetailPage({
                 ) : null;
               })}
             </div>
+          )}
+          {viewerRole === "tutor" && (request.status === "concluido" || request.status === "avaliacao") && (
+            <Link
+              href={`/solicitacoes/nova?profissional=${request.professional_id}&repetir=${request.id}`}
+              className="inline-block mt-2 text-xs font-semibold text-teal hover:underline"
+            >
+              Contratar novamente
+            </Link>
           )}
         </div>
 

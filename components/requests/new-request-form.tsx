@@ -40,21 +40,30 @@ export function NewRequestForm({
   professionalId,
   pets,
   initialIsVisitaInicial = false,
+  initialCategory = "",
+  initialPetIds = [],
+  initialAddress = "",
+  initialCategoryAnswers = {},
 }: {
   professionalId: string;
   pets: PetOption[];
   initialIsVisitaInicial?: boolean;
+  /** "Contratar novamente" (seção 12.3, item 6 da Onda 4) — reaproveita categoria, pets, endereço e respostas de um atendimento anterior. Data e consentimento nunca vêm pré-preenchidos: são específicos de cada pedido. */
+  initialCategory?: string;
+  initialPetIds?: string[];
+  initialAddress?: string;
+  initialCategoryAnswers?: Record<string, string>;
 }) {
-  const [category, setCategory] = useState("");
-  const [petIds, setPetIds] = useState<string[]>([]);
+  const [category, setCategory] = useState(initialCategory);
+  const [petIds, setPetIds] = useState<string[]>(initialPetIds);
   const [isRecurring, setIsRecurring] = useState(false);
   const [isVisitaInicial, setIsVisitaInicial] = useState(initialIsVisitaInicial);
   const [occurrencesTotal, setOccurrencesTotal] = useState("1");
   const [recurrenceInterval, setRecurrenceInterval] = useState("semanal");
   const [firstOccurrenceAt, setFirstOccurrenceAt] = useState("");
   const [notes, setNotes] = useState("");
-  const [address, setAddress] = useState("");
-  const [categoryAnswers, setCategoryAnswers] = useState<Record<string, string>>({});
+  const [address, setAddress] = useState(initialAddress);
+  const [categoryAnswers, setCategoryAnswers] = useState<Record<string, string>>(initialCategoryAnswers);
   const [prontuarioConsent, setProntuarioConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
