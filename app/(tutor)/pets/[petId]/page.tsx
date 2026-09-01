@@ -2,6 +2,65 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { PawPrint } from "lucide-react";
 import { CoTutorsSection } from "@/components/pets/co-tutors-section";
+import { PetProfileSection, type FieldDef } from "@/components/pets/pet-profile-section";
+import {
+  updatePetHealth,
+  updatePetBehavior,
+  updatePetRoutine,
+  updatePetEmergency,
+} from "@/lib/actions/pets";
+
+const HEALTH_FIELDS: FieldDef[] = [
+  { key: "veterinario", label: "Veterinário de referência" },
+  { key: "clinica", label: "Clínica" },
+  { key: "vacinas", label: "Vacinas em dia (quais e quando)", type: "textarea" },
+  { key: "alergias", label: "Alergias", type: "textarea" },
+  { key: "restricoes", label: "Restrições alimentares ou físicas", type: "textarea" },
+  { key: "condicoes", label: "Condições de saúde conhecidas", type: "textarea" },
+  { key: "medicamentos", label: "Medicamentos em uso", type: "textarea" },
+  { key: "dosagemHorarios", label: "Dosagem e horários", type: "textarea" },
+];
+
+const BEHAVIOR_FIELDS: FieldDef[] = [
+  { key: "temperamento", label: "Temperamento", type: "textarea" },
+  { key: "interacaoPessoas", label: "Interação com pessoas", type: "textarea" },
+  { key: "interacaoAnimais", label: "Interação com outros animais", type: "textarea" },
+  { key: "medos", label: "Medos", type: "textarea" },
+  { key: "agressividade", label: "Agressividade (quando ocorre)", type: "textarea" },
+  { key: "fuga", label: "Tendência a fugir", type: "textarea" },
+  { key: "usaGuia", label: "Usa guia/coleira?" },
+  { key: "comportamentoNoCarro", label: "Comportamento no carro", type: "textarea" },
+  { key: "gatilhos", label: "Gatilhos a evitar", type: "textarea" },
+];
+
+const ROUTINE_FIELDS: FieldDef[] = [
+  { key: "alimentacao", label: "Alimentação", type: "textarea" },
+  { key: "agua", label: "Água" },
+  { key: "higiene", label: "Higiene", type: "textarea" },
+  { key: "passeios", label: "Passeios", type: "textarea" },
+  { key: "sono", label: "Sono", type: "textarea" },
+  { key: "comandos", label: "Comandos que conhece", type: "textarea" },
+  { key: "objetosPreferidos", label: "Objetos preferidos" },
+  { key: "outrasPreferencias", label: "Outras preferências", type: "textarea" },
+];
+
+const EMERGENCY_FIELDS: FieldDef[] = [
+  { key: "contatoEmergenciaNome", label: "Nome do contato de emergência" },
+  { key: "contatoEmergenciaTelefone", label: "Telefone do contato de emergência" },
+  {
+    key: "limitesDecisao",
+    label: "O que o profissional pode decidir sozinho numa emergência",
+    type: "textarea",
+  },
+  { key: "autorizaTransporte", label: "Autorizo transporte do pet em caso de emergência", type: "checkbox" },
+  {
+    key: "autorizaAcessoResidencia",
+    label: "Autorizo acesso à residência quando necessário",
+    type: "checkbox",
+  },
+  { key: "ondeFicamChaves", label: "Onde ficam as chaves (se aplicável)" },
+  { key: "outrosConsentimentos", label: "Outros consentimentos", type: "textarea" },
+];
 
 export default async function PetDetailPage({
   params,
@@ -25,9 +84,6 @@ export default async function PetDetailPage({
   const tutors = (tutorLinks ?? [])
     .filter((t) => t.profiles)
     .map((t) => ({ tutor_profile_id: t.tutor_profile_id, full_name: t.profiles!.full_name }));
-
-  const healthFilled = Object.keys(pet.health_info ?? {}).length > 0;
-  const behaviorFilled = Object.keys(pet.behavior_info ?? {}).length > 0;
 
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
@@ -55,8 +111,34 @@ export default async function PetDetailPage({
         </div>
 
         <div className="flex flex-col gap-3 mb-6">
-          <ProgressRow label="Saúde" done={healthFilled} />
-          <ProgressRow label="Comportamento" done={behaviorFilled} />
+          <PetProfileSection
+            petId={pet.id}
+            title="Saúde"
+            fields={HEALTH_FIELDS}
+            initialValues={(pet.health_info ?? {}) as Record<string, unknown>}
+            onSave={updatePetHealth}
+          />
+          <PetProfileSection
+            petId={pet.id}
+            title="Comportamento"
+            fields={BEHAVIOR_FIELDS}
+            initialValues={(pet.behavior_info ?? {}) as Record<string, unknown>}
+            onSave={updatePetBehavior}
+          />
+          <PetProfileSection
+            petId={pet.id}
+            title="Rotina e cuidados"
+            fields={ROUTINE_FIELDS}
+            initialValues={(pet.routine_info ?? {}) as Record<string, unknown>}
+            onSave={updatePetRoutine}
+          />
+          <PetProfileSection
+            petId={pet.id}
+            title="Emergência e autorizações"
+            fields={EMERGENCY_FIELDS}
+            initialValues={(pet.emergency_info ?? {}) as Record<string, unknown>}
+            onSave={updatePetEmergency}
+          />
         </div>
 
         <CoTutorsSection petId={pet.id} tutors={tutors} />
@@ -76,21 +158,6 @@ function InfoCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-gray-200 bg-white p-3">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="text-sm font-semibold text-black capitalize">{value}</p>
-    </div>
-  );
-}
-
-function ProgressRow({ label, done }: { label: string; done: boolean }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
-      <span className="text-sm text-black">{label}</span>
-      <span
-        className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-          done ? "text-black bg-green" : "text-gray-400 bg-gray"
-        }`}
-      >
-        {done ? "Preenchido" : "Pendente"}
-      </span>
     </div>
   );
 }

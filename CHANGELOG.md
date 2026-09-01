@@ -4,6 +4,23 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 1: prontuário completo do pet (etapas 2–5)
+
+**Contexto:** recebido `PETLYS_PILAR1_PLANO_100_PERCENT.md`, um plano bem mais amplo que a Especificação v1.2 original (incorpora Petlys Espaços, seguro, backup de emergência, operação regional, Academy — itens que a própria v1.2, seção 11, listava como fora do Pilar 1). Duas ressalvas registradas antes de executar: (1) a seção 5 desse plano ("pendências confirmadas") repete 8 itens que já tinham sido corrigidos na reconciliação de 2026-09-01 — a auditoria dele é anterior a esse merge; (2) seguir esse plano é uma mudança de escopo real (de "marketplace Tutor↔Profissional" pra "ecossistema Petlys inteiro"), confirmada explicitamente pelo usuário antes de começar a Onda 1.
+
+**Entrega:** primeira história da Onda 1 — "Cadastro e prontuário do pet" (seção 6.2 do plano). Antes, `updatePetHealth`/`updatePetBehavior` existiam como Server Actions mas **nenhuma tela as chamava** — `/pets/[petId]` só mostrava um selo estático "Pendente/Preenchido", sem jeito de preencher. Rotina e Emergência não tinham nem action.
+
+- `lib/validations/pets.ts`: adicionados `petRoutineSchema` e `petEmergencySchema` (etapas 4 e 5, campos da seção 4.1 da Especificação v1.2). Enriquecidos `petHealthSchema` (+ restrições, dosagem/horários) e `petBehaviorSchema` (+ agressividade, fuga, uso de guia, comportamento no carro) pra bater com o que a v1.2 já detalhava.
+- `lib/actions/pets.ts`: novas `updatePetRoutine` e `updatePetEmergency` (mesmo padrão de `updatePetHealth`). Nenhuma migration necessária — `routine_info` e `emergency_info` já existiam como colunas `jsonb` desde `0002_identity_and_pets.sql`, só não eram usadas.
+- `components/pets/pet-profile-section.tsx` (novo): bloco expansível genérico (título + campos + status Preenchido/Pendente) reaproveitado pelas 4 etapas — evita repetir o mesmo formulário 4 vezes.
+- `app/(tutor)/pets/[petId]/page.tsx`: as 4 etapas agora renderizam com `PetProfileSection` de verdade, cada uma com seus campos e a action correspondente. Emergência inclui os dois consentimentos explícitos (autorização de transporte e de acesso à residência) como checkbox, não texto livre — são consentimento, não informação.
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado com sessão real do Tutor (RLS, não bypass) — os 3 updates (`health_info`, `routine_info`, `emergency_info`) gravaram corretamente; `/pets/[petId]` renderizou os 4 selos com o status certo (3 "Preenchido", 1 "Pendente" — bate com os dados de teste).
+
+**Não incluído nesta história** (fica pra depois, dentro da mesma seção 6.2 do plano): foto/documentos/carteira de vacinação como upload real (hoje é só texto livre descrevendo vacinas), exigência dinâmica de campos por categoria de serviço, alerta de dado desatualizado, e o fluxo de convite formal de cotutor (hoje só vincula quem já tem conta, sem convite/aceite).
+
+---
+
 ## 2026-09-01 — Reconciliação com a sessão avulsa do Claude Code (equalização pet3108)
 
 **Contexto:** uma sessão separada do Claude Code (rodando em `Dev/plataforma-pet_2/plataforma-pet`, sem acesso à memória desta sessão) executou uma rodada extensa de testes manuais ponta a ponta em todas as visões (Tutor, Profissional, Admin, Supervisor), achou e corrigiu 6 bugs reais, e implementou 2 features inteiras que não existiam. Esse trabalho nunca chegou ao `pet3108` nem ao GitHub — só existia naquela outra sessão. O handoff (`PETLYS_HANDOFF_CLAUDE_CODE_PET3108.md`) recebido do Claude browse redescobriu exatamente os mesmos 6 bugs de forma independente (confirma que o diagnóstico estava certo), mas propunha reconstruir do zero algo que já existia pronto e testado. Em vez de reconstruir, foi feita a reconciliação direta: diff de arquivo por arquivo entre as duas bases, cópia das partes ausentes pro pet3108, preservando os ajustes que só existiam aqui.

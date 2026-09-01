@@ -28,8 +28,10 @@ export const petHealthSchema = z.object({
   clinica: z.string().trim().optional(),
   vacinas: z.string().trim().optional(),
   alergias: z.string().trim().optional(),
+  restricoes: z.string().trim().optional(),
   condicoes: z.string().trim().optional(),
   medicamentos: z.string().trim().optional(),
+  dosagemHorarios: z.string().trim().optional(),
 });
 export type PetHealthValues = z.infer<typeof petHealthSchema>;
 
@@ -38,6 +40,42 @@ export const petBehaviorSchema = z.object({
   interacaoPessoas: z.string().trim().optional(),
   interacaoAnimais: z.string().trim().optional(),
   medos: z.string().trim().optional(),
+  agressividade: z.string().trim().optional(),
+  fuga: z.string().trim().optional(),
+  usaGuia: z.string().trim().optional(),
+  comportamentoNoCarro: z.string().trim().optional(),
   gatilhos: z.string().trim().optional(),
 });
 export type PetBehaviorValues = z.infer<typeof petBehaviorSchema>;
+
+/**
+ * Etapa 4 — Rotina e cuidados (seção 4.1).
+ */
+export const petRoutineSchema = z.object({
+  alimentacao: z.string().trim().optional(),
+  agua: z.string().trim().optional(),
+  higiene: z.string().trim().optional(),
+  passeios: z.string().trim().optional(),
+  sono: z.string().trim().optional(),
+  comandos: z.string().trim().optional(),
+  objetosPreferidos: z.string().trim().optional(),
+  outrasPreferencias: z.string().trim().optional(),
+});
+export type PetRoutineValues = z.infer<typeof petRoutineSchema>;
+
+/**
+ * Etapa 5 — Emergência e autorizações (seção 4.1). `autorizaTransporte` e
+ * `autorizaAcessoResidencia` ficam registrados explicitamente porque são
+ * consentimentos, não só informação — usados antes de liberar quem pode
+ * decidir por conta própria numa emergência.
+ */
+export const petEmergencySchema = z.object({
+  contatoEmergenciaNome: z.string().trim().optional(),
+  contatoEmergenciaTelefone: z.string().trim().optional(),
+  limitesDecisao: z.string().trim().optional(),
+  autorizaTransporte: z.boolean().default(false),
+  autorizaAcessoResidencia: z.boolean().default(false),
+  ondeFicamChaves: z.string().trim().optional(),
+  outrosConsentimentos: z.string().trim().optional(),
+});
+export type PetEmergencyValues = z.infer<typeof petEmergencySchema>;
