@@ -40,7 +40,7 @@ export default async function PerfilProfissionalPage() {
       .select("id", { count: "exact", head: true })
       .eq("professional_id", user.id)
       .in("status", ["avaliacao", "concluido"]),
-    supabase.from("reviews").select("rating").eq("reviewee_id", user.id),
+    supabase.from("reviews").select("rating").eq("reviewee_id", user.id).is("hidden_at", null),
   ]);
 
   const level = computeProfessionalLevel(completedCount ?? 0, averageRating(reviews ?? []));

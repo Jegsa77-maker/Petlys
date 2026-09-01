@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitReview, respondToReview } from "@/lib/actions/reviews";
+import { flagReview } from "@/lib/actions/moderation";
 
 type Review = {
   id: string;
@@ -10,6 +11,8 @@ type Review = {
   rating: { qualidade: number; comunicacao: number; pontualidade: number; aderencia_combinado: number };
   comment: string | null;
   response: string | null;
+  flagged_reason?: string | null;
+  hidden_at?: string | null;
 };
 
 export function ReviewSection({
@@ -41,8 +44,10 @@ export function ReviewSection({
         <ReviewCard
           key={review.id}
           review={review}
+          requestId={requestId}
           isMine={review.reviewer_id === currentUserId}
           canRespond={review.reviewee_id === currentUserId && !review.response}
+          canFlag={review.reviewee_id === currentUserId}
         />
       ))}
     </div>
@@ -155,17 +160,37 @@ function StarRating({
 
 function ReviewCard({
   review,
+  requestId,
   isMine,
   canRespond,
+  canFlag,
 }: {
   review: Review;
+  requestId: string;
   isMine: boolean;
   canRespond: boolean;
+  canFlag: boolean;
 }) {
   const [showRespond, setShowRespond] = useState(false);
   const [response, setResponse] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [showFlagForm, setShowFlagForm] = useState(false);
+  const [flagReason, setFlagReason] = useState("");
+  const [flagged, setFlagged] = useState(!!review.flagged_reason);
+  const [isFlagSubmitting, setIsFlagSubmitting] = useState(false);
+
+  async function handleFlag(e: React.FormEvent) {
+    e.preventDefault();
+    if (!flagReason.trim()) return;
+    setIsFlagSubmitting(true);
+    const result = await flagReview(review.id, requestId, flagReason);
+    setIsFlagSubmitting(false);
+    if (!result?.error) {
+      setFlagged(true);
+      setShowFlagForm(false);
+    }
+  }
 
   const avg =
     (review.rating.qualidade +
@@ -181,6 +206,19 @@ function ReviewCard({
     const result = await respondToReview({ reviewId: review.id, response });
     setIsSubmitting(false);
     if (!result?.error) setSent(true);
+  }
+
+  if (review.hidden_at) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <p className="text-xs font-semibold text-gray-500 mb-1">
+          {isMine ? "Sua avaliação" : "Avaliação recebida"}
+        </p>
+        <p className="text-sm text-gray-400 italic">
+          Avaliação removida pela moderação — não conta na nota média.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -228,6 +266,43 @@ function ReviewCard({
             </form>
           )}
         </>
+      )}
+
+      {canFlag && !showFlagForm && (
+        <button
+          onClick={() => setShowFlagForm(true)}
+          disabled={flagged}
+          className="text-xs text-gray-400 hover:text-red-600 disabled:hover:text-gray-400 mt-2 block"
+        >
+          {flagged ? "Sinalizada pro suporte" : "Reportar avaliação"}
+        </button>
+      )}
+      {showFlagForm && (
+        <form onSubmit={handleFlag} className="flex flex-col gap-2 mt-2">
+          <textarea
+            value={flagReason}
+            onChange={(e) => setFlagReason(e.target.value)}
+            placeholder="Por que essa avaliação deveria ser revisada?"
+            rows={2}
+            className="input text-xs"
+          />
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={isFlagSubmitting}
+              className="text-xs font-semibold rounded-lg bg-red-700 text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
+            >
+              Enviar
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFlagForm(false)}
+              className="text-xs text-gray-500"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
       )}
       {sent && <p className="text-xs text-teal mt-2">Resposta enviada.</p>}
     </div>

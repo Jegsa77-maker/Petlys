@@ -52,6 +52,7 @@ export default async function ProfissionalPage({
     .from("reviews")
     .select("rating, comment")
     .eq("reviewee_id", profissionalId)
+    .is("hidden_at", null)
     .limit(10);
 
   const { data: professionalProfile } = await supabase

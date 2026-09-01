@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { IncidentQueue } from "@/components/admin/incident-queue";
 import { NotificationsBadgeLink } from "@/components/shared/notifications-badge-link";
@@ -17,9 +18,12 @@ export default async function SupervisorIncidentesPage() {
           <h1 className="text-2xl font-bold text-teal">Fila de incidentes</h1>
           <NotificationsBadgeLink />
         </div>
-        <p className="text-sm text-gray-600 mb-6">
+        <p className="text-sm text-gray-600 mb-2">
           Assuma um caso pra tratar. Casos complexos podem ser escalados para o Administrador.
         </p>
+        <Link href="/supervisor/moderacao" className="text-xs font-semibold text-teal hover:underline mb-4 inline-block">
+          Ver mensagens e avaliações sinalizadas →
+        </Link>
         <IncidentQueue incidents={incidents ?? []} viewerIsAdmin={false} />
       </div>
     </main>

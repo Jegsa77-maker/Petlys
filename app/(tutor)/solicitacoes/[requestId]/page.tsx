@@ -81,7 +81,7 @@ export default async function SolicitacaoDetailPage({
   ] = await Promise.all([
     supabase
       .from("messages")
-      .select("id, sender_id, content, created_at")
+      .select("id, sender_id, content, created_at, flagged_reason, hidden_at")
       .eq("request_id", requestId)
       .order("created_at", { ascending: true }),
     supabase
@@ -109,7 +109,7 @@ export default async function SolicitacaoDetailPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("reviews")
-      .select("id, reviewer_id, reviewee_id, rating, comment, response")
+      .select("id, reviewer_id, reviewee_id, rating, comment, response, flagged_reason, hidden_at")
       .eq("request_id", requestId),
     supabase
       .from("request_attachments")
@@ -274,6 +274,8 @@ export default async function SolicitacaoDetailPage({
                 },
                 comment: r.comment,
                 response: r.response,
+                flagged_reason: r.flagged_reason,
+                hidden_at: r.hidden_at,
               }))}
             />
           </section>

@@ -4,6 +4,23 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 4, item 4: moderação de avaliações e mensagens
+
+**Entrega:** quarto item da Onda 4 (seção 12.3). `messages.flagged_reason` já existia desde `0004_requests_and_proposals.sql`, mas nenhum código nunca escreveu nela — coluna existia, funcionalidade não.
+
+- `supabase/migrations/0031_moderacao.sql`: `messages` ganha `flagged_by/flagged_at/hidden_at/hidden_by`; `reviews` ganha os mesmos cinco campos (incluindo `flagged_reason`, que não existia). Funções `flag_message`/`flag_review` (SECURITY DEFINER — quem sinaliza só pode mexer nessas colunas, não no conteúdo) e `set_message_hidden`/`set_review_hidden` (Admin/Supervisor).
+- `supabase/migrations/0033_dismiss_flag.sql`: "Manter" na fila de moderação precisa limpar a sinalização de verdade (`dismiss_message_flag`/`dismiss_review_flag`), senão o item reaparece pra sempre a cada carregamento.
+- `components/requests/chat-panel.tsx`: quem não mandou a mensagem pode sinalizar; mensagem oculta vira um aviso genérico pras duas partes.
+- `components/requests/review-section.tsx`: só quem foi avaliado pode reportar a própria avaliação recebida; avaliação oculta mostra aviso no lugar do conteúdo.
+- `components/admin/moderation-queue.tsx` + `/admin/moderacao` + `/supervisor/moderacao` (novas rotas): fila de conteúdo sinalizado, com "Ocultar" ou "Manter".
+- Avaliação oculta passa a ser excluída do cálculo de nota média e da listagem pública em todos os 3 lugares que agregam `reviews` (perfil público do profissional, perfil próprio, busca com filtro de nota mínima).
+
+**Gap de RLS encontrado e corrigido no processo:** `messages_select` só liberava Admin/Supervisor lerem mensagens de uma solicitação que já tivesse **incidente** — uma mensagem sinalizada numa solicitação sem incidente ficaria invisível pra quem precisa moderar. Corrigido em `supabase/migrations/0032_moderacao_visibilidade_admin.sql`, liberando leitura também quando `flagged_reason is not null`.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos, types regenerados. Testado com sessões RLS reais: Tutor sinaliza mensagem do Admin → Admin consegue ver (fix de RLS confirmado) → Admin oculta → mensagem reverte pra estado limpo. Auto-sinalização de mensagem própria bloqueada. Avaliação: Tutor avalia Profissional com nota baixa → Profissional (reviewee) sinaliza → Admin oculta → query de agregação de nota média confirmadamente exclui a avaliação oculta (1 avaliação total, 0 na agregação). Reviewer tentando sinalizar a própria avaliação enviada, e Tutor tentando ocultar uma mensagem, ambos bloqueados com erro claro.
+
+---
+
 ## 2026-09-01 — Onda 4, item 3: disputas e apelação + bug de RLS corrigido
 
 **Entrega:** terceiro item da Onda 4 (seção 3 — "Em disputa: pagamento, qualidade ou responsabilidade sob análise administrativa"). `em_disputa`/`incidente` já existiam como `request_status`, e as transições confirmado/checkin/em_andamento/finalizacao → incidente → em_disputa já estavam na tabela de transições — só nunca eram usadas de verdade, e faltava a própria parte poder apelar de uma resolução.

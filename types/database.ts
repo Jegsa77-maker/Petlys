@@ -335,7 +335,11 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          flagged_at: string | null
+          flagged_by: string | null
           flagged_reason: string | null
+          hidden_at: string | null
+          hidden_by: string | null
           id: string
           request_id: string
           sender_id: string
@@ -343,7 +347,11 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          flagged_at?: string | null
+          flagged_by?: string | null
           flagged_reason?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           request_id: string
           sender_id: string
@@ -351,12 +359,30 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          flagged_at?: string | null
+          flagged_by?: string | null
           flagged_reason?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           request_id?: string
           sender_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_flagged_by_fkey"
+            columns: ["flagged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_request_id_fkey"
             columns: ["request_id"]
@@ -1504,6 +1530,11 @@ export type Database = {
         Row: {
           comment: string | null
           created_at: string
+          flagged_at: string | null
+          flagged_by: string | null
+          flagged_reason: string | null
+          hidden_at: string | null
+          hidden_by: string | null
           id: string
           rating: Json
           request_id: string
@@ -1514,6 +1545,11 @@ export type Database = {
         Insert: {
           comment?: string | null
           created_at?: string
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           rating: Json
           request_id: string
@@ -1524,6 +1560,11 @@ export type Database = {
         Update: {
           comment?: string | null
           created_at?: string
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           rating?: Json
           request_id?: string
@@ -1532,6 +1573,20 @@ export type Database = {
           reviewer_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "reviews_flagged_by_fkey"
+            columns: ["flagged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reviews_request_id_fkey"
             columns: ["request_id"]
@@ -1676,9 +1731,22 @@ export type Database = {
         Args: { other_profile_id: string }
         Returns: boolean
       }
+      dismiss_message_flag: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
+      dismiss_review_flag: { Args: { p_review_id: string }; Returns: undefined }
       distance_km: {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
+      }
+      flag_message: {
+        Args: { p_message_id: string; p_reason: string }
+        Returns: undefined
+      }
+      flag_review: {
+        Args: { p_reason: string; p_review_id: string }
+        Returns: undefined
       }
       has_role: {
         Args: { target_role: Database["public"]["Enums"]["app_role"] }
@@ -1689,6 +1757,14 @@ export type Database = {
       is_tutor_of_pet: { Args: { pet_id_arg: string }; Returns: boolean }
       notify: {
         Args: { p_payload: Json; p_profile_id: string; p_type: string }
+        Returns: undefined
+      }
+      set_message_hidden: {
+        Args: { p_hidden: boolean; p_message_id: string }
+        Returns: undefined
+      }
+      set_review_hidden: {
+        Args: { p_hidden: boolean; p_review_id: string }
         Returns: undefined
       }
     }

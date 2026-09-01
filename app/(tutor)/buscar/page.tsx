@@ -105,7 +105,8 @@ export default async function BuscarPage({
     const { data: reviews } = await supabase
       .from("reviews")
       .select("reviewee_id, rating")
-      .in("reviewee_id", professionalIds);
+      .in("reviewee_id", professionalIds)
+      .is("hidden_at", null);
 
     const reviewsByProfessional = new Map<string, { rating: unknown }[]>();
     (reviews ?? []).forEach((r) => {
