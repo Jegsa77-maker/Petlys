@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Auditoria de pendências antigas + bug de RLS corrigido (Supervisor resolvendo incidente sozinho)
+
+**Contexto:** a pedido do usuário, cruzei o `BACKLOG.md` com a lista de pendências mais antiga do projeto (fim desta entrada, 2026-08-31) pra achar divergências antes de seguir pra Onda 5.
+
+**Achados:**
+- Branch `sync-pilar1-fixes` já estava 100% mergeada em `main` — pendência obsoleta.
+- "Módulo financeiro" virou a decisão de roadmap já registrada (Onda 3, fica por último).
+- "Reagendamento escolhendo horário livre do Profissional" foi resolvido de um jeito **diferente** do texto original: qualquer parte reagenda pra qualquer horário, sem checar a agenda do profissional (decisão deliberada de "nunca bloquear a agenda", já documentada nas entradas de agenda flexível). Confirmado com o usuário que esse desenho é o que vale, não o texto antigo.
+- `/dev-login` e Redirect URLs de produção seguem como pendências de pré-lançamento, sem tratamento ainda (dormem até existir domínio de produção).
+
+**Bug de RLS real encontrado (já estava anotado desde 2026-08-31, nunca corrigido):** a policy `incidents_update` (`0009_rls_policies.sql`) liberava Admin **e** Supervisor pra qualquer mudança em qualquer incidente — a regra "só o Admin decide o encerramento final" (seção 10.2) só existia na Server Action (`resolveIncident`, `requireAdmin`), não no banco. Um Supervisor com acesso direto à API conseguiria chamar `update({status:'resolvido'})` sozinho, inclusive liberando o bloqueio de saque (o trigger de `0007_safety_and_reputation.sql` reage a qualquer update pra `resolvido`, não só ao vindo da Server Action) — mesma categoria dos outros dois bugs de RLS corrigidos na Onda 4 (proposals accept, apelação de incidente).
+
+- `supabase/migrations/0034_fix_supervisor_resolve_incident_rls.sql`: policy dividida em duas — Admin sem restrição; Supervisor só pode levar o incidente pra `em_analise` ou `escalado`, nunca `resolvido`.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos (só migration, sem mudança de código TS). Testado com sessões RLS reais: Supervisor assume (`em_analise`) e escala (`escalado`) normalmente; tentativa de Supervisor resolver diretamente é bloqueada pela RLS com erro claro, status permanece `escalado`; Admin resolve normalmente.
+
+---
+
 ## 2026-09-01 — Onda 4, item 6: "Contratar novamente" — Onda 4 completa
 
 **Entrega:** sexto e último item da Onda 4 (seção 12.3) — reaproveitar categoria, pets, endereço e respostas por categoria de um atendimento concluído anterior, sem precisar preencher tudo de novo.
