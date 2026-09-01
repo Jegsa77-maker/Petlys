@@ -4,6 +4,22 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 2, item 2: busca avançada — filtros e favoritos (Especificação v2.0, seção 12.1)
+
+**Entrega:** segunda história da Onda 2 — filtros de preço, nota mínima, subcategoria e espécie em `/buscar`, mais favoritos do Tutor. Mapa visual (a outra parte do item do plano) fica pra um sub-item à parte — traz uma biblioteca nova (Leaflet) e é tecnicamente independente do resto.
+
+- `supabase/migrations/0020_favoritos.sql`: nova tabela `tutor_favorites` (par tutor+profissional, RLS restrita ao próprio Tutor).
+- `lib/actions/favorites.ts`: `toggleFavorite` — favorita/desfavorita, sem tabela de estado prévio no cliente (o próprio banco decide se é insert ou delete).
+- `components/search/favorite-button.tsx`: coração reutilizável (usado dentro de `<Link>` na lista de busca — por isso `preventDefault`/`stopPropagation`, senão o clique também navegaria pro perfil — e sozinho no cabeçalho do perfil público).
+- `components/search/search-filters-form.tsx`: painel de filtros que mescla parâmetros na URL (`useSearchParams` + `router.push`, mesmo padrão de `UseMyLocationButton`) — preço min/max, nota mínima, subcategoria (dependente da categoria escolhida, reaproveitando `lib/domain/service-catalog.ts` da Onda 2 item 1), espécie e "somente favoritos".
+- `app/(tutor)/buscar/page.tsx`: aplica os filtros na query (`gte`/`lte` de preço, `eq` de subcategoria, `.or()` de espécie aceitando também serviços sem restrição declarada) e, pra nota mínima, agrega `reviews` por profissional em memória (reaproveitando `averageRating` da Onda 1) — profissional sem nenhuma avaliação não atende um filtro de nota mínima explícito.
+
+**Verificação:** `tsc --noEmit`, `eslint .` limpos. Testado com sessões reais (RLS): Tutor favorita o próprio, tentativa de favoritar em nome de outro Tutor bloqueada, outro Tutor não enxerga favorito alheio; filtros de preço/subcategoria/espécie testados via query direta (incluindo o caso "espécie X não deve aparecer pra serviço que só aceita espécie Y"). Fluxo completo testado na UI real: abrir painel de filtros, aplicar preço mínimo (resultado mudou corretamente), favoritar um card sem sair da página, marcar "somente favoritos" e ver a lista reduzir ao esperado.
+
+**Não incluído nesta história:** mapa visual (Leaflet + OpenStreetMap, sem custo de API key — fica pra um próximo sub-item), tela dedicada `/favoritos` (hoje só dá pra filtrar por favoritos dentro de `/buscar`, não existe uma lista separada).
+
+---
+
 ## 2026-09-01 — Onda 2, item 1: catálogo de serviços flexível (Especificação v2.0, seção 12.1)
 
 **Entrega:** primeira história da Onda 2 — subcategoria, duração, espécies/porte atendidos, restrições e adicionais com preço próprio para cada serviço publicado. "Perguntas por categoria" (a outra metade do item do plano) fica pra história de solicitação contextual (item 4 da Onda 2) — é sobre o que se pergunta ao Tutor, não sobre o que o Profissional cadastra.
