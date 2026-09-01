@@ -49,7 +49,17 @@ export default async function SolicitacaoDetailPage({
     notFound();
   }
 
-  const viewerRole = request.tutor_id === user.id ? "tutor" : "profissional";
+  // Quem não é nem tutor nem profissional só chega aqui como staff — a RLS
+  // de requests já libera leitura pra admin/supervisor (0009_rls_policies),
+  // e eles só têm um motivo legítimo de estar aqui: intervir num incidente
+  // aberto vinculado a essa solicitação (ver messages_insert em
+  // 0015_staff_chat_intervention.sql).
+  const viewerRole: "tutor" | "profissional" | "staff" =
+    request.tutor_id === user.id
+      ? "tutor"
+      : request.professional_id === user.id
+        ? "profissional"
+        : "staff";
   const otherPartyId = viewerRole === "tutor" ? request.professional_id : request.tutor_id;
 
   const [
@@ -103,6 +113,16 @@ export default async function SolicitacaoDetailPage({
 
   const openIncident = (incidents ?? []).find((i) => i.status !== "resolvido");
 
+  // Mensagens de quem não é tutor nem profissional só podem ser de
+  // suporte/admin (única forma que a RLS permite, ver
+  // 0015_staff_chat_intervention.sql) — sinalizamos pra bolha do chat
+  // mostrar "Suporte" em vez de deixar as duas partes sem saber quem é
+  // essa 3ª pessoa. Não expomos o nome real do admin (RLS de profiles
+  // também não deixaria tutor/profissional lerem esse perfil).
+  const staffSenderIds = [...new Set((messages ?? []).map((m) => m.sender_id))].filter(
+    (id) => id !== request.tutor_id && id !== request.professional_id
+  );
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto flex flex-col gap-6">
@@ -125,14 +145,23 @@ export default async function SolicitacaoDetailPage({
           )}
         </div>
 
-        <section>
-          <h2 className="text-sm font-semibold text-black mb-2">Proposta</h2>
-          <ProposalPanel
-            requestId={request.id}
-            proposals={proposals ?? []}
-            viewerRole={viewerRole}
-          />
-        </section>
+        {viewerRole === "staff" && (
+          <p className="text-xs text-gray-500 bg-gray/50 rounded-lg px-3 py-2">
+            Você está vendo essa solicitação como suporte — visível só por
+            haver um incidente vinculado.
+          </p>
+        )}
+
+        {viewerRole !== "staff" && (
+          <section>
+            <h2 className="text-sm font-semibold text-black mb-2">Proposta</h2>
+            <ProposalPanel
+              requestId={request.id}
+              proposals={proposals ?? []}
+              viewerRole={viewerRole}
+            />
+          </section>
+        )}
 
         {viewerRole === "profissional" &&
           ["solicitacao_enviada", "em_conversa", "proposta_enviada"].includes(request.status) && (
@@ -152,7 +181,7 @@ export default async function SolicitacaoDetailPage({
                 {currentOccurrence.status.replace(/_/g, " ")}
               </span>
             </div>
-            {currentOccurrence.status === "agendado" && (
+            {currentOccurrence.status === "agendado" && viewerRole !== "staff" && (
               <div className="mt-3">
                 <NoShowButton
                   requestId={request.id}
@@ -173,7 +202,7 @@ export default async function SolicitacaoDetailPage({
           </section>
         )}
 
-        {(request.status === "avaliacao" || request.status === "concluido") && (
+        {viewerRole !== "staff" && (request.status === "avaliacao" || request.status === "concluido") && (
           <section>
             <h2 className="text-sm font-semibold text-black mb-2">Avaliação</h2>
             <ReviewSection
@@ -200,7 +229,12 @@ export default async function SolicitacaoDetailPage({
 
         <section>
           <h2 className="text-sm font-semibold text-black mb-2">Conversa</h2>
-          <ChatPanel requestId={request.id} messages={messages ?? []} currentUserId={user.id} />
+          <ChatPanel
+            requestId={request.id}
+            messages={messages ?? []}
+            currentUserId={user.id}
+            staffSenderIds={staffSenderIds}
+          />
         </section>
 
         <section>

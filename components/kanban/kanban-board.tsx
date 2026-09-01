@@ -11,6 +11,7 @@ type OccurrenceCard = {
   scheduled_at: string;
   status: string;
   requests: {
+    status: string;
     category: string;
     request_pets: { pets: { name: string } | null }[];
   } | null;
@@ -135,7 +136,7 @@ function OccurrenceCardView({
         })}
       </p>
 
-      {occurrence.status === "agendado" && (
+      {occurrence.status === "agendado" && occurrence.requests?.status === "confirmado" && (
         <button
           onClick={handleCheckin}
           disabled={isSubmitting}
@@ -143,6 +144,12 @@ function OccurrenceCardView({
         >
           Fazer check-in
         </button>
+      )}
+
+      {occurrence.status === "agendado" && occurrence.requests?.status !== "confirmado" && (
+        <p className="text-xs text-gray-400 text-center">
+          Aguardando confirmação da solicitação
+        </p>
       )}
 
       {occurrence.status === "checkin" && (

@@ -31,6 +31,35 @@ export const cpfCnpjSchema = z
   .transform((v) => v.replace(/\D/g, ""))
   .refine((v) => v.length === 11 || v.length === 14, "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)");
 
+/**
+ * Login por e-mail/senha — alternativa ao OAuth, opcional pro Tutor e
+ * Profissional, único caminho pra Admin/Supervisor (contas internas
+ * usam "usuário" em vez de e-mail real, resolvido pra
+ * usuario@internal.plataformapet no server action).
+ */
+export const signUpSchema = z.object({
+  fullName: z.string().trim().min(2, "Informe seu nome completo"),
+  email: z.string().trim().toLowerCase().email("E-mail inválido"),
+  password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres"),
+});
+export type SignUpValues = z.infer<typeof signUpSchema>;
+
+export const signInSchema = z.object({
+  identifier: z.string().trim().min(1, "Informe seu e-mail ou usuário"),
+  password: z.string().min(1, "Informe sua senha"),
+});
+export type SignInValues = z.infer<typeof signInSchema>;
+
+export const requestPasswordResetSchema = z.object({
+  email: z.string().trim().toLowerCase().email("E-mail inválido"),
+});
+export type RequestPasswordResetValues = z.infer<typeof requestPasswordResetSchema>;
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres"),
+});
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+
 export const chooseProfileSchema = z.object({
   roles: z
     .array(z.enum(["tutor", "profissional"]))

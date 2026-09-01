@@ -13,6 +13,40 @@ const checkinSchema = z.object({
 });
 
 /**
+ * A ocorrência (request_occurrences) e a solicitação (requests) têm
+ * máquinas de estado separadas. O Kanban só mexia na ocorrência — sem
+ * isto, o status que o tutor vê em /solicitacoes/[id] nunca avançava
+ * junto, e a solicitação nunca chegava a 'avaliacao' (avaliação exige
+ * esse status exato, ver policy reviews_insert em 0009_rls_policies.sql).
+ */
+async function syncRequestStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  occurrenceId: string,
+  status: "checkin" | "em_andamento" | "finalizacao" | "concluido" | "avaliacao"
+): Promise<{ error: string | null; requestId: string | null }> {
+  const { data: occurrence } = await supabase
+    .from("request_occurrences")
+    .select("request_id")
+    .eq("id", occurrenceId)
+    .single();
+
+  if (!occurrence) {
+    return { error: null, requestId: null };
+  }
+
+  const { error } = await supabase
+    .from("requests")
+    .update({ status })
+    .eq("id", occurrence.request_id);
+
+  revalidatePath(`/solicitacoes/${occurrence.request_id}`);
+  return {
+    error: error ? "Ocorrência atualizada, mas houve um erro ao sincronizar o status da solicitação." : null,
+    requestId: occurrence.request_id,
+  };
+}
+
+/**
  * Registra o check-in do profissional (seção 5, estado 11 "Execução").
  * Geolocalização é opcional — usada depois como parte da comprovação de
  * não comparecimento quando aplicável (seção 6.4).
@@ -38,8 +72,10 @@ export async function registerCheckin(input: unknown): Promise<ActionResult> {
     return { error: "Não foi possível registrar o check-in." };
   }
 
+  const sync = await syncRequestStatus(supabase, parsed.data.occurrenceId, "checkin");
+
   revalidatePath("/kanban");
-  return { error: null };
+  return { error: sync.error };
 }
 
 export async function advanceOccurrence(
@@ -59,6 +95,30 @@ export async function advanceOccurrence(
 
   if (error) {
     return { error: "Não foi possível atualizar o status do atendimento." };
+  }
+
+  const sync = await syncRequestStatus(supabase, occurrenceId, nextStatus);
+  if (sync.error) {
+    revalidatePath("/kanban");
+    return { error: sync.error };
+  }
+
+  // Em contratos recorrentes ainda há ocorrências futuras a atender — a
+  // solicitação volta pra 'confirmado' pra liberar o check-in da próxima
+  // (0014_recurring_occurrence_cycle.sql). Só vai pra 'avaliacao' quando
+  // essa era a última ocorrência pendente do contrato.
+  if (nextStatus === "concluido" && sync.requestId) {
+    const { count: pending } = await supabase
+      .from("request_occurrences")
+      .select("id", { count: "exact", head: true })
+      .eq("request_id", sync.requestId)
+      .not("status", "in", "(concluido,cancelado,nao_compareceu)");
+
+    await supabase
+      .from("requests")
+      .update({ status: pending && pending > 0 ? "confirmado" : "avaliacao" })
+      .eq("id", sync.requestId);
+    revalidatePath(`/solicitacoes/${sync.requestId}`);
   }
 
   revalidatePath("/kanban");
@@ -99,6 +159,8 @@ export async function submitOccurrenceReport(input: unknown): Promise<ActionResu
     return { error: "Não foi possível salvar o relatório." };
   }
 
+  const sync = await syncRequestStatus(supabase, parsed.data.occurrenceId, "finalizacao");
+
   revalidatePath("/kanban");
-  return { error: null };
+  return { error: sync.error };
 }

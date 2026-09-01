@@ -4,6 +4,40 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Reconciliação com a sessão avulsa do Claude Code (equalização pet3108)
+
+**Contexto:** uma sessão separada do Claude Code (rodando em `Dev/plataforma-pet_2/plataforma-pet`, sem acesso à memória desta sessão) executou uma rodada extensa de testes manuais ponta a ponta em todas as visões (Tutor, Profissional, Admin, Supervisor), achou e corrigiu 6 bugs reais, e implementou 2 features inteiras que não existiam. Esse trabalho nunca chegou ao `pet3108` nem ao GitHub — só existia naquela outra sessão. O handoff (`PETLYS_HANDOFF_CLAUDE_CODE_PET3108.md`) recebido do Claude browse redescobriu exatamente os mesmos 6 bugs de forma independente (confirma que o diagnóstico estava certo), mas propunha reconstruir do zero algo que já existia pronto e testado. Em vez de reconstruir, foi feita a reconciliação direta: diff de arquivo por arquivo entre as duas bases, cópia das partes ausentes pro pet3108, preservando os ajustes que só existiam aqui.
+
+**Confirmado antes de mexer:** os dois projetos apontam para o **mesmo projeto Supabase** (`xewgvxzpsdesqkohapbm`). As migrations 0013–0016 abaixo já estavam aplicadas no banco ao vivo desde a sessão original — essa reconciliação só estava faltando nos arquivos versionados, não no banco.
+
+### Bugs corrigidos (replicados via diff real, testados com RLS de verdade na sessão original — não simulação manual)
+
+1. **Perfil de profissional invisível pro Tutor** (`0013_profiles_public_professional_select.sql`) — `profiles_select` só liberava o próprio perfil ou Admin/Supervisor; `/buscar` mostrava "Profissional" genérico e `/profissional/[id]` dava 404 pra qualquer Tutor. Corrigido com policy adicional: perfil legível quando o dono tem `professional_services` ativo.
+2. **Ocorrências recorrentes empilhadas na mesma data** (`lib/actions/requests.ts`, `lib/validations/requests.ts`) — todas as ocorrências de um contrato recorrente recebiam `firstOccurrenceAt` idêntico. Adicionado campo de frequência (diária/semanal/quinzenal/mensal) no formulário (`components/requests/new-request-form.tsx`) e cálculo determinístico das datas.
+3. **Kanban dessincronizado do status principal** (`lib/actions/occurrences.ts`, `components/kanban/kanban-board.tsx`) — mover um cartão só atualizava `request_occurrences`, nunca `requests.status`; o Tutor nunca via o atendimento avançar. Corrigido: cada ação do Kanban agora sincroniza os dois; ao concluir uma ocorrência intermediária de um contrato recorrente, a solicitação volta pra `confirmado` (libera check-in da próxima); ao concluir a última, avança pra `avaliacao` (`0014_recurring_occurrence_cycle.sql` libera essa transição no banco). Kanban também passou a travar check-in até a solicitação estar `confirmado` (antes deixava check-in em qualquer status).
+4. **Suporte não conseguia intervir no chat** (`0015_staff_chat_intervention.sql`, `components/requests/chat-panel.tsx`, `components/admin/incident-queue.tsx`) — Admin/Supervisor só liam mensagens (e só com incidente aberto), nunca podiam responder. Agora enviam mensagem enquanto o incidente está aberto (bloqueado automaticamente após resolvido), aparecendo identificados como "Suporte" pras duas partes. Bônus: corrigido `viewerRole` em `app/(tutor)/solicitacoes/[requestId]/page.tsx`, que classificava incorretamente qualquer staff como "profissional" (mostrava botões de recusar/propor que não faziam sentido pra eles).
+5. **Suspensão de conta só cosmética** (`0016_suspension_actually_blocks_access.sql`, `lib/supabase/middleware.ts`, `app/(auth)/conta-suspensa/`) — **bug crítico**: conta suspensa continuava logando normalmente e conseguia se auto-atribuir um papel novo (mesmo um que nunca teve) pela RLS de `account_roles`, voltando a ter acesso total. Corrigido em duas camadas: RLS bloqueia auto-atribuição de papel quando há suspensão aprovada; middleware redireciona qualquer rota pra `/conta-suspensa` antes de qualquer outra checagem (com cuidado extra pra não criar loop de redirecionamento com `/escolher-perfil`).
+6. **Exclusão de parâmetro comercial sempre falhava** (`lib/actions/admin.ts`) — `platform_parameters_log` referencia o parâmetro sem `ON DELETE CASCADE`, e como toda criação já gera log, o `DELETE` físico batia em violação de FK sempre. Trocado por soft-delete (`status: 'substituido'`), consistente com o `parameter_lifecycle` que o próprio schema já previa.
+
+### Features novas (não existiam em nenhuma versão anterior)
+
+7. **Papel ativo / isolamento de visões** (`lib/supabase/middleware.ts`, `app/page.tsx`, `lib/actions/auth.ts:setActiveRole`) — conta com Tutor + Profissional agora escolhe explicitamente em `/` qual papel está usando; middleware bloqueia fisicamente rotas do outro papel; nunca troca sozinho. `app/(tutor)/solicitacoes/page.tsx` parou de sempre priorizar a visão de Profissional pra contas duplas (bug que fazia o Tutor nunca ver a própria lista).
+8. **Adicionar um segundo papel depois** (`app/(onboarding)/escolher-perfil/page.tsx`, `components/auth/choose-profile-form.tsx`, links em `/inicio` e `/dashboard`) — Tutor vira também Profissional (e vice-versa) sem perder o papel atual. Corrigido no processo: o `chooseProfile` original fazia `upsert` de todos os papéis marcados, inclusive o já existente — como `account_roles` não tem policy de UPDATE pra usuário comum, isso derrubava a RLS e quebrava 100% das tentativas de adicionar um segundo papel. Agora só insere o que falta.
+9. **Login e cadastro por e-mail/senha** (`components/auth/email-password-form.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/confirmar-email/`, `app/(auth)/redefinir-senha/`, `lib/actions/auth.ts`, `lib/validations/auth.ts`) — Google/Facebook viram opcionais; Tutor/Profissional cadastram por e-mail+senha; Admin/Supervisor entram pelo mesmo formulário digitando o "usuário" interno (resolvido pro e-mail sintético `@internal.plataformapet` no servidor). Inclui "Esqueci minha senha". Achado no processo: os links de confirmação de e-mail e de redefinição de senha do Supabase entregam o token no **fragmento da URL** (`#access_token=...`), não em `?code=` — a rota `/callback` existente só tratava o fluxo OAuth. `/confirmar-email` e `/redefinir-senha` tratam isso no client. Exige que as duas URLs estejam cadastradas em Authentication → URL Configuration → Redirect URLs no Supabase (feito para localhost; produção pendente de domínio Vercel).
+
+### O que não precisou ser refeito
+
+O handoff supunha que seria necessário reconstruir tudo isso do zero. Como já existia — testado com sessões reais e RLS real, não bypass — o trabalho desta entrada foi puramente mecânico: diff arquivo por arquivo entre as duas bases, cópia do que faltava, preservando dois ajustes de lint que só existiam no pet3108 (`let`→`const` em `app/(tutor)/buscar/page.tsx`; variável `reviewAboutMe` não utilizada removida de `components/requests/review-section.tsx`).
+
+### Verificação
+
+- `tsc --noEmit`: limpo.
+- `eslint .`: limpo — achou e corrigiu 3 problemas reais introduzidos pelas páginas novas (`react-hooks/set-state-in-effect` em `/confirmar-email` e `/redefinir-senha`, setState síncrono dentro do corpo do efeito; variável `isParty` declarada e nunca usada em `solicitacoes/[requestId]/page.tsx`). Correções replicadas de volta pro `plataforma-pet_2/plataforma-pet` também.
+- `next build`: passa, 30 rotas geradas — inclui as 4 rotas novas de autenticação por senha (`/confirmar-email`, `/conta-suspensa`, `/dev-login`, `/redefinir-senha`).
+- Alterações feitas na branch `sync-pilar1-fixes` (não mergeada em `main` nem enviada ao GitHub ainda — aguardando confirmação do usuário).
+
+---
+
 ## 2026-08-31 — Recuperação de artefatos perdidos + primeira auditoria real do Supabase
 
 **Contexto:** duas sessões anteriores geraram artefatos (a Especificação v1.2 completa em `.docx`, e o código-fonte da Fase 3 em `.zip`) que existiram apenas como upload/download dentro daquelas conversas e não foram salvos de forma persistente. Ambos foram dados como perdidos no início desta sessão, e depois localizados pelo usuário em backups locais.
@@ -39,9 +73,13 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ## Pendências abertas ao final desta entrada
 
-- [ ] Corrigir os achados de segurança do Supabase (funções `SECURITY DEFINER` expostas).
+- [ ] Corrigir os achados de segurança do Supabase (funções `SECURITY DEFINER` expostas como RPC público).
+- [ ] Fixar `search_path` em `distance_km` e `set_updated_at`, e revisar as demais funções `SECURITY DEFINER`.
+- [ ] Garantir por RLS (não só por Server Action) que Supervisor não encerre incidente sozinho — hoje a policy `incidents_update` permite tanto Admin quanto Supervisor.
 - [ ] Ativar proteção contra senha vazada no Supabase Auth.
-- [ ] Anexar `Especificacao_Pilar_1_Jornadas_v1_2_backup_2026-08-22.docx` ao Project do Claude.ai.
-- [ ] Conectar o repositório à Vercel.
-- [ ] Escrever testes automatizados reais (Fase 4).
+- [ ] Reagendamento de ocorrências pelo Tutor, escolhendo horário livre do Profissional (hoje a data só é definida na criação da solicitação).
+- [ ] Escrever testes automatizados reais (unitário/integração/E2E) — não existem no projeto.
+- [ ] Configurar Redirect URLs de produção no Supabase quando o domínio Vercel existir.
 - [ ] Módulo financeiro / Pagar.me — aguardando decisões comerciais (percentuais, condições) listadas na seção 13.3 da Especificação v1.2.
+- [ ] Decidir se a rota `/dev-login` (bypass de autenticação só pra teste local, sem efeito em produção via checagem de `NODE_ENV`) deve ser removida antes do deploy ou mantida — revisar antes de ir pra produção.
+- [ ] Revisar e mergear a branch `sync-pilar1-fixes` em `main`, e enviar ao GitHub.

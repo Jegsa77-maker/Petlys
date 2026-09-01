@@ -14,10 +14,12 @@ export function ChatPanel({
   requestId,
   messages,
   currentUserId,
+  staffSenderIds = [],
 }: {
   requestId: string;
   messages: Message[];
   currentUserId: string;
+  staffSenderIds?: string[];
 }) {
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -50,14 +52,22 @@ export function ChatPanel({
         ) : (
           messages.map((message) => {
             const isMine = message.sender_id === currentUserId;
+            const isStaff = staffSenderIds.includes(message.sender_id);
             return (
               <div
                 key={message.id}
-                className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                  isMine ? "self-end bg-teal text-white" : "self-start bg-gray text-black"
-                }`}
+                className={`max-w-[80%] flex flex-col gap-0.5 ${isMine ? "self-end items-end" : "self-start items-start"}`}
               >
-                {message.content}
+                {isStaff && (
+                  <span className="text-[10px] font-semibold uppercase text-gray-400">Suporte</span>
+                )}
+                <div
+                  className={`rounded-lg px-3 py-2 text-sm ${
+                    isMine ? "bg-teal text-white" : isStaff ? "bg-black text-white" : "bg-gray text-black"
+                  }`}
+                >
+                  {message.content}
+                </div>
               </div>
             );
           })

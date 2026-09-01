@@ -6,14 +6,23 @@ import { chooseProfileSchema } from "@/lib/validations/auth";
 
 type Role = "tutor" | "profissional";
 
-export function ChooseProfileForm() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [birthDate, setBirthDate] = useState("");
-  const [cpfCnpj, setCpfCnpj] = useState("");
+export function ChooseProfileForm({
+  existingRoles = [],
+  existingBirthDate = "",
+  existingCpfCnpj = "",
+}: {
+  existingRoles?: Role[];
+  existingBirthDate?: string;
+  existingCpfCnpj?: string;
+}) {
+  const [roles, setRoles] = useState<Role[]>(existingRoles);
+  const [birthDate, setBirthDate] = useState(existingBirthDate);
+  const [cpfCnpj, setCpfCnpj] = useState(existingCpfCnpj);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function toggleRole(role: Role) {
+    if (existingRoles.includes(role)) return; // já tem esse papel, não dá pra desmarcar aqui
     setRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
@@ -51,23 +60,29 @@ export function ChooseProfileForm() {
           Como você quer usar a plataforma? (pode escolher os dois)
         </p>
         <div className="flex flex-col gap-2">
-          {(["tutor", "profissional"] as const).map((role) => (
-            <label
-              key={role}
-              className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors
-                ${roles.includes(role) ? "border-teal bg-teal/5" : "border-gray-300"}`}
-            >
-              <input
-                type="checkbox"
-                checked={roles.includes(role)}
-                onChange={() => toggleRole(role)}
-                className="h-4 w-4 accent-teal"
-              />
-              <span className="text-sm font-medium text-black">
-                {role === "tutor" ? "Tutor — quero contratar serviços pet" : "Profissional — quero oferecer serviços pet"}
-              </span>
-            </label>
-          ))}
+          {(["tutor", "profissional"] as const).map((role) => {
+            const isLocked = existingRoles.includes(role);
+            return (
+              <label
+                key={role}
+                className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors
+                  ${roles.includes(role) ? "border-teal bg-teal/5" : "border-gray-300"}
+                  ${isLocked ? "cursor-default opacity-70" : "cursor-pointer"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={roles.includes(role)}
+                  onChange={() => toggleRole(role)}
+                  disabled={isLocked}
+                  className="h-4 w-4 accent-teal"
+                />
+                <span className="text-sm font-medium text-black">
+                  {role === "tutor" ? "Tutor — quero contratar serviços pet" : "Profissional — quero oferecer serviços pet"}
+                  {isLocked && " (já é seu)"}
+                </span>
+              </label>
+            );
+          })}
         </div>
       </div>
 

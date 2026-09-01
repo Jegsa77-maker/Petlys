@@ -9,12 +9,20 @@ const SERVICE_CATEGORIES = [
   "veterinario_domiciliar",
 ] as const;
 
+export const RECURRENCE_INTERVAL_DAYS = {
+  diario: 1,
+  semanal: 7,
+  quinzenal: 14,
+  mensal: 30,
+} as const;
+
 export const createRequestSchema = z.object({
   professionalId: z.uuid("Profissional inválido"),
   category: z.enum(SERVICE_CATEGORIES, { message: "Selecione a categoria do serviço" }),
   petIds: z.array(z.uuid()).min(1, "Selecione ao menos um pet"),
   isRecurring: z.boolean(),
   occurrencesTotal: z.coerce.number().int().min(1).default(1),
+  recurrenceInterval: z.enum(["diario", "semanal", "quinzenal", "mensal"]).default("semanal"),
   firstOccurrenceAt: z.string().min(1, "Informe a data e hora do primeiro atendimento"),
   notes: z.string().trim().max(2000).optional(),
   isVisitaInicial: z.boolean().default(false),

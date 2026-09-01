@@ -1,0 +1,166 @@
+"use client";
+
+import { useState } from "react";
+import {
+  signInWithPassword,
+  signUpWithPassword,
+  requestPasswordReset,
+} from "@/lib/actions/auth";
+import {
+  signInSchema,
+  signUpSchema,
+  requestPasswordResetSchema,
+} from "@/lib/validations/auth";
+
+type Mode = "entrar" | "criar" | "esqueci";
+
+export function EmailPasswordForm() {
+  const [mode, setMode] = useState<Mode>("entrar");
+  const [fullName, setFullName] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+
+    if (mode === "entrar") {
+      const parsed = signInSchema.safeParse({ identifier, password });
+      if (!parsed.success) {
+        setError(parsed.error.issues[0]?.message ?? "Verifique os dados informados");
+        return;
+      }
+      setIsSubmitting(true);
+      const result = await signInWithPassword(parsed.data);
+      setIsSubmitting(false);
+      if (result?.error) setError(result.error);
+      return;
+    }
+
+    if (mode === "criar") {
+      const parsed = signUpSchema.safeParse({ fullName, email: identifier, password });
+      if (!parsed.success) {
+        setError(parsed.error.issues[0]?.message ?? "Verifique os dados informados");
+        return;
+      }
+      setIsSubmitting(true);
+      const result = await signUpWithPassword(parsed.data);
+      setIsSubmitting(false);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      if (result?.needsEmailConfirmation) {
+        setNotice("Conta criada! Confira seu e-mail para confirmar antes de entrar.");
+      }
+      return;
+    }
+
+    // esqueci a senha
+    const parsed = requestPasswordResetSchema.safeParse({ email: identifier });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "E-mail inválido");
+      return;
+    }
+    setIsSubmitting(true);
+    await requestPasswordReset(parsed.data);
+    setIsSubmitting(false);
+    setNotice("Se esse e-mail estiver cadastrado, você vai receber um link pra redefinir a senha.");
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-4 text-sm font-medium border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => switchMode("entrar")}
+          className={`pb-2 -mb-px border-b-2 ${mode === "entrar" ? "border-teal text-teal" : "border-transparent text-gray-400"}`}
+        >
+          Entrar
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode("criar")}
+          className={`pb-2 -mb-px border-b-2 ${mode === "criar" ? "border-teal text-teal" : "border-transparent text-gray-400"}`}
+        >
+          Criar conta
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        {mode === "criar" && (
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Nome completo"
+            className="input"
+          />
+        )}
+
+        <input
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
+          placeholder={mode === "entrar" ? "E-mail ou usuário" : "E-mail"}
+          className="input"
+          autoCapitalize="none"
+        />
+
+        {mode !== "esqueci" && (
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Senha"
+            className="input"
+          />
+        )}
+
+        {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+        {notice && <p className="text-sm text-teal">{notice}</p>}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full rounded-lg bg-teal px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+        >
+          {isSubmitting
+            ? "Enviando..."
+            : mode === "entrar"
+              ? "Entrar"
+              : mode === "criar"
+                ? "Criar conta"
+                : "Enviar link de redefinição"}
+        </button>
+
+        {mode === "entrar" && (
+          <button
+            type="button"
+            onClick={() => switchMode("esqueci")}
+            className="text-xs text-gray-500 hover:text-teal text-center"
+          >
+            Esqueci minha senha
+          </button>
+        )}
+        {mode === "esqueci" && (
+          <button
+            type="button"
+            onClick={() => switchMode("entrar")}
+            className="text-xs text-gray-500 hover:text-teal text-center"
+          >
+            Voltar pro login
+          </button>
+        )}
+      </form>
+    </div>
+  );
+}
