@@ -4,6 +4,14 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Criação do IDEIAS_FUTURAS.md
+
+**Contexto:** usuário quis registrar duas ideias de funcionalidade pra Onda 5 (CRM) antes de continuar a Onda 2, pra não perdê-las: (1) Kanban reordenável manualmente pelo Profissional, evoluindo pra sugestão de rota mais rápida entre atendimentos com integração de trânsito, e estimativa de chegada em tempo real conforme o horário se aproxima; (2) post automático no Instagram, com selo Petlys e comentário do Tutor, usando uma foto do relatório do atendimento escolhida pelo Profissional.
+
+**Entrega:** novo `IDEIAS_FUTURAS.md` — diferente do `BACKLOG.md` (que é só pra itens adiados no meio de uma implementação em andamento), este é pra ideias de produto de ondas que ainda não começaram, sem desenho técnico fechado. Cada ideia já lista as dependências que evidencia (ex.: a ideia de rota depende de endereço estruturado por atendimento, que é o item 4 da Onda 2, e de um fornecedor de trânsito ainda não escolhido; a ideia do Instagram depende de um consentimento de imagem específico, diferente do consentimento de prontuário já existente).
+
+---
+
 ## 2026-09-01 — Decisão de produto/arquitetura: CRM do Profissional como módulo da Onda 5
 
 **Contexto:** usuário propôs ter na plataforma só as funcionalidades básicas pro Profissional e um CRM à parte, com funcionalidades avançadas, mesmo banco de dados, camada extra sobre o Profissional.
