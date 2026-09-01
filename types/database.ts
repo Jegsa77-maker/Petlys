@@ -601,6 +601,7 @@ export type Database = {
           breed: string | null
           created_at: string
           created_by: string
+          document_url: string | null
           emergency_info: Json
           health_info: Json
           id: string
@@ -619,6 +620,7 @@ export type Database = {
           breed?: string | null
           created_at?: string
           created_by: string
+          document_url?: string | null
           emergency_info?: Json
           health_info?: Json
           id?: string
@@ -637,6 +639,7 @@ export type Database = {
           breed?: string | null
           created_at?: string
           created_by?: string
+          document_url?: string | null
           emergency_info?: Json
           health_info?: Json
           id?: string
@@ -864,6 +867,57 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: false
             referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      professional_certifications: {
+        Row: {
+          category: Database["public"]["Enums"]["service_category"]
+          created_at: string
+          document_url: string
+          id: string
+          professional_id: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["service_category"]
+          created_at?: string
+          document_url: string
+          id?: string
+          professional_id: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["service_category"]
+          created_at?: string
+          document_url?: string
+          id?: string
+          professional_id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_certifications_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_certifications_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1259,6 +1313,7 @@ export type Database = {
           occurrences_total: number
           origin_request_id: string | null
           professional_id: string
+          prontuario_shared_at: string | null
           status: Database["public"]["Enums"]["request_status"]
           tutor_id: string
           updated_at: string
@@ -1273,6 +1328,7 @@ export type Database = {
           occurrences_total?: number
           origin_request_id?: string | null
           professional_id: string
+          prontuario_shared_at?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           tutor_id: string
           updated_at?: string
@@ -1287,6 +1343,7 @@ export type Database = {
           occurrences_total?: number
           origin_request_id?: string | null
           professional_id?: string
+          prontuario_shared_at?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           tutor_id?: string
           updated_at?: string
@@ -1413,6 +1470,32 @@ export type Database = {
           {
             foreignKeyName: "supervisor_grants_supervisor_profile_id_fkey"
             columns: ["supervisor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terms_acceptances: {
+        Row: {
+          accepted_at: string
+          profile_id: string
+          version: string
+        }
+        Insert: {
+          accepted_at?: string
+          profile_id: string
+          version: string
+        }
+        Update: {
+          accepted_at?: string
+          profile_id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terms_acceptances_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

@@ -26,6 +26,12 @@ export const createRequestSchema = z.object({
   firstOccurrenceAt: z.string().min(1, "Informe a data e hora do primeiro atendimento"),
   notes: z.string().trim().max(2000).optional(),
   isVisitaInicial: z.boolean().default(false),
+  // Consentimento explícito de compartilhar a ficha dos pets selecionados
+  // com este profissional (seção 6.4) — obrigatório, registrado em
+  // requests.prontuario_shared_at na criação (0018_terms_consent_...sql).
+  prontuarioConsent: z.boolean().refine((v) => v === true, {
+    message: "Autorize o compartilhamento da ficha do pet para continuar",
+  }),
 });
 export type CreateRequestValues = z.infer<typeof createRequestSchema>;
 

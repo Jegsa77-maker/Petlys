@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
+import { CURRENT_TERMS_VERSION } from "@/lib/domain/terms";
 
 const PUBLIC_PATHS = ["/login", "/callback", "/dev-login", "/redefinir-senha", "/confirmar-email"];
 const SUSPENDED_PATH = "/conta-suspensa";
@@ -115,6 +116,24 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/verificar-telefone";
       return NextResponse.redirect(url);
+    }
+
+    // Aceite versionado de Termos/Privacidade (seção 6.1) — obrigatório pra
+    // qualquer conta (OAuth ou e-mail/senha), antes de escolher papel.
+    // Sobe a versão em lib/domain/terms.ts força novo aceite de todo mundo.
+    if (isVerified && path !== "/aceitar-termos") {
+      const { data: acceptance } = await supabase
+        .from("terms_acceptances")
+        .select("profile_id")
+        .eq("profile_id", user.id)
+        .eq("version", CURRENT_TERMS_VERSION)
+        .maybeSingle();
+
+      if (!acceptance) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/aceitar-termos";
+        return NextResponse.redirect(url);
+      }
     }
 
     if (isVerified && path !== "/escolher-perfil") {

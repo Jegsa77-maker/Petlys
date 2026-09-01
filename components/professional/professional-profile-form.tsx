@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { upsertProfessionalProfile } from "@/lib/actions/professional-profile";
 import { professionalProfileSchema } from "@/lib/validations/professional-profile";
+import { FileUploadField } from "@/components/shared/file-upload-field";
 
 export function ProfessionalProfileForm({
+  profileId,
   initial,
 }: {
+  profileId: string;
   initial: {
     bio: string;
     experienceYears: string;
@@ -50,15 +53,17 @@ export function ProfessionalProfileForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-black mb-1">Foto de perfil (URL)</label>
-        <input
-          value={values.avatarUrl}
-          onChange={(e) => setField("avatarUrl", e.target.value)}
-          placeholder="https://..."
-          className="input"
+        <label className="block text-sm font-medium text-black mb-1">Foto de perfil</label>
+        <FileUploadField
+          bucket="avatars"
+          pathPrefix={profileId}
+          accept="image/*"
+          currentUrl={values.avatarUrl || undefined}
+          buttonLabel={values.avatarUrl ? "Trocar foto" : "Enviar foto"}
+          onUploaded={(url) => setField("avatarUrl", url)}
         />
         <p className="text-xs text-gray-500 mt-1">
-          Upload direto de arquivo ainda não existe — cole o link de uma foto já hospedada.
+          Clique em &quot;Salvar perfil&quot; depois de enviar pra confirmar.
         </p>
       </div>
 

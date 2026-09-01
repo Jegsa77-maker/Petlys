@@ -149,6 +149,40 @@ export async function updatePetEmergency(petId: string, input: unknown): Promise
 }
 
 /**
+ * Foto do pet (upload real, seção 6.2) — bucket público `pet-photos`,
+ * caminho `{petId}/...` (ver 0018_terms_consent_documents_certifications.sql).
+ */
+export async function updatePetPhoto(petId: string, photoUrl: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("pets").update({ photo_url: photoUrl }).eq("id", petId);
+
+  if (error) {
+    return { error: "Não foi possível salvar a foto do pet." };
+  }
+
+  revalidatePath(`/pets/${petId}`);
+  revalidatePath("/pets");
+  return { error: null };
+}
+
+/**
+ * Carteira de vacinação ou documento similar (upload real, seção 6.2) —
+ * bucket privado `pet-documents`, caminho `{petId}/...`. Guardamos só o
+ * caminho (não a URL pública, já que o bucket não é público).
+ */
+export async function updatePetDocument(petId: string, documentPath: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("pets").update({ document_url: documentPath }).eq("id", petId);
+
+  if (error) {
+    return { error: "Não foi possível salvar o documento do pet." };
+  }
+
+  revalidatePath(`/pets/${petId}`);
+  return { error: null };
+}
+
+/**
  * Convida outro tutor (por e-mail já cadastrado na plataforma) a ter
  * acesso completo ao pet — múltiplos tutores por pet (seção 2.2).
  * O co-tutor precisa já ter conta criada; não enviamos convite por

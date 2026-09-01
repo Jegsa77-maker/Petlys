@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminDashboardPage() {
@@ -11,6 +12,7 @@ export default async function AdminDashboardPage() {
     { count: professionalCount },
     { count: incidentsOpen },
     { count: incidentsResolved },
+    { count: certificationsPending },
   ] = await Promise.all([
     supabase.from("requests").select("status"),
     supabase.from("payments").select("amount, commission_amount, status"),
@@ -33,6 +35,10 @@ export default async function AdminDashboardPage() {
       .from("incidents")
       .select("id", { count: "exact", head: true })
       .eq("status", "resolvido"),
+    supabase
+      .from("professional_certifications")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pendente"),
   ]);
 
   const statusCounts: Record<string, number> = {};
@@ -92,6 +98,15 @@ export default async function AdminDashboardPage() {
           <div className="grid grid-cols-2 gap-3">
             <Metric label="Abertos" value={String(incidentsOpen ?? 0)} />
             <Metric label="Resolvidos" value={String(incidentsResolved ?? 0)} />
+          </div>
+        </Block>
+
+        <Block title="Habilitações">
+          <div className="flex items-center justify-between">
+            <Metric label="Pendentes de revisão" value={String(certificationsPending ?? 0)} />
+            <Link href="/admin/habilitacoes" className="text-sm font-semibold text-teal hover:underline">
+              Revisar
+            </Link>
           </div>
         </Block>
       </div>

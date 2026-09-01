@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import Link from "next/link";
 import { createRequest } from "@/lib/actions/requests";
 import { createRequestSchema } from "@/lib/validations/requests";
+import {
+  missingProntuarioSections,
+  PRONTUARIO_SECTION_LABEL,
+} from "@/lib/domain/category-requirements";
+import type { ServiceCategory } from "@/types/database";
 
 const RECURRENCE_LABEL: Record<string, string> = {
   diario: "Todo dia",
@@ -20,7 +26,14 @@ const CATEGORY_LABEL: Record<string, string> = {
   veterinario_domiciliar: "Veterinário domiciliar",
 };
 
-type PetOption = { id: string; name: string };
+type PetOption = {
+  id: string;
+  name: string;
+  health_info: unknown;
+  behavior_info: unknown;
+  routine_info: unknown;
+  emergency_info: unknown;
+};
 
 export function NewRequestForm({
   professionalId,
@@ -37,12 +50,28 @@ export function NewRequestForm({
   const [recurrenceInterval, setRecurrenceInterval] = useState("semanal");
   const [firstOccurrenceAt, setFirstOccurrenceAt] = useState("");
   const [notes, setNotes] = useState("");
+  const [prontuarioConsent, setProntuarioConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function togglePet(id: string) {
     setPetIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   }
+
+  // Requisitos dinâmicos por categoria (seção 6.4) — avisa antes de tentar
+  // enviar, com link direto pra completar o prontuário do pet.
+  const missingByPet = useMemo(() => {
+    if (!category) return [];
+    const selectedPets = pets.filter((p) => petIds.includes(p.id));
+    return selectedPets
+      .map((pet) => ({
+        pet,
+        missing: missingProntuarioSections(pet, category as ServiceCategory),
+      }))
+      .filter((entry) => entry.missing.length > 0);
+  }, [category, petIds, pets]);
+
+  const hasBlockingRequirements = missingByPet.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,6 +87,7 @@ export function NewRequestForm({
       firstOccurrenceAt,
       notes: notes || undefined,
       isVisitaInicial,
+      prontuarioConsent,
     });
 
     if (!parsed.success) {
@@ -113,6 +143,22 @@ export function NewRequestForm({
           </div>
         )}
       </div>
+
+      {hasBlockingRequirements && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold mb-1">Complete o prontuário antes de continuar</p>
+          <ul className="flex flex-col gap-1">
+            {missingByPet.map(({ pet, missing }) => (
+              <li key={pet.id}>
+                <Link href={`/pets/${pet.id}`} className="underline font-medium">
+                  {pet.name}
+                </Link>
+                : falta {missing.map((s) => PRONTUARIO_SECTION_LABEL[s]).join(", ")}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <label className="flex items-center gap-3 rounded-lg border border-gray-300 px-4 py-3 cursor-pointer">
         <input
@@ -196,11 +242,24 @@ export function NewRequestForm({
         />
       </div>
 
+      <label className="flex items-start gap-3 rounded-lg border border-gray-300 px-4 py-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={prontuarioConsent}
+          onChange={(e) => setProntuarioConsent(e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-teal"
+        />
+        <span className="text-sm text-black">
+          Autorizo compartilhar a ficha completa dos pets selecionados (saúde,
+          comportamento, rotina e emergência) com este profissional.
+        </span>
+      </label>
+
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
 
       <button
         type="submit"
-        disabled={isSubmitting || pets.length === 0}
+        disabled={isSubmitting || pets.length === 0 || hasBlockingRequirements}
         className="w-full rounded-lg bg-teal px-4 py-3 text-sm font-semibold text-white
                    hover:opacity-90 disabled:opacity-60 transition-opacity"
       >

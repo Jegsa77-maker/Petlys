@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { MessageCircle, CalendarPlus, ShieldCheck, UserRound } from "lucide-react";
+import { MessageCircle, CalendarPlus, ShieldCheck, UserRound, Award, BadgeCheck } from "lucide-react";
+import {
+  computeProfessionalLevel,
+  averageRating,
+  PROFESSIONAL_LEVEL_LABEL,
+} from "@/lib/domain/professional-reputation";
 
 const CATEGORY_LABEL: Record<string, string> = {
   pet_sitter: "Pet sitter / cuidador",
@@ -48,6 +53,21 @@ export default async function ProfissionalPage({
     .eq("profile_id", profissionalId)
     .maybeSingle();
 
+  const [{ count: completedCount }, { count: approvedCertCount }] = await Promise.all([
+    supabase
+      .from("requests")
+      .select("id", { count: "exact", head: true })
+      .eq("professional_id", profissionalId)
+      .in("status", ["avaliacao", "concluido"]),
+    supabase
+      .from("professional_certifications")
+      .select("id", { count: "exact", head: true })
+      .eq("professional_id", profissionalId)
+      .eq("status", "aprovado"),
+  ]);
+
+  const level = computeProfessionalLevel(completedCount ?? 0, averageRating(reviews ?? []));
+
   const specializations = professionalProfile?.specializations ?? [];
   const languages = professionalProfile?.languages ?? [];
 
@@ -68,8 +88,18 @@ export default async function ProfissionalPage({
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2 text-xs text-teal font-semibold mb-1">
-              <ShieldCheck size={14} /> Conta verificada
+            <div className="flex flex-wrap items-center gap-2 text-xs text-teal font-semibold mb-1">
+              <span className="flex items-center gap-1">
+                <ShieldCheck size={14} /> Conta verificada
+              </span>
+              <span className="flex items-center gap-1 bg-teal/10 rounded-full px-2 py-0.5">
+                <Award size={12} /> {PROFESSIONAL_LEVEL_LABEL[level]}
+              </span>
+              {(approvedCertCount ?? 0) > 0 && (
+                <span className="flex items-center gap-1 bg-teal/10 rounded-full px-2 py-0.5">
+                  <BadgeCheck size={12} /> Documentação verificada
+                </span>
+              )}
             </div>
             <h1 className="text-xl font-bold text-black">{profile.full_name}</h1>
           </div>
