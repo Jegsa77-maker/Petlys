@@ -7,7 +7,7 @@ import {
   PROFESSIONAL_LEVEL_LABEL,
 } from "@/lib/domain/professional-reputation";
 import Link from "next/link";
-import { Eye, Award } from "lucide-react";
+import { Eye, Award, Star } from "lucide-react";
 
 export default async function PerfilProfissionalPage() {
   const supabase = await createClient();
@@ -43,7 +43,8 @@ export default async function PerfilProfissionalPage() {
     supabase.from("reviews").select("rating").eq("reviewee_id", user.id).is("hidden_at", null),
   ]);
 
-  const level = computeProfessionalLevel(completedCount ?? 0, averageRating(reviews ?? []));
+  const avgRating = averageRating(reviews ?? []);
+  const level = computeProfessionalLevel(completedCount ?? 0, avgRating);
 
   const specializations = profile?.specializations ?? [];
   const languages = profile?.languages ?? [];
@@ -68,9 +69,17 @@ export default async function PerfilProfissionalPage() {
           <p className="text-sm text-gray-600 mb-2">
             É o que o Tutor vê antes de decidir contratar você.
           </p>
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-teal bg-teal/10 rounded-full px-2 py-1 w-fit">
-            <Award size={14} /> {PROFESSIONAL_LEVEL_LABEL[level]}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-teal bg-teal/10 rounded-full px-2 py-1 w-fit">
+              <Award size={14} /> {PROFESSIONAL_LEVEL_LABEL[level]}
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-black bg-gray rounded-full px-2 py-1 w-fit">
+              <Star size={14} className={avgRating !== null ? "text-teal fill-teal" : "text-gray-400"} />
+              {avgRating !== null
+                ? `${avgRating.toFixed(1)} (${reviews?.length ?? 0})`
+                : "Sem avaliações ainda"}
+            </span>
+          </div>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4">

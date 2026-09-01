@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { MessageCircle, CalendarPlus, ShieldCheck, UserRound, Award, BadgeCheck } from "lucide-react";
+import { MessageCircle, CalendarPlus, ShieldCheck, UserRound, Award, BadgeCheck, Star } from "lucide-react";
 import {
   computeProfessionalLevel,
   averageRating,
@@ -84,7 +84,8 @@ export default async function ProfissionalPage({
       : Promise.resolve({ data: null }),
   ]);
 
-  const level = computeProfessionalLevel(completedCount ?? 0, averageRating(reviews ?? []));
+  const avgRating = averageRating(reviews ?? []);
+  const level = computeProfessionalLevel(completedCount ?? 0, avgRating);
 
   const specializations = professionalProfile?.specializations ?? [];
   const languages = professionalProfile?.languages ?? [];
@@ -159,11 +160,20 @@ export default async function ProfissionalPage({
           </div>
         )}
 
-        <p className="text-sm text-gray-500 mb-6">
-          {reviews && reviews.length > 0
-            ? `${reviews.length} avaliação(ões) de atendimentos concluídos`
-            : "Ainda sem avaliações públicas"}
-        </p>
+        <div className="flex items-center gap-1 text-sm text-gray-500 mb-6">
+          {avgRating !== null ? (
+            <>
+              <Star size={14} className="text-teal fill-teal" />
+              <span className="font-semibold text-teal">{avgRating.toFixed(1)}</span>
+              <span>
+                · {reviews?.length ?? 0} avaliação{(reviews?.length ?? 0) === 1 ? "" : "ões"} de
+                atendimentos concluídos
+              </span>
+            </>
+          ) : (
+            "Ainda sem avaliações públicas"
+          )}
+        </div>
 
         <div className="flex gap-2 mb-3">
           <Link

@@ -4,6 +4,18 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 4, item 5: nota média agregada no perfil e na busca
+
+**Entrega:** quinto item da Onda 4 (seção 12.3). `averageRating()` já existia (Onda 1) mas só alimentava o cálculo do **nível** (Novo/Experiente/Top) — o número de verdade nunca era mostrado em lugar nenhum. Achado mais grave: o card de cada profissional em `/buscar` mostrava **"★ novo" fixo pra todo mundo**, mesmo profissional com dezenas de avaliações 5 estrelas — não era só uma ausência, era uma informação errada na tela.
+
+- `app/(tutor)/buscar/page.tsx`: a agregação de `reviews` por profissional, que só rodava quando o filtro de nota mínima estava ativo, passa a rodar sempre que há resultado — o card mostra `★ 4.8 (12)` de verdade, ou "novo" só quando é mesmo o caso.
+- `app/(tutor)/profissional/[profissionalId]/page.tsx`: nota numérica ao lado da contagem de avaliações, no lugar do texto genérico.
+- `app/(profissional)/perfil/page.tsx`: o próprio profissional passa a ver sua nota média junto do nível, ao lado do "Completude do perfil".
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos. Testado ao vivo: criada uma avaliação real (Tutor avalia Profissional com nota 4.8) → busca mostra "4.8 (1)" pra esse profissional e "novo" pro outro, sem avaliação nenhuma → perfil público mostra "4.8 · 1 avaliação de atendimentos concluídos" — confirmado nas duas telas antes de reverter o dado de teste.
+
+---
+
 ## 2026-09-01 — Onda 4, item 4: moderação de avaliações e mensagens
 
 **Entrega:** quarto item da Onda 4 (seção 12.3). `messages.flagged_reason` já existia desde `0004_requests_and_proposals.sql`, mas nenhum código nunca escreveu nela — coluna existia, funcionalidade não.

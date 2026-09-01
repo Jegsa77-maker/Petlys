@@ -97,10 +97,12 @@ export default async function BuscarPage({
     filteredServices = filteredServices.filter((s) => withinRange.has(s.professional_id));
   }
 
-  // Nota mínima (seção 12.1) — agrega avaliações por profissional; quem
-  // ainda não tem nenhuma avaliação não atende a um filtro de nota mínima
-  // explícito (não dá pra confirmar que atinge o mínimo pedido).
-  if (notaMin && filteredServices.length > 0) {
+  // Nota média agregada (seção 12.3, item 5 da Onda 4) — buscada sempre
+  // que há resultado, não só quando o filtro de nota mínima está ativo:
+  // antes disso, todo card na busca mostrava "novo" fixo no lugar da nota
+  // de verdade, mesmo profissionais com dezenas de avaliações 5 estrelas.
+  const ratingByProfessional = new Map<string, { avg: number | null; count: number }>();
+  if (filteredServices.length > 0) {
     const professionalIds = [...new Set(filteredServices.map((s) => s.professional_id))];
     const { data: reviews } = await supabase
       .from("reviews")
@@ -115,14 +117,18 @@ export default async function BuscarPage({
       reviewsByProfessional.set(r.reviewee_id, list);
     });
 
-    const minRating = Number(notaMin);
-    const meetsMinRating = new Set<string>();
     professionalIds.forEach((id) => {
-      const avg = averageRating(reviewsByProfessional.get(id) ?? []);
-      if (avg !== null && avg >= minRating) meetsMinRating.add(id);
+      const list = reviewsByProfessional.get(id) ?? [];
+      ratingByProfessional.set(id, { avg: averageRating(list), count: list.length });
     });
 
-    filteredServices = filteredServices.filter((s) => meetsMinRating.has(s.professional_id));
+    if (notaMin) {
+      const minRating = Number(notaMin);
+      filteredServices = filteredServices.filter((s) => {
+        const avg = ratingByProfessional.get(s.professional_id)?.avg ?? null;
+        return avg !== null && avg >= minRating;
+      });
+    }
   }
 
   // Favoritos do Tutor logado (seção 12.1) — precisa vir antes do filtro
@@ -178,6 +184,7 @@ export default async function BuscarPage({
           <ul className="flex flex-col gap-3">
             {filteredServices.map((service) => {
               const dist = distanceByProfessional[service.professional_id];
+              const rating = ratingByProfessional.get(service.professional_id);
               return (
                 <li key={service.id}>
                   <Link
@@ -202,7 +209,14 @@ export default async function BuscarPage({
                           {service.base_price ? `R$ ${service.base_price}` : "Sob consulta"}
                         </p>
                         <div className="flex items-center gap-1 justify-end text-xs text-gray-400">
-                          <Star size={12} /> novo
+                          <Star size={12} className={rating?.avg ? "text-teal fill-teal" : ""} />
+                          {rating?.avg ? (
+                            <span className="text-teal font-semibold">
+                              {rating.avg.toFixed(1)} ({rating.count})
+                            </span>
+                          ) : (
+                            "novo"
+                          )}
                         </div>
                       </div>
                       {user && (
