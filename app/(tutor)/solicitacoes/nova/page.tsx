@@ -5,9 +5,9 @@ import { redirect } from "next/navigation";
 export default async function NovaSolicitacaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ profissional?: string }>;
+  searchParams: Promise<{ profissional?: string; visitaInicial?: string }>;
 }) {
-  const { profissional } = await searchParams;
+  const { profissional, visitaInicial } = await searchParams;
 
   if (!profissional) {
     redirect("/buscar");
@@ -36,7 +36,11 @@ export default async function NovaSolicitacaoPage({
         <p className="text-sm text-gray-600 mb-6">
           Revise antes de enviar — dá pra editar até o envio.
         </p>
-        <NewRequestForm professionalId={profissional} pets={pets} />
+        <NewRequestForm
+          professionalId={profissional}
+          pets={pets}
+          initialIsVisitaInicial={visitaInicial === "1"}
+        />
       </div>
     </main>
   );

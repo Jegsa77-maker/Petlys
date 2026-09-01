@@ -17,6 +17,11 @@ export function ProfessionalProfileForm({
     languages: string;
     policies: string;
     avatarUrl: string;
+    visitaInicialEnabled: boolean;
+    visitaInicialPrice: string;
+    visitaInicialDurationMinutes: string;
+    visitaInicialModality: string;
+    visitaInicialDeductible: boolean;
   };
 }) {
   const [values, setValues] = useState(initial);
@@ -120,6 +125,57 @@ export function ProfessionalProfileForm({
           rows={3}
           className="input"
         />
+      </div>
+
+      <div className="rounded-lg border border-gray-200 p-3">
+        <label className="flex items-center gap-2 text-sm font-medium text-black mb-2">
+          <input
+            type="checkbox"
+            checked={values.visitaInicialEnabled}
+            onChange={(e) => setField("visitaInicialEnabled", e.target.checked)}
+            className="h-4 w-4 accent-teal"
+          />
+          Ofereço visita inicial
+        </label>
+        {values.visitaInicialEnabled && (
+          <div className="flex flex-col gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              value={values.visitaInicialPrice}
+              onChange={(e) => setField("visitaInicialPrice", e.target.value)}
+              placeholder="Preço (R$) — deixe em branco pra ser gratuita"
+              className="input"
+            />
+            <input
+              type="number"
+              min={1}
+              value={values.visitaInicialDurationMinutes}
+              onChange={(e) => setField("visitaInicialDurationMinutes", e.target.value)}
+              placeholder="Duração (minutos)"
+              className="input"
+            />
+            <select
+              value={values.visitaInicialModality}
+              onChange={(e) => setField("visitaInicialModality", e.target.value)}
+              className="input"
+            >
+              <option value="">Modalidade</option>
+              <option value="presencial">Presencial</option>
+              <option value="online">Online</option>
+            </select>
+            <label className="flex items-center gap-2 text-xs text-black">
+              <input
+                type="checkbox"
+                checked={values.visitaInicialDeductible}
+                onChange={(e) => setField("visitaInicialDeductible", e.target.checked)}
+                className="h-4 w-4 accent-teal"
+              />
+              Abater o valor da visita do atendimento principal, se o Tutor contratar
+            </label>
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}

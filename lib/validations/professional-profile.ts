@@ -22,6 +22,14 @@ export const professionalProfileSchema = z.object({
     .pipe(z.array(z.string()).max(10)),
   policies: z.string().trim().max(2000, "Máximo de 2000 caracteres").optional(),
   avatarUrl: z.string().trim().url("Informe uma URL válida").optional().or(z.literal("")),
+  // Visita inicial como jornada própria (seção 7.4/12.1, item 6 da Onda 2)
+  // — tudo opcional, igual ao resto do perfil: ativar não é obrigatório
+  // pra publicar serviço nenhum.
+  visitaInicialEnabled: z.boolean().default(false),
+  visitaInicialPrice: z.coerce.number().min(0).optional(),
+  visitaInicialDurationMinutes: z.coerce.number().int().positive().optional(),
+  visitaInicialModality: z.enum(["presencial", "online"]).optional(),
+  visitaInicialDeductible: z.boolean().default(false),
 });
 export type ProfessionalProfileValues = z.infer<typeof professionalProfileSchema>;
 
@@ -32,4 +40,9 @@ export type ProfessionalProfileFormInput = {
   languages: string;
   policies: string;
   avatarUrl: string;
+  visitaInicialEnabled: boolean;
+  visitaInicialPrice: string;
+  visitaInicialDurationMinutes: string;
+  visitaInicialModality: string;
+  visitaInicialDeductible: boolean;
 };

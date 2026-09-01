@@ -56,7 +56,9 @@ export default async function ProfissionalPage({
 
   const { data: professionalProfile } = await supabase
     .from("professional_profiles")
-    .select("bio, experience_years, specializations, languages, policies, avatar_url")
+    .select(
+      "bio, experience_years, specializations, languages, policies, avatar_url, visita_inicial_enabled, visita_inicial_price, visita_inicial_duration_minutes, visita_inicial_modality"
+    )
     .eq("profile_id", profissionalId)
     .maybeSingle();
 
@@ -162,7 +164,7 @@ export default async function ProfissionalPage({
             : "Ainda sem avaliações públicas"}
         </p>
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-3">
           <Link
             href={`/solicitacoes/nova?profissional=${profissionalId}`}
             className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-teal px-3 py-3 text-sm font-semibold text-white hover:opacity-90"
@@ -176,6 +178,26 @@ export default async function ProfissionalPage({
             <MessageCircle size={16} /> Conversar
           </Link>
         </div>
+
+        {professionalProfile?.visita_inicial_enabled && (
+          <Link
+            href={`/solicitacoes/nova?profissional=${profissionalId}&visitaInicial=1`}
+            className="block mb-6 rounded-lg border border-gray-200 bg-white p-3 hover:border-teal transition-colors"
+          >
+            <p className="text-sm font-semibold text-black">Solicitar visita inicial</p>
+            <p className="text-xs text-gray-500">
+              {professionalProfile.visita_inicial_price
+                ? `R$ ${professionalProfile.visita_inicial_price}`
+                : "Gratuita"}
+              {professionalProfile.visita_inicial_duration_minutes
+                ? ` · ${professionalProfile.visita_inicial_duration_minutes} min`
+                : ""}
+              {professionalProfile.visita_inicial_modality
+                ? ` · ${professionalProfile.visita_inicial_modality === "online" ? "Online" : "Presencial"}`
+                : ""}
+            </p>
+          </Link>
+        )}
 
         <h2 className="text-sm font-semibold text-black mb-3">Serviços oferecidos</h2>
         <ul className="flex flex-col gap-3 mb-6">
