@@ -8,6 +8,7 @@ import {
   missingProntuarioSections,
   PRONTUARIO_SECTION_LABEL,
 } from "@/lib/domain/category-requirements";
+import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 import type { ServiceCategory } from "@/types/database";
 
 const RECURRENCE_LABEL: Record<string, string> = {
@@ -38,18 +39,22 @@ type PetOption = {
 export function NewRequestForm({
   professionalId,
   pets,
+  initialIsVisitaInicial = false,
 }: {
   professionalId: string;
   pets: PetOption[];
+  initialIsVisitaInicial?: boolean;
 }) {
   const [category, setCategory] = useState("");
   const [petIds, setPetIds] = useState<string[]>([]);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [isVisitaInicial, setIsVisitaInicial] = useState(false);
+  const [isVisitaInicial, setIsVisitaInicial] = useState(initialIsVisitaInicial);
   const [occurrencesTotal, setOccurrencesTotal] = useState("1");
   const [recurrenceInterval, setRecurrenceInterval] = useState("semanal");
   const [firstOccurrenceAt, setFirstOccurrenceAt] = useState("");
   const [notes, setNotes] = useState("");
+  const [address, setAddress] = useState("");
+  const [categoryAnswers, setCategoryAnswers] = useState<Record<string, string>>({});
   const [prontuarioConsent, setProntuarioConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +93,8 @@ export function NewRequestForm({
       notes: notes || undefined,
       isVisitaInicial,
       prontuarioConsent,
+      address: address || undefined,
+      categoryAnswers,
     });
 
     if (!parsed.success) {
@@ -227,6 +234,34 @@ export function NewRequestForm({
           className="input"
         />
       </div>
+
+      <div>
+        <label htmlFor="address" className="block text-sm font-medium text-black mb-1">
+          Endereço do atendimento (opcional)
+        </label>
+        <input
+          id="address"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className="input"
+          placeholder="Rua, número, bairro — se o atendimento for na sua casa"
+        />
+      </div>
+
+      {category && (CATEGORY_QUESTIONS[category] ?? []).length > 0 && (
+        <div className="flex flex-col gap-3">
+          {CATEGORY_QUESTIONS[category].map((q) => (
+            <div key={q.key}>
+              <label className="block text-sm font-medium text-black mb-1">{q.label}</label>
+              <input
+                value={categoryAnswers[q.key] ?? ""}
+                onChange={(e) => setCategoryAnswers((prev) => ({ ...prev, [q.key]: e.target.value }))}
+                className="input"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div>
         <label htmlFor="notes" className="block text-sm font-medium text-black mb-1">

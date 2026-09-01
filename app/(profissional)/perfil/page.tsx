@@ -98,6 +98,15 @@ export default async function PerfilProfissionalPage() {
             languages: languages.join(", "),
             policies: profile?.policies ?? "",
             avatarUrl: profile?.avatar_url ?? "",
+            visitaInicialEnabled: profile?.visita_inicial_enabled ?? false,
+            visitaInicialPrice:
+              profile?.visita_inicial_price != null ? String(profile.visita_inicial_price) : "",
+            visitaInicialDurationMinutes:
+              profile?.visita_inicial_duration_minutes != null
+                ? String(profile.visita_inicial_duration_minutes)
+                : "",
+            visitaInicialModality: profile?.visita_inicial_modality ?? "",
+            visitaInicialDeductible: profile?.visita_inicial_deductible ?? false,
           }}
         />
 

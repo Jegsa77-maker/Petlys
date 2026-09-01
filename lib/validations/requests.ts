@@ -32,8 +32,39 @@ export const createRequestSchema = z.object({
   prontuarioConsent: z.boolean().refine((v) => v === true, {
     message: "Autorize o compartilhamento da ficha do pet para continuar",
   }),
+  // Solicitação contextual (seção 12.1, item 4 da Onda 2) — nenhum dos dois
+  // é obrigatório: local nem sempre se aplica, perguntas são pra ajudar o
+  // Profissional a decidir, não uma barreira de envio.
+  address: z.string().trim().max(300).optional(),
+  categoryAnswers: z.record(z.string(), z.string().trim().max(1000)).default({}),
 });
 export type CreateRequestValues = z.infer<typeof createRequestSchema>;
+
+// Pedido de ajuste (seção 12.1, item 5 da Onda 2) — Tutor devolve a
+// proposta pro Profissional com o que quer mudar, sem precisar recusar de
+// vez (0024_proposta_ajuste.sql libera a transição de status).
+export const requestAdjustmentSchema = z.object({
+  requestId: z.uuid(),
+  proposalId: z.uuid(),
+  feedback: z.string().trim().min(1, "Descreva o que você gostaria de ajustar").max(1000),
+});
+export type RequestAdjustmentValues = z.infer<typeof requestAdjustmentSchema>;
+
+// Reagendar uma ocorrência específica (seção 12.1, item 7 — recorrência
+// avançada) — nunca bloqueia o Profissional, só move a data.
+export const rescheduleOccurrenceSchema = z.object({
+  occurrenceId: z.uuid(),
+  newScheduledAt: z.string().min(1, "Informe a nova data e hora"),
+});
+export type RescheduleOccurrenceValues = z.infer<typeof rescheduleOccurrenceSchema>;
+
+// Editar a recorrência dali pra frente sem corromper ocorrências já
+// executadas (seção 12.1, item 7).
+export const updateRecurrenceSchema = z.object({
+  requestId: z.uuid(),
+  newInterval: z.enum(["diario", "semanal", "quinzenal", "mensal"]),
+});
+export type UpdateRecurrenceValues = z.infer<typeof updateRecurrenceSchema>;
 
 export const sendMessageSchema = z.object({
   requestId: z.uuid(),

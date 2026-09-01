@@ -37,6 +37,11 @@ export async function upsertProfessionalProfile(input: unknown): Promise<ActionR
       languages: parsed.data.languages,
       policies: parsed.data.policies || null,
       avatar_url: parsed.data.avatarUrl || null,
+      visita_inicial_enabled: parsed.data.visitaInicialEnabled,
+      visita_inicial_price: parsed.data.visitaInicialPrice ?? null,
+      visita_inicial_duration_minutes: parsed.data.visitaInicialDurationMinutes ?? null,
+      visita_inicial_modality: parsed.data.visitaInicialModality ?? null,
+      visita_inicial_deductible: parsed.data.visitaInicialDeductible,
     },
     { onConflict: "profile_id" }
   );

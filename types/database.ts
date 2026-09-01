@@ -932,6 +932,11 @@ export type Database = {
           profile_id: string
           specializations: string[]
           updated_at: string
+          visita_inicial_deductible: boolean
+          visita_inicial_duration_minutes: number | null
+          visita_inicial_enabled: boolean
+          visita_inicial_modality: string | null
+          visita_inicial_price: number | null
         }
         Insert: {
           avatar_url?: string | null
@@ -942,6 +947,11 @@ export type Database = {
           profile_id: string
           specializations?: string[]
           updated_at?: string
+          visita_inicial_deductible?: boolean
+          visita_inicial_duration_minutes?: number | null
+          visita_inicial_enabled?: boolean
+          visita_inicial_modality?: string | null
+          visita_inicial_price?: number | null
         }
         Update: {
           avatar_url?: string | null
@@ -952,6 +962,11 @@ export type Database = {
           profile_id?: string
           specializations?: string[]
           updated_at?: string
+          visita_inicial_deductible?: boolean
+          visita_inicial_duration_minutes?: number | null
+          visita_inicial_enabled?: boolean
+          visita_inicial_modality?: string | null
+          visita_inicial_price?: number | null
         }
         Relationships: [
           {
@@ -1218,6 +1233,45 @@ export type Database = {
           },
         ]
       }
+      request_attachments: {
+        Row: {
+          created_at: string
+          id: string
+          request_id: string
+          uploaded_by: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          request_id: string
+          uploaded_by: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          request_id?: string
+          uploaded_by?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_attachments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_occurrences: {
         Row: {
           checkin_at: string | null
@@ -1360,7 +1414,9 @@ export type Database = {
       }
       requests: {
         Row: {
+          address: string | null
           category: Database["public"]["Enums"]["service_category"]
+          category_answers: Json
           commission_percent_snapshot: number | null
           created_at: string
           id: string
@@ -1370,12 +1426,15 @@ export type Database = {
           origin_request_id: string | null
           professional_id: string
           prontuario_shared_at: string | null
+          recurrence_interval: string | null
           status: Database["public"]["Enums"]["request_status"]
           tutor_id: string
           updated_at: string
         }
         Insert: {
+          address?: string | null
           category: Database["public"]["Enums"]["service_category"]
+          category_answers?: Json
           commission_percent_snapshot?: number | null
           created_at?: string
           id?: string
@@ -1385,12 +1444,15 @@ export type Database = {
           origin_request_id?: string | null
           professional_id: string
           prontuario_shared_at?: string | null
+          recurrence_interval?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           tutor_id: string
           updated_at?: string
         }
         Update: {
+          address?: string | null
           category?: Database["public"]["Enums"]["service_category"]
+          category_answers?: Json
           commission_percent_snapshot?: number | null
           created_at?: string
           id?: string
@@ -1400,6 +1462,7 @@ export type Database = {
           origin_request_id?: string | null
           professional_id?: string
           prontuario_shared_at?: string | null
+          recurrence_interval?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           tutor_id?: string
           updated_at?: string

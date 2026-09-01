@@ -5,6 +5,9 @@ import {
   createRequestSchema,
   sendMessageSchema,
   sendProposalSchema,
+  requestAdjustmentSchema,
+  rescheduleOccurrenceSchema,
+  updateRecurrenceSchema,
   RECURRENCE_INTERVAL_DAYS,
 } from "@/lib/validations/requests";
 import {
@@ -57,6 +60,26 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
     }
   }
 
+  // Visita inicial anterior com este mesmo par Tutor/Profissional (seção
+  // 7.4/12.1) — vincula automaticamente o novo atendimento como
+  // continuação, pra permitir abater o valor da visita quando o pagamento
+  // real existir (Onda 3). Silencioso: não bloqueia nem exige nada do
+  // Tutor, só registra a relação quando ela existe.
+  let originRequestId: string | null = null;
+  if (!parsed.data.isVisitaInicial) {
+    const { data: priorVisita } = await supabase
+      .from("requests")
+      .select("id")
+      .eq("tutor_id", user.id)
+      .eq("professional_id", parsed.data.professionalId)
+      .eq("is_visita_inicial", true)
+      .in("status", ["avaliacao", "concluido"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    originRequestId = priorVisita?.id ?? null;
+  }
+
   const { data: request, error: requestError } = await supabase
     .from("requests")
     .insert({
@@ -66,7 +89,11 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
       status: "rascunho",
       is_recurring: parsed.data.isRecurring,
       occurrences_total: parsed.data.occurrencesTotal,
+      recurrence_interval: parsed.data.isRecurring ? parsed.data.recurrenceInterval : null,
       is_visita_inicial: parsed.data.isVisitaInicial,
+      origin_request_id: originRequestId,
+      address: parsed.data.address || null,
+      category_answers: parsed.data.categoryAnswers,
       // Consentimento é validado pelo schema (prontuarioConsent === true) —
       // aqui só registramos o carimbo de quando foi dado (seção 6.4).
       prontuario_shared_at: new Date().toISOString(),
@@ -318,6 +345,19 @@ export async function acceptProposal(requestId: string, proposalId: string): Pro
     return { error: "Você não tem permissão para aceitar esta proposta." };
   }
 
+  // Expiração automática (seção 12.1, item 5) — revalidado no servidor,
+  // nunca só na interface: uma proposta vencida não pode ser aceita, mesmo
+  // que o botão ainda apareça numa tela desatualizada.
+  const { data: proposalCheck } = await supabase
+    .from("proposals")
+    .select("validity_at")
+    .eq("id", proposalId)
+    .single();
+
+  if (proposalCheck && new Date(proposalCheck.validity_at) < new Date()) {
+    return { error: "Essa proposta expirou. Peça ao profissional para enviar uma nova." };
+  }
+
   const { data: proposal, error: proposalError } = await supabase
     .from("proposals")
     .update({ accepted_at: new Date().toISOString() })
@@ -367,5 +407,177 @@ export async function acceptProposal(requestId: string, proposalId: string): Pro
   }
 
   revalidatePath(`/solicitacoes/${requestId}`);
+  return { error: null };
+}
+
+/**
+ * Tutor pede ajuste numa proposta em vez de aceitar ou recusar de vez
+ * (seção 12.1, item 5). Devolve a solicitação pra conversa — o Profissional
+ * pode então enviar uma nova versão da proposta. Registra o pedido como
+ * mensagem no chat, pra ficar no histórico visível pras duas partes.
+ */
+export async function requestAdjustment(input: unknown): Promise<ActionResult> {
+  const parsed = requestAdjustmentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Descreva o ajuste desejado" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: request } = await supabase
+    .from("requests")
+    .select("id, tutor_id, status")
+    .eq("id", parsed.data.requestId)
+    .single();
+
+  if (!request || request.tutor_id !== user.id) {
+    return { error: "Você não tem permissão para pedir ajuste nesta solicitação." };
+  }
+
+  const { error: messageError } = await supabase.from("messages").insert({
+    request_id: parsed.data.requestId,
+    sender_id: user.id,
+    content: `Pedido de ajuste na proposta: ${parsed.data.feedback}`,
+  });
+  if (messageError) {
+    return { error: "Não foi possível registrar o pedido de ajuste." };
+  }
+
+  const { error: statusError2 } = await supabase
+    .from("requests")
+    .update({ status: "em_conversa" })
+    .eq("id", parsed.data.requestId);
+  if (statusError2) {
+    return { error: "Pedido registrado no chat, mas houve um erro ao atualizar o status." };
+  }
+
+  revalidatePath(`/solicitacoes/${parsed.data.requestId}`);
+  return { error: null };
+}
+
+/**
+ * Reagendar uma ocorrência específica (seção 12.1, item 7 — recorrência
+ * avançada). Nunca bloqueia: qualquer parte da solicitação pode mover uma
+ * ocorrência ainda não iniciada. Ocorrências em andamento/concluídas ficam
+ * intocáveis — reagendar o passado não faz sentido.
+ */
+export async function rescheduleOccurrence(input: unknown): Promise<ActionResult> {
+  const parsed = rescheduleOccurrenceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: occurrence } = await supabase
+    .from("request_occurrences")
+    .select("id, request_id, status")
+    .eq("id", parsed.data.occurrenceId)
+    .single();
+
+  if (!occurrence) {
+    return { error: "Ocorrência não encontrada." };
+  }
+  if (occurrence.status !== "agendado") {
+    return { error: "Só é possível reagendar uma ocorrência que ainda não começou." };
+  }
+
+  const { error } = await supabase
+    .from("request_occurrences")
+    .update({ scheduled_at: new Date(parsed.data.newScheduledAt).toISOString() })
+    .eq("id", parsed.data.occurrenceId);
+
+  if (error) {
+    return { error: "Não foi possível reagendar. Verifique se você faz parte desta solicitação." };
+  }
+
+  revalidatePath(`/solicitacoes/${occurrence.request_id}`);
+  return { error: null };
+}
+
+/**
+ * Muda a frequência de um contrato recorrente dali pra frente, sem
+ * corromper ocorrências já executadas (seção 12.1, item 7). Recalcula as
+ * datas só das ocorrências ainda 'agendado', ancoradas na próxima que
+ * ainda vai acontecer — o histórico (concluído/cancelado) nunca é tocado.
+ */
+export async function updateRecurrence(input: unknown): Promise<ActionResult> {
+  const parsed = updateRecurrenceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: request } = await supabase
+    .from("requests")
+    .select("id, is_recurring")
+    .eq("id", parsed.data.requestId)
+    .single();
+
+  if (!request || !request.is_recurring) {
+    return { error: "Esta solicitação não é um contrato recorrente." };
+  }
+
+  const { data: pendingOccurrences } = await supabase
+    .from("request_occurrences")
+    .select("id, scheduled_at, sequence_number")
+    .eq("request_id", parsed.data.requestId)
+    .eq("status", "agendado")
+    .order("sequence_number", { ascending: true });
+
+  if (!pendingOccurrences || pendingOccurrences.length === 0) {
+    return { error: "Não há ocorrências futuras para reorganizar." };
+  }
+
+  const intervalDays = RECURRENCE_INTERVAL_DAYS[parsed.data.newInterval];
+  const anchorMs = new Date(pendingOccurrences[0].scheduled_at).getTime();
+
+  const updates = pendingOccurrences.map((occ, i) => ({
+    id: occ.id,
+    scheduled_at: new Date(anchorMs + i * intervalDays * 24 * 60 * 60 * 1000).toISOString(),
+  }));
+
+  const updateResults = await Promise.all(
+    updates.map((u) =>
+      supabase.from("request_occurrences").update({ scheduled_at: u.scheduled_at }).eq("id", u.id)
+    )
+  );
+  const failedUpdate = updateResults.find((r) => r.error);
+
+  if (failedUpdate) {
+    return { error: "Não foi possível atualizar as próximas ocorrências." };
+  }
+
+  const { error: requestError } = await supabase
+    .from("requests")
+    .update({ recurrence_interval: parsed.data.newInterval })
+    .eq("id", parsed.data.requestId);
+  if (requestError) {
+    return { error: "Ocorrências atualizadas, mas houve um erro ao salvar a nova frequência." };
+  }
+
+  revalidatePath(`/solicitacoes/${parsed.data.requestId}`);
   return { error: null };
 }

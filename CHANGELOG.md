@@ -4,6 +4,37 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 2 completa: itens 4, 5, 6 e 7 (solicitação contextual, ajuste de proposta, visita inicial, recorrência avançada)
+
+**Entrega:** fecha a Onda 2 por completo — os quatro itens restantes do plano (Especificação v2.0, seção 12.1), depois da agenda flexível (item 5, parte) já ter sido entregue em entrada anterior deste changelog.
+
+**Item 4 — Solicitação contextual completa:**
+- `supabase/migrations/0023_solicitacao_contextual.sql`: `requests` ganha `address` (texto livre, opcional) e `category_answers` (jsonb); nova tabela `request_attachments` (RLS: leitura pra parte da solicitação ou admin/supervisor; inserção só por quem é parte) + bucket privado `request-attachments` (mesmo padrão de path `{request_id}/arquivo` das entregas anteriores).
+- `lib/domain/category-questions.ts`: uma pergunta específica por categoria de serviço (ex.: pet sitter pergunta acesso à residência; veterinário domiciliar pergunta sintomas) — nenhuma é obrigatória no schema, é só contexto a mais que o Profissional recebe já na solicitação.
+- `components/requests/request-attachments-section.tsx`: upload/visualização de anexos da solicitação (reaproveita `FileUploadField` da Onda 1), com URL assinada pra visualização (bucket privado).
+- Formulário de nova solicitação (`components/requests/new-request-form.tsx`) e página de detalhe ganham os campos de endereço, perguntas por categoria e anexos.
+
+**Item 5 (conclusão) — Propostas completas:**
+- `supabase/migrations/0024_proposta_ajuste.sql`: libera a transição de status `proposta_enviada → em_conversa` na máquina de estados (`request_status_transitions_allowed`) — sem isso, "pedir ajuste" seria bloqueado pelo trigger de transição.
+- `lib/actions/requests.ts` (`requestAdjustment`): Tutor pede ajuste numa proposta ainda não aceita — grava o feedback como mensagem no chat e volta o status pra `em_conversa`, sem preço/escopo novo ainda (o Profissional reenvia uma nova versão pelo fluxo normal de proposta).
+- `acceptProposal` ganha checagem de expiração (`validity_at`) antes de aceitar — bloqueia aceite de proposta vencida.
+- `components/requests/proposal-panel.tsx`: histórico de versões anteriores com diff de preço (`<details>` colapsável), badge de "Proposta expirada", botão "Pedir ajuste" com formulário inline.
+
+**Item 6 — Visita inicial como jornada própria:**
+- `supabase/migrations/0025_visita_inicial_config.sql`: `professional_profiles` ganha `visita_inicial_enabled/price/duration_minutes/modality/deductible` — o Profissional configura se oferece visita inicial, preço (nulo = gratuita), duração, modalidade e se é abatido do primeiro contrato fechado.
+- Perfil do Profissional (`app/(profissional)/perfil/page.tsx` + form) ganha o bloco de configuração; perfil público do Profissional (`app/(tutor)/profissional/[profissionalId]/page.tsx`) mostra um card "Solicitar visita inicial" com preço/duração/modalidade quando habilitado, linkando pra `/solicitacoes/nova?...&visitaInicial=1`.
+- `createRequest` faz auto-link silencioso: se o Tutor já teve uma visita inicial concluída/avaliada com o mesmo Profissional, a nova solicitação grava `origin_request_id` automaticamente — sem UI extra, é só contexto de histórico entre visita e contrato completo.
+
+**Item 7 — Recorrência avançada:**
+- `supabase/migrations/0026_recorrencia_avancada.sql`: `requests.recurrence_interval` passa a ser persistido (antes só existia no momento da criação, sem ficar salvo).
+- `lib/actions/requests.ts` (`rescheduleOccurrence`): reagenda uma ocorrência específica (`request_occurrences.status = 'agendado'`) pra qualquer parte da solicitação, sem aprovação da contraparte — "nunca bloqueia a agenda", mesmo princípio já usado na agenda flexível.
+- `lib/actions/requests.ts` (`updateRecurrence`): edita a frequência dali pra frente — recalcula só as ocorrências com `status = 'agendado'`, ancorando na primeira pendente; ocorrências já `concluido`/`cancelado` nunca são tocadas (verificado com checagem direta no banco: ocorrência concluída manteve a data, as `agendado` foram recalculadas).
+- Timezone: avaliado e descartado como item separado — a matemática de data já usada em todo o projeto é UTC-safe (mesmo padrão da agenda flexível), não havia bug a corrigir.
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado com sessões reais (RLS), incluindo os quatro fluxos ponta a ponta na UI real (não só via script): solicitação com endereço + pergunta de categoria + visita inicial pré-marcada via link; profissional envia proposta → tutor pede ajuste → status volta pra "Em conversa" e a mensagem aparece no chat; reagendar uma ocorrência específica sem afetar as demais; editar recorrência de semanal pra quinzenal recalculando só as ocorrências futuras. Upload de anexo testado com sessão RLS real, incluindo checagem negativa (um Tutor que não é parte da solicitação não enxerga o anexo).
+
+---
+
 ## 2026-09-01 — Criação do IDEIAS_FUTURAS.md
 
 **Contexto:** usuário quis registrar duas ideias de funcionalidade pra Onda 5 (CRM) antes de continuar a Onda 2, pra não perdê-las: (1) Kanban reordenável manualmente pelo Profissional, evoluindo pra sugestão de rota mais rápida entre atendimentos com integração de trânsito, e estimativa de chegada em tempo real conforme o horário se aproxima; (2) post automático no Instagram, com selo Petlys e comentário do Tutor, usando uma foto do relatório do atendimento escolhida pelo Profissional.

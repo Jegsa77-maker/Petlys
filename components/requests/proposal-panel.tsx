@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { acceptProposal, sendProposal } from "@/lib/actions/requests";
+import { acceptProposal, sendProposal, requestAdjustment } from "@/lib/actions/requests";
 import { sendProposalSchema } from "@/lib/validations/requests";
 
 const PERIOD_LABEL: Record<string, string> = {
@@ -34,6 +34,7 @@ export function ProposalPanel({
   viewerRole: "tutor" | "profissional";
 }) {
   const latest = proposals.at(-1) ?? null;
+  const older = proposals.slice(0, -1).reverse();
 
   return (
     <div className="flex flex-col gap-4">
@@ -41,6 +42,36 @@ export function ProposalPanel({
         <ProposalCard requestId={requestId} proposal={latest} viewerRole={viewerRole} />
       ) : (
         <p className="text-sm text-gray-400">Nenhuma proposta enviada ainda.</p>
+      )}
+
+      {older.length > 0 && (
+        <details className="text-xs text-gray-500">
+          <summary className="cursor-pointer font-semibold text-gray-600">
+            Ver versões anteriores ({older.length})
+          </summary>
+          <ul className="flex flex-col gap-2 mt-2">
+            {older.map((p) => {
+              const total = Number(p.price) + Number(p.additional_fees);
+              const priceDiff = total - (Number(latest?.price ?? 0) + Number(latest?.additional_fees ?? 0));
+              return (
+                <li key={p.id} className="rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Proposta v{p.version}</span>
+                    <span>R$ {total.toFixed(2)}</span>
+                  </div>
+                  <p className="mt-1">{p.scope}</p>
+                  {priceDiff !== 0 && (
+                    <p className="mt-1 text-teal">
+                      {priceDiff > 0
+                        ? `R$ ${priceDiff.toFixed(2)} mais barata que a versão atual`
+                        : `R$ ${Math.abs(priceDiff).toFixed(2)} mais cara que a versão atual`}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       )}
 
       {viewerRole === "profissional" && (!latest || latest.accepted_at === null) && (
@@ -61,7 +92,10 @@ function ProposalCard({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [feedback, setFeedback] = useState("");
   const total = Number(proposal.price) + Number(proposal.additional_fees);
+  const isExpired = !proposal.accepted_at && new Date(proposal.validity_at) < new Date();
 
   async function handleAccept() {
     setError(null);
@@ -69,6 +103,20 @@ function ProposalCard({
     const result = await acceptProposal(requestId, proposal.id);
     setIsSubmitting(false);
     if (result?.error) setError(result.error);
+  }
+
+  async function handleAdjustmentSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    const result = await requestAdjustment({ requestId, proposalId: proposal.id, feedback });
+    setIsSubmitting(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    setIsAdjusting(false);
+    setFeedback("");
   }
 
   return (
@@ -99,15 +147,56 @@ function ProposalCard({
 
       {proposal.accepted_at ? (
         <p className="mt-3 inline-block text-xs font-semibold text-black bg-green px-2 py-1 rounded-full">Proposta aceita</p>
+      ) : isExpired ? (
+        <p className="mt-3 inline-block text-xs font-semibold text-red-700 bg-red-50 px-2 py-1 rounded-full">
+          Proposta expirada
+        </p>
       ) : viewerRole === "tutor" ? (
-        <button
-          type="button"
-          onClick={handleAccept}
-          disabled={isSubmitting}
-          className="mt-3 w-full rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-        >
-          {isSubmitting ? "Aceitando..." : "Aceitar proposta"}
-        </button>
+        <div className="mt-3 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={handleAccept}
+            disabled={isSubmitting}
+            className="w-full rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {isSubmitting ? "Aceitando..." : "Aceitar proposta"}
+          </button>
+          {!isAdjusting ? (
+            <button
+              type="button"
+              onClick={() => setIsAdjusting(true)}
+              className="text-xs font-semibold text-teal hover:underline w-fit"
+            >
+              Pedir ajuste
+            </button>
+          ) : (
+            <form onSubmit={handleAdjustmentSubmit} className="flex flex-col gap-2">
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="O que você gostaria de ajustar nessa proposta?"
+                rows={2}
+                className="input text-sm"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 rounded-lg border border-teal px-3 py-1.5 text-xs font-semibold text-teal hover:bg-teal/5 disabled:opacity-60"
+                >
+                  Enviar pedido de ajuste
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAdjusting(false)}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       ) : null}
       {error && <p className="text-sm text-red-600 mt-2" role="alert">{error}</p>}
     </div>
@@ -213,6 +302,7 @@ function NewProposalForm({ requestId }: { requestId: string }) {
           resolve pelo chat se precisar de mais ajuste.
         </p>
       </div>
+
       <div className="grid grid-cols-2 gap-2">
         <input
           type="number"

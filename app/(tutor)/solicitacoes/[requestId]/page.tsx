@@ -7,6 +7,10 @@ import { RequestTimeline } from "@/components/requests/request-timeline";
 import { NoShowButton } from "@/components/requests/no-show-button";
 import { ReviewSection } from "@/components/requests/review-section";
 import { EvidenceUpload } from "@/components/requests/evidence-upload";
+import { RequestAttachmentsSection } from "@/components/requests/request-attachments-section";
+import { RescheduleOccurrenceButton } from "@/components/requests/reschedule-occurrence-button";
+import { EditRecurrenceForm } from "@/components/requests/edit-recurrence-form";
+import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 
 const STATUS_LABEL: Record<string, string> = {
   rascunho: "Rascunho",
@@ -41,7 +45,9 @@ export default async function SolicitacaoDetailPage({
 
   const { data: request } = await supabase
     .from("requests")
-    .select("id, tutor_id, professional_id, category, status, is_recurring, occurrences_total, is_visita_inicial")
+    .select(
+      "id, tutor_id, professional_id, category, status, is_recurring, occurrences_total, is_visita_inicial, address, category_answers, recurrence_interval"
+    )
     .eq("id", requestId)
     .single();
 
@@ -70,6 +76,7 @@ export default async function SolicitacaoDetailPage({
     { data: occurrences },
     { data: incidents },
     { data: reviews },
+    { data: attachments },
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -103,6 +110,11 @@ export default async function SolicitacaoDetailPage({
       .from("reviews")
       .select("id, reviewer_id, reviewee_id, rating, comment, response")
       .eq("request_id", requestId),
+    supabase
+      .from("request_attachments")
+      .select("id, url, created_at")
+      .eq("request_id", requestId)
+      .order("created_at", { ascending: true }),
   ]);
 
   const pets = (petLinks ?? [])
@@ -141,9 +153,29 @@ export default async function SolicitacaoDetailPage({
             {pets.map((p) => p.name).join(", ") || "Solicitação"}
           </h1>
           {request.is_recurring && (
-            <p className="text-xs text-gray-500">
-              Contrato recorrente — {request.occurrences_total} ocorrências
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-xs text-gray-500">
+                Contrato recorrente — {request.occurrences_total} ocorrências
+              </p>
+              {viewerRole !== "staff" && (
+                <EditRecurrenceForm requestId={request.id} currentInterval={request.recurrence_interval} />
+              )}
+            </div>
+          )}
+          {request.address && (
+            <p className="text-xs text-gray-500 mt-1">Local: {request.address}</p>
+          )}
+          {Object.keys((request.category_answers as Record<string, string>) ?? {}).length > 0 && (
+            <div className="mt-1 flex flex-col gap-0.5">
+              {Object.entries(request.category_answers as Record<string, string>).map(([key, value]) => {
+                const question = CATEGORY_QUESTIONS[request.category]?.find((q) => q.key === key);
+                return value ? (
+                  <p key={key} className="text-xs text-gray-500">
+                    <span className="font-medium">{question?.label ?? key}:</span> {value}
+                  </p>
+                ) : null;
+              })}
+            </div>
           )}
         </div>
 
@@ -184,12 +216,13 @@ export default async function SolicitacaoDetailPage({
               </span>
             </div>
             {currentOccurrence.status === "agendado" && viewerRole !== "staff" && (
-              <div className="mt-3">
+              <div className="mt-3 flex items-center justify-between">
                 <NoShowButton
                   requestId={request.id}
                   occurrenceId={currentOccurrence.id}
                   viewerRole={viewerRole}
                 />
+                <RescheduleOccurrenceButton occurrenceId={currentOccurrence.id} />
               </div>
             )}
           </section>
@@ -238,6 +271,10 @@ export default async function SolicitacaoDetailPage({
             staffSenderIds={staffSenderIds}
           />
         </section>
+
+        {viewerRole !== "staff" && (
+          <RequestAttachmentsSection requestId={request.id} attachments={attachments ?? []} />
+        )}
 
         <section>
           <h2 className="text-sm font-semibold text-black mb-2">Histórico</h2>
