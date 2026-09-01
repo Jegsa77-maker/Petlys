@@ -78,7 +78,9 @@ export default async function SolicitacaoDetailPage({
       .order("created_at", { ascending: true }),
     supabase
       .from("proposals")
-      .select("id, version, scope, price, additional_fees, validity_at, requires_full_payment, deposit_percent, accepted_at")
+      .select(
+        "id, version, scope, price, additional_fees, validity_at, requires_full_payment, deposit_percent, accepted_at, proposed_scheduled_at, proposed_period"
+      )
       .eq("request_id", requestId)
       .order("version", { ascending: true }),
     supabase.from("request_pets").select("pets(id, name)").eq("request_id", requestId),

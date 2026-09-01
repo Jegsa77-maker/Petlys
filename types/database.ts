@@ -1159,6 +1159,8 @@ export type Database = {
           deposit_percent: number | null
           id: string
           price: number
+          proposed_period: string | null
+          proposed_scheduled_at: string | null
           request_id: string
           requires_full_payment: boolean
           scope: string
@@ -1174,6 +1176,8 @@ export type Database = {
           deposit_percent?: number | null
           id?: string
           price: number
+          proposed_period?: string | null
+          proposed_scheduled_at?: string | null
           request_id: string
           requires_full_payment?: boolean
           scope: string
@@ -1189,6 +1193,8 @@ export type Database = {
           deposit_percent?: number | null
           id?: string
           price?: number
+          proposed_period?: string | null
+          proposed_scheduled_at?: string | null
           request_id?: string
           requires_full_payment?: boolean
           scope?: string

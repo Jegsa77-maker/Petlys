@@ -4,6 +4,12 @@ import { useState } from "react";
 import { acceptProposal, sendProposal } from "@/lib/actions/requests";
 import { sendProposalSchema } from "@/lib/validations/requests";
 
+const PERIOD_LABEL: Record<string, string> = {
+  manha: "Manhã",
+  tarde: "Tarde",
+  noite: "Noite",
+};
+
 type Proposal = {
   id: string;
   version: number;
@@ -14,6 +20,8 @@ type Proposal = {
   requires_full_payment: boolean;
   deposit_percent: number | null;
   accepted_at: string | null;
+  proposed_scheduled_at: string | null;
+  proposed_period: string | null;
 };
 
 export function ProposalPanel({
@@ -70,6 +78,16 @@ function ProposalCard({
         <p className="text-sm font-semibold text-teal">R$ {total.toFixed(2)}</p>
       </div>
       <p className="text-sm text-gray-600 mb-2">{proposal.scope}</p>
+      {proposal.proposed_scheduled_at && (
+        <p className="text-xs text-teal font-medium">
+          Novo horário proposto: {new Date(proposal.proposed_scheduled_at).toLocaleString("pt-BR")}
+        </p>
+      )}
+      {proposal.proposed_period && (
+        <p className="text-xs text-teal font-medium">
+          Período proposto: {PERIOD_LABEL[proposal.proposed_period] ?? proposal.proposed_period} (horário exato a combinar pelo chat)
+        </p>
+      )}
       <p className="text-xs text-gray-400">
         Válida até {new Date(proposal.validity_at).toLocaleString("pt-BR")}
       </p>
@@ -104,6 +122,9 @@ function NewProposalForm({ requestId }: { requestId: string }) {
   const [requiresFullPayment, setRequiresFullPayment] = useState(true);
   const [depositPercent, setDepositPercent] = useState("");
   const [cancellationPolicyText, setCancellationPolicyText] = useState("");
+  const [scheduleChoice, setScheduleChoice] = useState<"manter" | "horario_exato" | "periodo">("manter");
+  const [proposedScheduledAt, setProposedScheduledAt] = useState("");
+  const [proposedPeriod, setProposedPeriod] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -120,6 +141,9 @@ function NewProposalForm({ requestId }: { requestId: string }) {
       requiresFullPayment,
       depositPercent: requiresFullPayment ? undefined : depositPercent,
       cancellationPolicyText,
+      scheduleChoice,
+      proposedScheduledAt: scheduleChoice === "horario_exato" ? proposedScheduledAt : undefined,
+      proposedPeriod: scheduleChoice === "periodo" ? proposedPeriod : undefined,
     });
 
     if (!parsed.success) {
@@ -136,6 +160,9 @@ function NewProposalForm({ requestId }: { requestId: string }) {
       setScope("");
       setPrice("");
       setCancellationPolicyText("");
+      setScheduleChoice("manter");
+      setProposedScheduledAt("");
+      setProposedPeriod("");
     }
   }
 
@@ -149,6 +176,43 @@ function NewProposalForm({ requestId }: { requestId: string }) {
         rows={2}
         className="input"
       />
+
+      <div>
+        <p className="text-xs font-medium text-black mb-1">Horário</p>
+        <select
+          value={scheduleChoice}
+          onChange={(e) => setScheduleChoice(e.target.value as typeof scheduleChoice)}
+          className="input"
+        >
+          <option value="manter">Manter o horário que o Tutor pediu</option>
+          <option value="horario_exato">Propor outro horário exato</option>
+          <option value="periodo">Propor só um período (sem hora exata)</option>
+        </select>
+        {scheduleChoice === "horario_exato" && (
+          <input
+            type="datetime-local"
+            value={proposedScheduledAt}
+            onChange={(e) => setProposedScheduledAt(e.target.value)}
+            className="input mt-2"
+          />
+        )}
+        {scheduleChoice === "periodo" && (
+          <select
+            value={proposedPeriod}
+            onChange={(e) => setProposedPeriod(e.target.value)}
+            className="input mt-2"
+          >
+            <option value="">Selecione o período</option>
+            <option value="manha">Manhã</option>
+            <option value="tarde">Tarde</option>
+            <option value="noite">Noite</option>
+          </select>
+        )}
+        <p className="text-xs text-gray-400 mt-1">
+          Isso nunca bloqueia sua agenda — é só o que você propõe ao Tutor; o horário final se
+          resolve pelo chat se precisar de mais ajuste.
+        </p>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <input
           type="number"
