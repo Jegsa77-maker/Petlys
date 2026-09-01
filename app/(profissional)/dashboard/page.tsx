@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Inbox, Calendar, Wallet, LayoutGrid, PawPrint } from "lucide-react";
+import { Inbox, Calendar, Wallet, LayoutGrid, PawPrint, UserRound } from "lucide-react";
 
 export default async function ProfessionalDashboardPage() {
   const supabase = await createClient();
@@ -53,6 +53,7 @@ export default async function ProfessionalDashboardPage() {
         </div>
 
         <div className="flex flex-col gap-2 mb-6">
+          <QuickLink href="/perfil" icon={<UserRound size={16} />} label="Meu perfil" />
           <QuickLink href="/agenda" icon={<Calendar size={16} />} label="Agenda e bloqueios" />
           <QuickLink href="/servicos" icon={<Inbox size={16} />} label="Serviços e preços" />
           <QuickLink href="/kanban" icon={<LayoutGrid size={16} />} label="Kanban de atendimentos" />
