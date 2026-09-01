@@ -7,6 +7,10 @@ import {
   sendProposalSchema,
   RECURRENCE_INTERVAL_DAYS,
 } from "@/lib/validations/requests";
+import {
+  missingProntuarioSections,
+  PRONTUARIO_SECTION_LABEL,
+} from "@/lib/domain/category-requirements";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -35,6 +39,24 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
     return { error: "Sessão expirada. Faça login novamente." };
   }
 
+  // Requisitos dinâmicos por categoria (seção 6.4): bloqueia o envio se
+  // faltar alguma seção do prontuário que a categoria escolhida exige —
+  // ex.: passeador precisa saber comportamento/emergência antes de aceitar.
+  const { data: selectedPets } = await supabase
+    .from("pets")
+    .select("id, name, health_info, behavior_info, routine_info, emergency_info")
+    .in("id", parsed.data.petIds);
+
+  for (const pet of selectedPets ?? []) {
+    const missing = missingProntuarioSections(pet, parsed.data.category);
+    if (missing.length > 0) {
+      const labels = missing.map((s) => PRONTUARIO_SECTION_LABEL[s]).join(", ");
+      return {
+        error: `Complete o prontuário de ${pet.name} antes de solicitar esse serviço (falta: ${labels}). Vá em Meus pets > ${pet.name} para preencher.`,
+      };
+    }
+  }
+
   const { data: request, error: requestError } = await supabase
     .from("requests")
     .insert({
@@ -45,6 +67,9 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
       is_recurring: parsed.data.isRecurring,
       occurrences_total: parsed.data.occurrencesTotal,
       is_visita_inicial: parsed.data.isVisitaInicial,
+      // Consentimento é validado pelo schema (prontuarioConsent === true) —
+      // aqui só registramos o carimbo de quando foi dado (seção 6.4).
+      prontuario_shared_at: new Date().toISOString(),
     })
     .select("id")
     .single();

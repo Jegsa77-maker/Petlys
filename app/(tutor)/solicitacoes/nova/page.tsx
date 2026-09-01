@@ -21,7 +21,7 @@ export default async function NovaSolicitacaoPage({
   const { data: petLinks } = user
     ? await supabase
         .from("pet_tutors")
-        .select("pets(id, name)")
+        .select("pets(id, name, health_info, behavior_info, routine_info, emergency_info)")
         .eq("tutor_profile_id", user.id)
     : { data: null };
 

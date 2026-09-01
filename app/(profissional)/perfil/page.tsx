@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProfessionalProfileForm } from "@/components/professional/professional-profile-form";
+import { CertificationsSection } from "@/components/professional/certifications-section";
+import {
+  computeProfessionalLevel,
+  averageRating,
+  PROFESSIONAL_LEVEL_LABEL,
+} from "@/lib/domain/professional-reputation";
 import Link from "next/link";
-import { Eye } from "lucide-react";
+import { Eye, Award } from "lucide-react";
 
 export default async function PerfilProfissionalPage() {
   const supabase = await createClient();
@@ -11,14 +17,33 @@ export default async function PerfilProfissionalPage() {
 
   if (!user) return null;
 
-  const [{ data: profile }, { count: activeServicesCount }] = await Promise.all([
+  const [
+    { data: profile },
+    { count: activeServicesCount },
+    { data: certifications },
+    { count: completedCount },
+    { data: reviews },
+  ] = await Promise.all([
     supabase.from("professional_profiles").select("*").eq("profile_id", user.id).maybeSingle(),
     supabase
       .from("professional_services")
       .select("id", { count: "exact", head: true })
       .eq("professional_id", user.id)
       .eq("active", true),
+    supabase
+      .from("professional_certifications")
+      .select("id, category, status, review_notes")
+      .eq("professional_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("requests")
+      .select("id", { count: "exact", head: true })
+      .eq("professional_id", user.id)
+      .in("status", ["avaliacao", "concluido"]),
+    supabase.from("reviews").select("rating").eq("reviewee_id", user.id),
   ]);
+
+  const level = computeProfessionalLevel(completedCount ?? 0, averageRating(reviews ?? []));
 
   const specializations = profile?.specializations ?? [];
   const languages = profile?.languages ?? [];
@@ -40,9 +65,12 @@ export default async function PerfilProfissionalPage() {
       <div className="max-w-md mx-auto flex flex-col gap-6">
         <div>
           <h1 className="text-2xl font-bold text-teal mb-1">Meu perfil</h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 mb-2">
             É o que o Tutor vê antes de decidir contratar você.
           </p>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-teal bg-teal/10 rounded-full px-2 py-1 w-fit">
+            <Award size={14} /> {PROFESSIONAL_LEVEL_LABEL[level]}
+          </span>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -62,6 +90,7 @@ export default async function PerfilProfissionalPage() {
         </div>
 
         <ProfessionalProfileForm
+          profileId={user.id}
           initial={{
             bio: profile?.bio ?? "",
             experienceYears: profile?.experience_years != null ? String(profile.experience_years) : "",
@@ -71,6 +100,8 @@ export default async function PerfilProfissionalPage() {
             avatarUrl: profile?.avatar_url ?? "",
           }}
         />
+
+        <CertificationsSection professionalId={user.id} certifications={certifications ?? []} />
       </div>
     </main>
   );

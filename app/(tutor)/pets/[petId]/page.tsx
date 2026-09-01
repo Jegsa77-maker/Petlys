@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { PawPrint } from "lucide-react";
 import { CoTutorsSection } from "@/components/pets/co-tutors-section";
+import { PetMediaSection } from "@/components/pets/pet-media-section";
 import { PetProfileSection, type FieldDef } from "@/components/pets/pet-profile-section";
 import {
   updatePetHealth,
@@ -108,6 +109,10 @@ export default async function PetDetailPage({
         <div className="grid grid-cols-2 gap-3 mb-6">
           <InfoCard label="Porte" value={pet.size ?? "—"} />
           <InfoCard label="Peso" value={pet.weight ? `${pet.weight} kg` : "—"} />
+        </div>
+
+        <div className="mb-6">
+          <PetMediaSection petId={pet.id} photoUrl={pet.photo_url} hasDocument={!!pet.document_url} />
         </div>
 
         <div className="flex flex-col gap-3 mb-6">

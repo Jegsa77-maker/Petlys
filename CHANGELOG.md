@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 1: fechamento (termos, requisitos por categoria, upload real, habilitações e selos)
+
+**Entrega:** últimas quatro histórias da Onda 1, encerrando a onda — termos versionados (6.1), requisitos dinâmicos do prontuário + consentimento de compartilhamento (6.2/6.4), upload real de arquivo (6.1/6.2/6.3) e habilitações/selos do profissional (6.3). Migration única `0018_terms_consent_documents_certifications.sql`.
+
+- **Termos e privacidade (6.1):** nova tabela `terms_acceptances` (aceite versionado — `CURRENT_TERMS_VERSION` em `lib/domain/terms.ts`). Gate obrigatório em `lib/supabase/middleware.ts`, entre a verificação de telefone/e-mail e a escolha de papel: sem aceite da versão vigente, qualquer rota redireciona pra `/aceitar-termos` (novo). Texto de Termos/Privacidade é um placeholder funcional — precisa de revisão jurídica antes de produção (documentado no próprio arquivo).
+- **Requisitos dinâmicos por categoria + consentimento (6.2/6.4):** `lib/domain/category-requirements.ts` mapeia cada categoria de serviço às seções do prontuário que ela exige (ex.: passeador exige comportamento; hospedagem exige rotina). `NewRequestForm` avisa quais pets estão incompletos pra categoria escolhida e bloqueia o envio até resolver; `createRequest` valida de novo no servidor (RLS não cobre isso, é regra de produto). Checkbox obrigatório "Autorizo compartilhar a ficha..." grava `requests.prontuario_shared_at` (nova coluna) no momento da criação.
+- **Upload real de arquivo (6.1/6.2/6.3):** `components/shared/file-upload-field.tsx` (novo, genérico) substitui os campos de URL por upload de verdade em 4 lugares: avatar do profissional (bucket `avatars`, já existia), foto do pet (bucket novo `pet-photos`, público), carteira de vacinação/documento do pet (bucket novo `pet-documents`, privado — só tutor/co-tutores/profissional com solicitação vinculada/admin-supervisor) e documento de habilitação do profissional (bucket novo `professional-certifications`, privado — só o dono e admin/supervisor).
+- **Habilitações e selos (6.3):** nova tabela `professional_certifications` — profissional envia documento por categoria regulamentada (`lib/domain/regulated-categories.ts`, hoje só `veterinario_domiciliar`), fica `pendente` até Admin/Supervisor aprovar/rejeitar em `/admin/habilitacoes` (novo). `createService` bloqueia publicar serviço em categoria regulamentada sem habilitação aprovada. Selo "Documentação verificada" e nível de carreira (`lib/domain/professional-reputation.ts` — Novo/Experiente/Top Petlys, calculado por atendimentos concluídos + média de avaliações) aparecem em `/perfil` e `/profissional/[id]`.
+- `types/database.ts` regenerado; aliases de conveniência reaplicados no fim do arquivo (mesma rotina de toda regeneração — ver entrada anterior).
+
+**Verificação:** `tsc --noEmit`, `eslint .` e `next build` limpos (32 rotas, incluindo `/aceitar-termos` e `/admin/habilitacoes`). Testado com sessões reais (RLS, não bypass): aceite de termos bloqueia e libera navegação corretamente; tentativa de um usuário aceitar termos por outro é bloqueada; profissional não consegue se auto-aprovar habilitação (0 linhas afetadas — RLS correta); outro profissional não enxerga certificação alheia; tutor sobe foto/documento do próprio pet, profissional sem solicitação vinculada não lê o documento; outro profissional não lê certificação alheia. Fluxo completo testado no browser: gate de termos (checkbox → redirect), formulário de nova solicitação mostrando "falta Comportamento" pra Nina na categoria Passeador, sumindo ao trocar pra Banho e Tosa, envio real gravando `prontuario_shared_at`. `/perfil` mostra "Profissional experiente" e completude 100%; `/profissional/[id]` mostra os selos.
+
+**Não incluído nesta história:** revisão jurídica real do texto de Termos/Privacidade (placeholder, documentado); catálogo administrável de requisitos por categoria (hoje é uma constante no código, não editável pelo Admin); moderação de avaliações; UI para o profissional reenviar habilitação rejeitada com um novo documento sem precisar trocar de categoria manualmente.
+
+Com isso, a **Onda 1 do plano 100% está concluída** (identidade, papéis, perfis e prontuário). Próxima: Onda 2 (descoberta e contratação negociada).
+
+---
+
 ## 2026-09-02 — Onda 1: perfil profissional completo (seção 6.3)
 
 **Entrega:** segunda história da Onda 1 — "Perfil profissional" (seção 6.3 do plano). Antes, a única informação de um profissional visível ao Tutor era o nome e os serviços publicados; não existia bio, foto, experiência, especializações, idiomas ou políticas próprias, nem indicador de completude pro profissional saber o que falta pra converter mais na busca.

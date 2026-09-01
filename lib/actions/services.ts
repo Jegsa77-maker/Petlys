@@ -6,6 +6,7 @@ import {
   availabilitySlotSchema,
   blockDateSchema,
 } from "@/lib/validations/services";
+import { categoryRequiresCertification } from "@/lib/domain/regulated-categories";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { error: string | null };
@@ -27,6 +28,25 @@ export async function createService(input: unknown): Promise<ActionResult> {
 
   if (!user) {
     return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  // Categorias regulamentadas exigem habilitação aprovada antes de publicar
+  // (seção 6.3) — ex.: veterinário domiciliar precisa de CRMV verificado.
+  if (categoryRequiresCertification(parsed.data.category)) {
+    const { data: approvedCert } = await supabase
+      .from("professional_certifications")
+      .select("id")
+      .eq("professional_id", user.id)
+      .eq("category", parsed.data.category)
+      .eq("status", "aprovado")
+      .maybeSingle();
+
+    if (!approvedCert) {
+      return {
+        error:
+          "Essa categoria exige habilitação verificada. Envie seu documento em Meu perfil > Habilitações antes de publicar este serviço.",
+      };
+    }
   }
 
   const { error } = await supabase.from("professional_services").insert({
