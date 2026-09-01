@@ -4,6 +4,14 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Criação do BACKLOG.md
+
+**Contexto:** a pedido do usuário, o item 3 da Onda 2 ("chat com mídia") foi adiado ("não é necessário agora") e ele pediu pra documentar essa lista de itens adiados pra revisão futura, em vez de deixar isso só registrado numa conversa.
+
+**Entrega:** novo `BACKLOG.md` na raiz do repositório — lista curada de funcionalidades **deliberadamente adiadas** durante a implementação (não o roadmap completo, que é a seção 12 da Especificação v2.0, nem as decisões de negócio pendentes, que são a seção 14). Cada item registra origem, motivo do adiamento e esforço estimado pra quando for retomado. Populado com: chat com mídia (Onda 2, item 3, adiado nesta entrada), mapa visual na busca e tela dedicada `/favoritos` (já adiados em 2026-09-01 na entrega de busca avançada), e os dois itens pendentes da Onda 0 (achados de segurança do Supabase, testes automatizados/CI) que já existiam soltos em entradas antigas deste changelog.
+
+---
+
 ## 2026-09-01 — Onda 2, item 2: busca avançada — filtros e favoritos (Especificação v2.0, seção 12.1)
 
 **Entrega:** segunda história da Onda 2 — filtros de preço, nota mínima, subcategoria e espécie em `/buscar`, mais favoritos do Tutor. Mapa visual (a outra parte do item do plano) fica pra um sub-item à parte — traz uma biblioteca nova (Leaflet) e é tecnicamente independente do resto.
