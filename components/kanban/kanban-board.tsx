@@ -4,6 +4,8 @@ import { useState } from "react";
 import { registerCheckin, advanceOccurrence, submitOccurrenceReport } from "@/lib/actions/occurrences";
 import { createClient } from "@/lib/supabase/client";
 import { Paperclip, Loader2 } from "lucide-react";
+import { occurrenceStageLabel } from "@/lib/domain/occurrence-pipeline";
+import type { OccurrenceStatus, ServiceCategory } from "@/types/database";
 
 type OccurrenceCard = {
   id: string;
@@ -70,6 +72,12 @@ function OccurrenceCardView({
     .filter(Boolean)
     .join(", ");
 
+  const category = occurrence.requests?.category as ServiceCategory | undefined;
+  // Nome da fase específico da categoria (seção 5.2) — a coluna do Kanban
+  // continua genérica, só o card fala a língua do serviço.
+  const stageLabel = (status: OccurrenceStatus) =>
+    category ? occurrenceStageLabel(category, status) : status;
+
   async function handleCheckin() {
     setIsSubmitting(true);
     let coords: { lat?: number; lng?: number } = {};
@@ -127,7 +135,7 @@ function OccurrenceCardView({
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3">
       <p className="text-sm font-semibold text-black">{petNames || "Atendimento"}</p>
-      <p className="text-xs text-gray-500 mb-2">
+      <p className="text-xs text-gray-500 mb-1">
         {new Date(occurrence.scheduled_at).toLocaleString("pt-BR", {
           day: "2-digit",
           month: "2-digit",
@@ -135,6 +143,11 @@ function OccurrenceCardView({
           minute: "2-digit",
         })}
       </p>
+      {occurrence.status !== "agendado" && occurrence.status !== "concluido" && (
+        <p className="text-xs font-semibold text-teal mb-2">
+          {stageLabel(occurrence.status as OccurrenceStatus)}
+        </p>
+      )}
 
       {occurrence.status === "agendado" && occurrence.requests?.status === "confirmado" && (
         <button
@@ -142,7 +155,7 @@ function OccurrenceCardView({
           disabled={isSubmitting}
           className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
         >
-          Fazer check-in
+          Marcar: {stageLabel("checkin")}
         </button>
       )}
 
@@ -158,7 +171,7 @@ function OccurrenceCardView({
           disabled={isSubmitting}
           className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
         >
-          Iniciar atendimento
+          Marcar: {stageLabel("em_andamento")}
         </button>
       )}
 
@@ -205,13 +218,13 @@ function OccurrenceCardView({
           disabled={isSubmitting}
           className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
         >
-          Concluir atendimento
+          Marcar: {stageLabel("concluido")}
         </button>
       )}
 
       {occurrence.status === "concluido" && (
         <p className="text-xs font-semibold text-black bg-green inline-block px-2 py-0.5 rounded-full">
-          Concluído
+          {stageLabel("concluido")}
         </p>
       )}
     </div>

@@ -4,6 +4,18 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 4, item 1: pipeline de execução por categoria no card do Kanban
+
+**Entrega:** primeiro item da Onda 4 (execução, segurança e reputação — seção 12.3 da Especificação v2.0). Discutido com o usuário antes de implementar: o enum `occurrence_status` continua único e genérico (`agendado/checkin/em_andamento/finalizacao/concluido`), cumprindo o critério de aceite da seção 15 ("um único modelo de status e histórico") — só o **rótulo exibido no card** muda por categoria de serviço, sem migration nem lógica de transição nova.
+
+- `lib/domain/occurrence-pipeline.ts` (novo): mapa `STAGE_LABEL_BY_CATEGORY` com o nome específico de cada fase por categoria (ex.: passeador usa "Pet recebido/Passeio iniciado/Retorno"; hospedagem usa "Entrada/Hospedado/Preparando saída/Entregue"; banho e tosa usa "Pronto pra retirada/Entregue"), com fallback genérico ("Início do atendimento/Em andamento/Finalização/Concluído") pra quando a categoria não tem nome próprio pra uma fase.
+- "Buscado"/"Entregue" não virou um estado novo — é o mesmo `concluido` de sempre, só nomeado do ponto de vista de quem usa o Kanban (o profissional entrega o pet de volta); banho/tosa e hospedagem compartilham essa leitura porque são fisicamente o mesmo caso.
+- `components/kanban/kanban-board.tsx`: as colunas continuam genéricas (mesmo texto pra todo mundo); o card individual ganha um rótulo da fase atual (exceto em `agendado`, que já tem seu próprio aviso, e em `concluido`, que já tem o badge terminal) e os botões de avançar fase passam a dizer "Marcar: {nome da fase}" em vez de um verbo fixo.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos. Testado ao vivo no Kanban real: forçado temporariamente (e revertido) a categoria de uma solicitação concluída pra `hospedagem_creche` — o card passou a mostrar "Entregue" em vez de "Concluído", confirmando que o mapa de rótulos por categoria funciona de ponta a ponta.
+
+---
+
 ## 2026-09-01 — Decisão de roadmap (revista duas vezes no mesmo dia): Onda 3 (financeiro real) fica pro final
 
 **Contexto:** usuário perguntou se o financeiro real (Onda 3, seção 12.2 da Especificação v2.0) precisa esperar o investimento fechar, ou se dá pra construir sem contratar o Pagar.me. Resposta técnica: a maior parte é construível em modo sandbox (chaves de teste gratuitas, sem CNPJ aprovado nem negociação comercial) — onboarding de recebedor, Pix/cartão, split, webhooks, extrato reconciliado e saque manual funcionam de ponta a ponta em sandbox. O que realmente depende de investimento/negociação são as decisões já registradas na seção 14 (conta de recebedor real com KYC, taxa de Pix negociada, prazo de liquidação, percentuais de comissão).
