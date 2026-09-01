@@ -49,17 +49,40 @@ export async function createService(input: unknown): Promise<ActionResult> {
     }
   }
 
-  const { error } = await supabase.from("professional_services").insert({
-    professional_id: user.id,
-    category: parsed.data.category,
-    pricing_model: parsed.data.pricingModel,
-    base_price: parsed.data.basePrice ?? null,
-    multi_pet_discount_percent: parsed.data.multiPetDiscountPercent ?? null,
-    description: parsed.data.description ?? null,
-  });
+  const { data: service, error } = await supabase
+    .from("professional_services")
+    .insert({
+      professional_id: user.id,
+      category: parsed.data.category,
+      subcategory: parsed.data.subcategory ?? null,
+      pricing_model: parsed.data.pricingModel,
+      base_price: parsed.data.basePrice ?? null,
+      multi_pet_discount_percent: parsed.data.multiPetDiscountPercent ?? null,
+      description: parsed.data.description ?? null,
+      duration_minutes: parsed.data.durationMinutes ?? null,
+      species_accepted: parsed.data.speciesAccepted,
+      min_size: parsed.data.minSize ?? null,
+      max_size: parsed.data.maxSize ?? null,
+      restrictions: parsed.data.restrictions ?? null,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !service) {
     return { error: "Não foi possível publicar o serviço." };
+  }
+
+  if (parsed.data.addons.length > 0) {
+    const { error: addonsError } = await supabase.from("professional_service_addons").insert(
+      parsed.data.addons.map((addon) => ({
+        service_id: service.id,
+        name: addon.name,
+        price: addon.price,
+      }))
+    );
+    if (addonsError) {
+      return { error: "Serviço publicado, mas houve um erro ao salvar os adicionais." };
+    }
   }
 
   revalidatePath("/servicos");

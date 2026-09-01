@@ -37,7 +37,9 @@ export default async function ProfissionalPage({
 
   const { data: services } = await supabase
     .from("professional_services")
-    .select("id, category, base_price, pricing_model, description, multi_pet_discount_percent")
+    .select(
+      "id, category, subcategory, base_price, pricing_model, description, multi_pet_discount_percent, duration_minutes, species_accepted, restrictions, professional_service_addons(id, name, price)"
+    )
     .eq("professional_id", profissionalId)
     .eq("active", true);
 
@@ -160,13 +162,30 @@ export default async function ProfissionalPage({
           {(services ?? []).map((service) => (
             <li key={service.id} className="rounded-lg border border-gray-200 bg-white p-4">
               <div className="flex items-center justify-between mb-1">
-                <p className="font-semibold text-black text-sm">{CATEGORY_LABEL[service.category]}</p>
+                <p className="font-semibold text-black text-sm">
+                  {CATEGORY_LABEL[service.category]}
+                  {service.subcategory ? ` · ${service.subcategory}` : ""}
+                </p>
                 <p className="text-sm font-semibold text-teal">
                   {service.base_price ? `R$ ${service.base_price}` : "Sob consulta"}
                 </p>
               </div>
               {service.description && (
                 <p className="text-xs text-gray-500">{service.description}</p>
+              )}
+              {service.duration_minutes && (
+                <p className="text-xs text-gray-400">Duração média: {service.duration_minutes} min</p>
+              )}
+              {service.species_accepted.length > 0 && (
+                <p className="text-xs text-gray-400">Atende: {service.species_accepted.join(", ")}</p>
+              )}
+              {service.restrictions && (
+                <p className="text-xs text-gray-400">Restrições: {service.restrictions}</p>
+              )}
+              {service.professional_service_addons.length > 0 && (
+                <p className="text-xs text-gray-400">
+                  Adicionais: {service.professional_service_addons.map((a) => `${a.name} (R$ ${a.price})`).join(", ")}
+                </p>
               )}
               {service.multi_pet_discount_percent ? (
                 <p className="text-xs text-teal mt-1">

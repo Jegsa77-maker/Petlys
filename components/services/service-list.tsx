@@ -15,9 +15,14 @@ const CATEGORY_LABEL: Record<string, string> = {
 type Service = {
   id: string;
   category: string;
+  subcategory: string | null;
   base_price: number | null;
   active: boolean;
   multi_pet_discount_percent: number | null;
+  duration_minutes: number | null;
+  species_accepted: string[];
+  restrictions: string | null;
+  professional_service_addons: { id: string; name: string; price: number }[];
 };
 
 export function ServiceList({ services }: { services: Service[] }) {
@@ -44,13 +49,25 @@ function ServiceRow({ service }: { service: Service }) {
   return (
     <li className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4">
       <div>
-        <p className="text-sm font-semibold text-black">{CATEGORY_LABEL[service.category]}</p>
+        <p className="text-sm font-semibold text-black">
+          {CATEGORY_LABEL[service.category]}
+          {service.subcategory ? ` · ${service.subcategory}` : ""}
+        </p>
         <p className="text-xs text-gray-500">
           {service.base_price ? `R$ ${service.base_price}` : "Sob consulta"}
+          {service.duration_minutes ? ` · ${service.duration_minutes} min` : ""}
           {service.multi_pet_discount_percent
             ? ` · ${service.multi_pet_discount_percent}% multi-pet`
             : ""}
         </p>
+        {service.species_accepted.length > 0 && (
+          <p className="text-xs text-gray-400">Atende: {service.species_accepted.join(", ")}</p>
+        )}
+        {service.professional_service_addons.length > 0 && (
+          <p className="text-xs text-gray-400">
+            Adicionais: {service.professional_service_addons.map((a) => `${a.name} (R$ ${a.price})`).join(", ")}
+          </p>
+        )}
       </div>
       <button
         type="button"

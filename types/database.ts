@@ -963,6 +963,38 @@ export type Database = {
           },
         ]
       }
+      professional_service_addons: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          price: number
+          service_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          price: number
+          service_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_service_addons_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "professional_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_service_areas: {
         Row: {
           center_lat: number
@@ -1008,10 +1040,16 @@ export type Database = {
           category: Database["public"]["Enums"]["service_category"]
           created_at: string
           description: string | null
+          duration_minutes: number | null
           id: string
+          max_size: Database["public"]["Enums"]["pet_size"] | null
+          min_size: Database["public"]["Enums"]["pet_size"] | null
           multi_pet_discount_percent: number | null
           pricing_model: string
           professional_id: string
+          restrictions: string | null
+          species_accepted: string[]
+          subcategory: string | null
           updated_at: string
         }
         Insert: {
@@ -1020,10 +1058,16 @@ export type Database = {
           category: Database["public"]["Enums"]["service_category"]
           created_at?: string
           description?: string | null
+          duration_minutes?: number | null
           id?: string
+          max_size?: Database["public"]["Enums"]["pet_size"] | null
+          min_size?: Database["public"]["Enums"]["pet_size"] | null
           multi_pet_discount_percent?: number | null
           pricing_model: string
           professional_id: string
+          restrictions?: string | null
+          species_accepted?: string[]
+          subcategory?: string | null
           updated_at?: string
         }
         Update: {
@@ -1032,10 +1076,16 @@ export type Database = {
           category?: Database["public"]["Enums"]["service_category"]
           created_at?: string
           description?: string | null
+          duration_minutes?: number | null
           id?: string
+          max_size?: Database["public"]["Enums"]["pet_size"] | null
+          min_size?: Database["public"]["Enums"]["pet_size"] | null
           multi_pet_discount_percent?: number | null
           pricing_model?: string
           professional_id?: string
+          restrictions?: string | null
+          species_accepted?: string[]
+          subcategory?: string | null
           updated_at?: string
         }
         Relationships: [

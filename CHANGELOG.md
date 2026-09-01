@@ -4,6 +4,22 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 2, item 1: catálogo de serviços flexível (Especificação v2.0, seção 12.1)
+
+**Entrega:** primeira história da Onda 2 — subcategoria, duração, espécies/porte atendidos, restrições e adicionais com preço próprio para cada serviço publicado. "Perguntas por categoria" (a outra metade do item do plano) fica pra história de solicitação contextual (item 4 da Onda 2) — é sobre o que se pergunta ao Tutor, não sobre o que o Profissional cadastra.
+
+- `supabase/migrations/0019_service_catalog_flexivel.sql`: `professional_services` ganha `subcategory`, `duration_minutes`, `species_accepted`, `min_size`/`max_size` (com constraint `min_size <= max_size`) e `restrictions`. Nova tabela `professional_service_addons` (nome + preço, RLS espelhando a visibilidade do serviço-pai: público se ativo, senão só dono/admin/supervisor).
+- `lib/domain/service-catalog.ts` (novo): subcategorias sugeridas por categoria mantidas em código, não em tabela administrável — catálogo editável pelo Admin é escopo maior, fora desta história.
+- `lib/validations/services.ts` / `lib/actions/services.ts`: `createServiceSchema` cobre os novos campos; `createService` grava o serviço e os adicionais numa sequência (adicionais dependem do id gerado).
+- `components/services/service-form.tsx`: subcategoria como select dependente da categoria, espécies como checkboxes, porte min/máx, restrições, e uma lista dinâmica de adicionais (nome + preço, adicionar/remover linha).
+- `components/services/service-list.tsx`, `app/(tutor)/profissional/[profissionalId]/page.tsx`: exibem os novos campos onde o catálogo já aparecia (painel do profissional e vitrine pública) — filtros de busca por esses campos ficam para o item 2 da Onda 2.
+
+**Verificação:** `tsc --noEmit`, `eslint .` limpos. Testado com sessões reais (RLS): criação com todos os campos, adicional só pode ser inserido pelo dono do serviço (RLS bloqueou tentativa de outro profissional), leitura pública inclui os adicionais, constraint de porte rejeita `min_size > max_size`. Fluxo completo também testado na UI de verdade (não só script): categoria → subcategoria dependente aparecendo/mudando corretamente, adicional criado, serviço publicado e listado.
+
+**Nota de processo:** a verificação na UI ficou intermitente por um bom tempo (formulário não reagia, submit não chegava ao servidor) — não era bug de código, era o servidor de desenvolvimento (rodando desde o início desta sessão longa) com módulo novo (`service-catalog.ts`) não totalmente atualizado via HMR. Reiniciar o `next dev` resolveu; guardado aqui porque é o tipo de sintoma que engana (parece bug de React, é cache de dev server).
+
+---
+
 ## 2026-09-01 — Especificação Funcional v2.0 (substitui a v1.2)
 
 **Contexto:** perguntado se existia uma especificação com escopo fechado e atualizada do Pilar 1. Resposta honesta: não — a v1.2 (`.docx`) estava desatualizada (não refletia a decisão de adotar o plano 100% nem nada entregue na Onda 1), e o `PETLYS_PILAR1_PLANO_100_PERCENT.md` não é um documento fechado (tem ~16 decisões de produto/negócio ainda em aberto na própria seção 7 dele, e é estruturado como plano evolutivo, não especificação congelada). Pedido do usuário: consolidar tudo em um único documento — a v2.0 — como fonte de verdade única a partir de agora.
