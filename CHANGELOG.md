@@ -4,6 +4,14 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Decisão de roadmap: Onda 3 (financeiro real) adiada pro final
+
+**Contexto:** usuário perguntou se o financeiro real (Onda 3, seção 12.2 da Especificação v2.0) precisa esperar o investimento fechar, ou se dá pra construir sem contratar o Pagar.me. Resposta técnica: a maior parte é construível em modo sandbox (chaves de teste gratuitas, sem CNPJ aprovado nem negociação comercial) — onboarding de recebedor, Pix/cartão, split, webhooks, extrato reconciliado e saque manual funcionam de ponta a ponta em sandbox. O que realmente depende de investimento/negociação são as decisões já registradas na seção 14 (conta de recebedor real com KYC, taxa de Pix negociada, prazo de liquidação, percentuais de comissão).
+
+**Decisão confirmada com o usuário:** mesmo sendo tecnicamente possível adiantar em sandbox, a Onda 3 fica **por último no roadmap**, não é a próxima onda. Ordem de execução das ondas restantes a definir com o usuário conforme o trabalho avança (candidatas: Onda 4 — execução/segurança/reputação; Onda 5 — CRM do profissional; Onda 6 — Espaços/seguro/backup/operação regional; Onda 7 — homologação/lançamento).
+
+---
+
 ## 2026-09-01 — Onda 2 completa: itens 4, 5, 6 e 7 (solicitação contextual, ajuste de proposta, visita inicial, recorrência avançada)
 
 **Entrega:** fecha a Onda 2 por completo — os quatro itens restantes do plano (Especificação v2.0, seção 12.1), depois da agenda flexível (item 5, parte) já ter sido entregue em entrada anterior deste changelog.
