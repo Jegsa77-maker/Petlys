@@ -11,7 +11,9 @@ export default async function ServicosPage() {
   const { data: services } = user
     ? await supabase
         .from("professional_services")
-        .select("id, category, base_price, active, multi_pet_discount_percent")
+        .select(
+          "id, category, subcategory, base_price, active, multi_pet_discount_percent, duration_minutes, species_accepted, restrictions, professional_service_addons(id, name, price)"
+        )
         .eq("professional_id", user.id)
         .order("category")
     : { data: [] };
