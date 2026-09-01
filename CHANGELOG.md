@@ -4,6 +4,19 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Decisão de produto/arquitetura: CRM do Profissional como módulo da Onda 5
+
+**Contexto:** usuário propôs ter na plataforma só as funcionalidades básicas pro Profissional e um CRM à parte, com funcionalidades avançadas, mesmo banco de dados, camada extra sobre o Profissional.
+
+**Decisão:**
+
+1. **O CRM avançado do Profissional fica dentro do escopo existente — é a Onda 5** ("Retenção e ferramentas do Profissional", seção 12.4 da Especificação v2.0), não um pilar/plataforma novo. A ideia do usuário vira, na prática, a resposta a uma decisão que já estava listada como pendente na seção 14: *"modelo econômico do cliente próprio, recorrência, mensalidade"* — o CRM avançado passa a ser modelado como **tier/assinatura paga** sobre a Onda 5.
+2. **Mesmo app, novas rotas — não um repositório/deploy separado.** O CRM será construído como uma área nova dentro do mesmo Next.js (ex.: `/crm/*`), com acesso controlado por uma flag de assinatura (RLS + checagem na aplicação), reaproveitando profiles/services/reviews/histórico já existentes. Decisão explícita contra separar em outro app/subdomínio: duas bases de código escrevendo migrations no mesmo Supabase é exatamente o problema que essa sessão já teve que reconciliar uma vez (sessões desalinhadas do Claude Code editando o mesmo banco sem saber uma da outra, ver entrada de 2026-09-01 "Reconciliação"). Um app separado só voltaria a ser considerado se houver time dedicado só ao CRM e disciplina de migration compartilhada.
+
+**Não decidido ainda (fica para quando a Onda 5 começar):** o modelo de preço da assinatura em si, quais funcionalidades específicas ficam do lado "básico" vs. "CRM avançado", e a atualização formal da Especificação v2.0 refletindo essa decisão (hoje só registrada aqui).
+
+---
+
 ## 2026-09-01 — Agenda flexível na proposta + bug crítico corrigido (aceite de proposta nunca gravava)
 
 **Contexto:** discussão de produto sobre como o Profissional deveria poder negociar horário sem ficar travado por um sistema rígido de agenda — o Tutor pede um horário, o Profissional pode manter, propor outro horário exato, ou só um período do dia (manhã/tarde/noite) quando ainda não sabe a hora certa. Decisão confirmada com o usuário: negociação dentro da própria proposta formal (não uma etapa separada), com período em opções fixas (não texto livre nem faixa de horário).
