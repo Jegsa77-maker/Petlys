@@ -250,6 +250,8 @@ export type Database = {
       }
       incidents: {
         Row: {
+          appeal_reason: string | null
+          appealed_at: string | null
           assigned_to: string | null
           blocks_payout: boolean
           created_at: string
@@ -265,6 +267,8 @@ export type Database = {
           urgency: Database["public"]["Enums"]["incident_urgency"]
         }
         Insert: {
+          appeal_reason?: string | null
+          appealed_at?: string | null
           assigned_to?: string | null
           blocks_payout?: boolean
           created_at?: string
@@ -280,6 +284,8 @@ export type Database = {
           urgency?: Database["public"]["Enums"]["incident_urgency"]
         }
         Update: {
+          appeal_reason?: string | null
+          appealed_at?: string | null
           assigned_to?: string | null
           blocks_payout?: boolean
           created_at?: string
@@ -1662,6 +1668,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      appeal_incident: {
+        Args: { p_incident_id: string; p_reason: string }
+        Returns: undefined
+      }
       contact_is_unlocked: {
         Args: { other_profile_id: string }
         Returns: boolean

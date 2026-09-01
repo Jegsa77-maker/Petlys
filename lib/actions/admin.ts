@@ -246,20 +246,68 @@ export async function decideSuspension(
  * Encerra um incidente (só Admin toma a decisão final — ver RLS
  * 0009_rls_policies.sql, incidents_update). Libera o bloqueio de saque
  * automaticamente via trigger (0007_safety_and_reputation.sql).
+ *
+ * Se a solicitação estava "em_disputa" (seção 3 — pagamento, qualidade
+ * ou responsabilidade sob análise), o Admin PRECISA decidir o resultado
+ * final: o contrato segue (concluído) ou é encerrado (cancelado) — são
+ * as duas únicas saídas permitidas desse status. Se estava só
+ * "incidente" (nunca virou disputa formal), a solicitação volta
+ * sozinha pra onde estava antes de parar.
  */
-export async function resolveIncident(incidentId: string, resolution: string): Promise<ActionResult> {
+export async function resolveIncident(
+  incidentId: string,
+  resolution: string,
+  finalOutcome?: "concluido" | "cancelado"
+): Promise<ActionResult> {
   const { user, isAdmin } = await requireAdmin();
   if (!user || !isAdmin) {
     return { error: "Apenas o Administrador pode encerrar um incidente." };
   }
 
   const supabase = await createClient();
+
+  const { data: incident } = await supabase
+    .from("incidents")
+    .select("request_id, requests(status)")
+    .eq("id", incidentId)
+    .single();
+
+  const requestStatus = (incident?.requests as { status: string } | null)?.status;
+
+  if (requestStatus === "em_disputa" && !finalOutcome) {
+    return { error: "Escolha o resultado final: contrato concluído ou cancelado." };
+  }
+
   const { error } = await supabase
     .from("incidents")
     .update({ status: "resolvido", resolution, resolved_at: new Date().toISOString() })
     .eq("id", incidentId);
 
   if (error) return { error: "Não foi possível encerrar o incidente." };
+
+  if (incident?.request_id) {
+    if (requestStatus === "em_disputa" && finalOutcome) {
+      await supabase.from("requests").update({ status: finalOutcome }).eq("id", incident.request_id);
+    } else if (requestStatus === "incidente") {
+      const { data: occurrences } = await supabase
+        .from("request_occurrences")
+        .select("status")
+        .eq("request_id", incident.request_id)
+        .in("status", ["agendado", "checkin", "em_andamento", "finalizacao"])
+        .limit(1);
+
+      const occurrenceStatus = occurrences?.[0]?.status as
+        | "agendado"
+        | "checkin"
+        | "em_andamento"
+        | "finalizacao"
+        | undefined;
+      const resumeStatus: "confirmado" | "checkin" | "em_andamento" | "finalizacao" =
+        !occurrenceStatus || occurrenceStatus === "agendado" ? "confirmado" : occurrenceStatus;
+      await supabase.from("requests").update({ status: resumeStatus }).eq("id", incident.request_id);
+    }
+    revalidatePath(`/solicitacoes/${incident.request_id}`);
+  }
 
   revalidatePath("/incidentes");
   return { error: null };

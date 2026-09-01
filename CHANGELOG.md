@@ -4,6 +4,23 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 4, item 3: disputas e apelação + bug de RLS corrigido
+
+**Entrega:** terceiro item da Onda 4 (seção 3 — "Em disputa: pagamento, qualidade ou responsabilidade sob análise administrativa"). `em_disputa`/`incidente` já existiam como `request_status`, e as transições confirmado/checkin/em_andamento/finalizacao → incidente → em_disputa já estavam na tabela de transições — só nunca eram usadas de verdade, e faltava a própria parte poder apelar de uma resolução.
+
+- `supabase/migrations/0029_disputas_apelacao.sql`: `incidents` ganha `appealed_at`/`appeal_reason`; novas transições `concluido → em_disputa` e `avaliacao → em_disputa` (qualidade só dá pra contestar depois do atendimento — gap na tabela original, não restrição intencional).
+- `lib/actions/incidents.ts` (`openIncident`): agora também move `requests.status` pra `incidente` quando havia um atendimento em curso (confirmado/checkin/em_andamento/finalizacao) — antes disso não existe transição permitida, e nem faria sentido.
+- `lib/actions/supervisor.ts` (`escalateIncident`): escalar pro Admin é o que caracteriza uma disputa de verdade — agora também avança `incidente → em_disputa`.
+- `lib/actions/admin.ts` (`resolveIncident`): ganhou parâmetro `finalOutcome` — se a solicitação estava `em_disputa`, o Admin **precisa** escolher o resultado final (`concluido` ou `cancelado`, as únicas saídas permitidas); se estava só `incidente` (nunca virou disputa formal), a solicitação volta sozinha pra onde estava antes de parar (resume pela ocorrência atual).
+- `components/requests/help-button.tsx`: ganhou apelação — quando não há incidente aberto, mostra o último resolvido com botão "Não concordo com essa resolução — apelar".
+- `components/admin/incident-queue.tsx`: badge "Em disputa"; formulário de encerramento pede o resultado final quando aplicável.
+
+**Bug de RLS encontrado e corrigido no processo:** a apelação, implementada como `update()` direto pela própria parte, "funcionava" sem erro mas afetava **0 linhas** — a policy `incidents_update` só libera Admin/Supervisor, RLS filtra linhas silenciosamente sem lançar exceção (mesma armadilha do bug de `accept` em `proposals` já corrigido nesta sessão). Corrigido com `supabase/migrations/0030_fix_appeal_incident_rls.sql`: função `appeal_incident()` `SECURITY DEFINER` que valida permissão e transição por dentro, em vez de uma policy de UPDATE nova que liberaria a linha inteira (todas as colunas, não só as da apelação) pra parte.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos, types regenerados. Testado de ponta a ponta com sessões RLS reais: Tutor abre incidente com atendimento `confirmado` → status vira `incidente` → Supervisor escala → `em_disputa` → Admin resolve com resultado final `concluido` → Tutor apela do resolvido (via RPC) → incidente volta a `escalado` com motivo registrado, solicitação volta a `em_disputa`. Teste negativo: um Tutor que não é parte do incidente recebe erro claro ao tentar apelar.
+
+---
+
 ## 2026-09-01 — Onda 4, item 2: botão "Preciso de ajuda"
 
 **Entrega:** segundo item da Onda 4 (seção 8.2 da Especificação v2.0). A tabela `incidents`, o bloqueio automático de payout por incidente aberto (trigger de `0007_safety_and_reputation.sql`) e a intervenção do Admin/Supervisor no chat como "Suporte" (`0015_staff_chat_intervention.sql`) já existiam — faltava só a porta de entrada pro próprio Tutor/Profissional abrir um incidente, e a notificação pro suporte ficar sabendo.

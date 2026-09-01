@@ -47,6 +47,12 @@ export async function takeIncident(incidentId: string): Promise<ActionResult> {
   return { error: null };
 }
 
+/**
+ * Escalar pro Administrador (seção 10.2) é o que caracteriza uma
+ * disputa de verdade (seção 3: "pagamento, qualidade ou
+ * responsabilidade sob análise administrativa") — por isso também
+ * avança a solicitação de 'incidente' pra 'em_disputa' quando possível.
+ */
 export async function escalateIncident(incidentId: string): Promise<ActionResult> {
   const { user, allowed } = await requireSupervisorOrAdmin();
   if (!user || !allowed) {
@@ -54,12 +60,20 @@ export async function escalateIncident(incidentId: string): Promise<ActionResult
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: incident, error } = await supabase
     .from("incidents")
     .update({ status: "escalado" })
-    .eq("id", incidentId);
+    .eq("id", incidentId)
+    .select("request_id")
+    .single();
 
   if (error) return { error: "Não foi possível escalar o incidente." };
+
+  await supabase
+    .from("requests")
+    .update({ status: "em_disputa" })
+    .eq("id", incident.request_id)
+    .eq("status", "incidente");
 
   revalidatePath("/incidentes");
   return { error: null };

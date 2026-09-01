@@ -32,7 +32,7 @@ export async function openIncident(input: unknown): Promise<ActionResult> {
 
   const { data: request } = await supabase
     .from("requests")
-    .select("id, tutor_id, professional_id")
+    .select("id, tutor_id, professional_id, status")
     .eq("id", parsed.data.requestId)
     .single();
 
@@ -53,6 +53,65 @@ export async function openIncident(input: unknown): Promise<ActionResult> {
     return { error: "Não foi possível registrar o incidente. Tente novamente." };
   }
 
+  // A solicitação só entra visivelmente em "incidente" (seção 3) quando
+  // já existe um atendimento em curso — antes disso (em_conversa,
+  // proposta_enviada etc.) não existe transição permitida pra esse
+  // status, e nem faria sentido. Melhor esforço: se falhar, o incidente
+  // já foi registrado do mesmo jeito.
+  if (["confirmado", "checkin", "em_andamento", "finalizacao"].includes(request.status)) {
+    await supabase.from("requests").update({ status: "incidente" }).eq("id", parsed.data.requestId);
+  }
+
   revalidatePath(`/solicitacoes/${parsed.data.requestId}`);
+  return { error: null };
+}
+
+/**
+ * Apelação (seção 12.3, item 3 da Onda 4) — uma das partes discorda de
+ * como um incidente já resolvido foi encerrado. Reabre direto pro
+ * Administrador (pula "em_analise": apelação já é, por natureza, um
+ * pedido de revisão de segunda instância).
+ *
+ * Passa por uma função SECURITY DEFINER (0030_fix_appeal_incident_rls.sql)
+ * em vez de um update() direto: a policy incidents_update só libera
+ * Admin/Supervisor, então a própria parte nunca conseguiria de fato
+ * apelar por RLS — descoberto testando este item (update "funcionava"
+ * sem erro, mas afetava 0 linhas, mesma armadilha do bug de accept em
+ * proposals já corrigido nesta sessão). A função valida a permissão e a
+ * transição de status por dentro, sem abrir uma policy de UPDATE nova
+ * que liberaria a linha inteira (todas as colunas) pra parte.
+ */
+export async function appealIncident(incidentId: string, reason: string): Promise<ActionResult> {
+  if (!reason.trim()) {
+    return { error: "Explique por que você está apelando dessa resolução." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: incident } = await supabase
+    .from("incidents")
+    .select("request_id")
+    .eq("id", incidentId)
+    .single();
+
+  const { error } = await supabase.rpc("appeal_incident", {
+    p_incident_id: incidentId,
+    p_reason: reason,
+  });
+
+  if (error) {
+    return { error: error.message || "Não foi possível registrar a apelação." };
+  }
+
+  if (incident?.request_id) {
+    revalidatePath(`/solicitacoes/${incident.request_id}`);
+  }
   return { error: null };
 }

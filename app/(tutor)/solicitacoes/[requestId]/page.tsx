@@ -127,6 +127,11 @@ export default async function SolicitacaoDetailPage({
   );
 
   const openIncident = (incidents ?? []).find((i) => i.status !== "resolvido");
+  // Só mostra o último resolvido (pra apelação) quando não há nenhum em
+  // aberto — evita empilhar histórico antigo enquanto há caso ativo.
+  const lastResolvedIncident = !openIncident
+    ? (incidents ?? []).find((i) => i.status === "resolvido")
+    : undefined;
 
   // Mensagens de quem não é tutor nem profissional só podem ser de
   // suporte/admin (única forma que a RLS permite, ver
@@ -226,23 +231,21 @@ export default async function SolicitacaoDetailPage({
                 <RescheduleOccurrenceButton occurrenceId={currentOccurrence.id} />
               </div>
             )}
-            {viewerRole !== "staff" && !openIncident && (
-              <div className="mt-3">
-                <HelpButton
-                  requestId={request.id}
-                  occurrenceId={currentOccurrence.id}
-                  currentIncident={null}
-                />
-              </div>
-            )}
           </section>
+        )}
+
+        {viewerRole !== "staff" && (
+          <HelpButton
+            requestId={request.id}
+            occurrenceId={currentOccurrence?.id}
+            currentIncident={openIncident ?? null}
+            lastResolvedIncident={lastResolvedIncident ?? null}
+          />
         )}
 
         {openIncident && (
           <section className="flex flex-col gap-3">
-            {viewerRole !== "staff" ? (
-              <HelpButton requestId={request.id} currentIncident={openIncident} />
-            ) : (
+            {viewerRole === "staff" && (
               <h2 className="text-sm font-semibold text-black capitalize">
                 Incidente: {openIncident.type.replace(/_/g, " ")}
               </h2>

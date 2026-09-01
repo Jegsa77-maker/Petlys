@@ -12,6 +12,7 @@ type Incident = {
   status: string;
   created_at: string;
   request_id: string;
+  requests?: { status: string } | null;
 };
 
 export function IncidentQueue({
@@ -33,9 +34,11 @@ export function IncidentQueue({
 function IncidentRow({ incident, viewerIsAdmin }: { incident: Incident; viewerIsAdmin: boolean }) {
   const [status, setStatus] = useState(incident.status);
   const [resolution, setResolution] = useState("");
+  const [finalOutcome, setFinalOutcome] = useState<"concluido" | "cancelado" | "">("");
   const [showResolveForm, setShowResolveForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDisputed = incident.requests?.status === "em_disputa";
 
   async function handleTake() {
     setIsSubmitting(true);
@@ -55,9 +58,14 @@ function IncidentRow({ incident, viewerIsAdmin }: { incident: Incident; viewerIs
 
   async function handleResolve(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     if (!resolution.trim()) return;
+    if (isDisputed && !finalOutcome) {
+      setError("Escolha o resultado final: contrato concluído ou cancelado.");
+      return;
+    }
     setIsSubmitting(true);
-    const result = await resolveIncident(incident.id, resolution);
+    const result = await resolveIncident(incident.id, resolution, finalOutcome || undefined);
     setIsSubmitting(false);
     if (result?.error) setError(result.error);
     else setStatus("resolvido");
@@ -67,9 +75,16 @@ function IncidentRow({ incident, viewerIsAdmin }: { incident: Incident; viewerIs
     <li className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between mb-1">
         <p className="text-sm font-semibold text-black capitalize">{incident.type.replace(/_/g, " ")}</p>
-        <span className="text-xs font-semibold text-teal bg-teal/10 px-2 py-1 rounded-full capitalize">
-          {status.replace(/_/g, " ")}
-        </span>
+        <div className="flex gap-1">
+          {isDisputed && (
+            <span className="text-xs font-semibold text-red-700 bg-red-50 px-2 py-1 rounded-full">
+              Em disputa
+            </span>
+          )}
+          <span className="text-xs font-semibold text-teal bg-teal/10 px-2 py-1 rounded-full capitalize">
+            {status.replace(/_/g, " ")}
+          </span>
+        </div>
       </div>
       <p className="text-xs text-gray-400 mb-3">
         Aberto em {new Date(incident.created_at).toLocaleString("pt-BR")}
@@ -114,6 +129,17 @@ function IncidentRow({ incident, viewerIsAdmin }: { incident: Incident; viewerIs
 
       {showResolveForm && (
         <form onSubmit={handleResolve} className="flex flex-col gap-2 mt-3">
+          {isDisputed && (
+            <select
+              value={finalOutcome}
+              onChange={(e) => setFinalOutcome(e.target.value as "concluido" | "cancelado")}
+              className="input text-xs"
+            >
+              <option value="">Resultado final da disputa</option>
+              <option value="concluido">Contrato segue — atendimento concluído</option>
+              <option value="cancelado">Contrato cancelado</option>
+            </select>
+          )}
           <textarea
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
