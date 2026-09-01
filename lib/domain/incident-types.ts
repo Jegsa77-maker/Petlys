@@ -43,9 +43,26 @@ export const INCIDENT_TYPE_OPTIONS = [
 export type IncidentTypeValue = (typeof INCIDENT_TYPE_OPTIONS)[number]["value"];
 
 export function incidentTypeLabel(type: string): string {
-  return INCIDENT_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type;
+  const known = INCIDENT_TYPE_OPTIONS.find((o) => o.value === type)?.label;
+  // Fallback pra tipo livre legado (achado na revisão de CX: incidentes
+  // de antes desta lista fixa existir, ex. seed antigo) — pelo menos
+  // não mostra o snake_case cru na tela.
+  return known ?? type.replace(/_/g, " ");
 }
 
 export function defaultUrgencyForType(type: string): IncidentUrgency {
   return INCIDENT_TYPE_OPTIONS.find((o) => o.value === type)?.defaultUrgency ?? "media";
 }
+
+/**
+ * Rótulo do status do incidente — existia duplicado dentro de
+ * help-button.tsx; consolidado aqui pra também ser usado na fila do
+ * Admin/Supervisor (incident-queue.tsx), que antes mostrava o valor
+ * cru do enum.
+ */
+export const INCIDENT_STATUS_LABEL: Record<string, string> = {
+  aberto: "Aberto",
+  em_analise: "Em análise pelo suporte",
+  escalado: "Escalado pro Administrador",
+  resolvido: "Resolvido",
+};

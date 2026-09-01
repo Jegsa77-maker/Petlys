@@ -2,25 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { Inbox, RotateCcw } from "lucide-react";
-
-const STATUS_LABEL: Record<string, string> = {
-  rascunho: "Rascunho",
-  solicitacao_enviada: "Solicitação enviada",
-  em_conversa: "Em conversa",
-  proposta_enviada: "Proposta enviada",
-  aguardando_pagamento: "Aguardando pagamento",
-  confirmado: "Confirmado",
-  checkin: "Check-in",
-  em_andamento: "Em andamento",
-  finalizacao: "Finalização",
-  concluido: "Concluído",
-  avaliacao: "Avaliação",
-  recusado: "Recusado",
-  expirado: "Expirado",
-  cancelado: "Cancelado",
-  incidente: "Incidente",
-  em_disputa: "Em disputa",
-};
+import { REQUEST_STATUS_LABEL as STATUS_LABEL } from "@/lib/domain/request-status-labels";
 
 export default async function SolicitacoesPage() {
   const supabase = await createClient();

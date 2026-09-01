@@ -14,25 +14,10 @@ import { EditRecurrenceForm } from "@/components/requests/edit-recurrence-form";
 import { HelpButton } from "@/components/requests/help-button";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 import { nextActionCopy } from "@/lib/domain/request-status-copy";
-
-const STATUS_LABEL: Record<string, string> = {
-  rascunho: "Rascunho",
-  solicitacao_enviada: "Solicitação enviada",
-  em_conversa: "Em conversa",
-  proposta_enviada: "Proposta enviada",
-  aguardando_pagamento: "Aguardando pagamento",
-  confirmado: "Confirmado",
-  checkin: "Check-in",
-  em_andamento: "Em andamento",
-  finalizacao: "Finalização",
-  concluido: "Concluído",
-  avaliacao: "Avaliação",
-  recusado: "Recusado",
-  expirado: "Expirado",
-  cancelado: "Cancelado",
-  incidente: "Incidente",
-  em_disputa: "Em disputa",
-};
+import { REQUEST_STATUS_LABEL as STATUS_LABEL } from "@/lib/domain/request-status-labels";
+import { occurrenceStageLabel } from "@/lib/domain/occurrence-pipeline";
+import type { ServiceCategory, OccurrenceStatus } from "@/types/database";
+import { incidentTypeLabel } from "@/lib/domain/incident-types";
 
 export default async function SolicitacaoDetailPage({
   params,
@@ -243,8 +228,11 @@ export default async function SolicitacaoDetailPage({
                   {new Date(currentOccurrence.scheduled_at).toLocaleString("pt-BR")}
                 </p>
               </div>
-              <span className="text-xs font-semibold text-teal bg-teal/10 px-2 py-1 rounded-full capitalize">
-                {currentOccurrence.status.replace(/_/g, " ")}
+              <span className="text-xs font-semibold text-teal bg-teal/10 px-2 py-1 rounded-full">
+                {occurrenceStageLabel(
+                  request.category as ServiceCategory,
+                  currentOccurrence.status as OccurrenceStatus
+                )}
               </span>
             </div>
             {currentOccurrence.status === "agendado" && viewerRole !== "staff" && (
@@ -272,8 +260,8 @@ export default async function SolicitacaoDetailPage({
         {openIncident && (
           <section className="flex flex-col gap-3">
             {viewerRole === "staff" && (
-              <h2 className="text-sm font-semibold text-black capitalize">
-                Incidente: {openIncident.type.replace(/_/g, " ")}
+              <h2 className="text-sm font-semibold text-black">
+                Incidente: {incidentTypeLabel(openIncident.type)}
               </h2>
             )}
             <EvidenceUpload incidentId={openIncident.id} requestId={request.id} uploadedBy={user.id} />

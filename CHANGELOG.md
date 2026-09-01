@@ -4,6 +4,21 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Auditoria de CX: revisão de todas as telas contra o padrão estabelecido
+
+**Contexto:** a pedido do usuário, revisão de toda a base (não só as telas mexidas nesta sessão) contra os 4 itens de CX já entregues (M-001/M-002 shell, M-013 hierarquia, M-007 preço). Auditoria estática (grep por padrões que violam o padrão) + verificação ao vivo dos achados.
+
+**Achados e correções:**
+- **`/notificacoes` sem shell** — a única rota que não mora dentro de `(tutor)`, `(profissional)`, `admin` ou `supervisor` (é `(shared)`) tinha ficado sem logo/nav ao clicar no sino. `app/(shared)/layout.tsx` (novo): resolve o papel de exibição (admin/supervisor por `account_roles`, senão o cookie `active_role` — mesma lógica de `lib/supabase/middleware.ts`) e monta o `AppShell` certo.
+- **3 cópias idênticas de `STATUS_LABEL`** (`request_status`) espalhadas em `(tutor)/solicitacoes/page.tsx`, `(tutor)/solicitacoes/[requestId]/page.tsx` e `request-timeline.tsx` — consolidadas em `lib/domain/request-status-labels.ts`, reaproveitado também em `admin/dashboard/page.tsx` (que antes mostrava o valor cru do enum em "Pedidos por status").
+- **Nome técnico vazando em 3 lugares** que já tinham helper de tradução pronto mas não usavam: o badge de "Atendimento atual" na tela de detalhe (usava `.replace()` cru em vez de `occurrenceStageLabel`, perdendo inclusive o rótulo por categoria da Onda 4 item 1); o tipo e o status do incidente em `incident-queue.tsx` (fila do Admin/Supervisor); o cabeçalho "Incidente:" visível só pro staff. `INCIDENT_STATUS_LABEL` também consolidado (estava só dentro de `help-button.tsx`) em `lib/domain/incident-types.ts`.
+- **Fallback de tipo de incidente sem tradução**: incidentes antigos (seed anterior a essa funcionalidade, com tipo em texto livre tipo `pet_machucado`) caíam no fallback cru do `incidentTypeLabel()`. Fallback ajustado pra pelo menos tirar o underscore (`pet machucado`) em vez de mostrar o snake_case.
+- **Verificado e sem problema**: paleta (zero hex cru fora dos tokens em `app/` e `components/`), nenhuma outra tela com botão de logout duplicado do shell, telas de Admin/Supervisor não tocadas nesta sessão (`habilitacoes`, `parametros`, `supervisores`, `usuarios/[profileId]`) e as do Profissional mais antigas (`agenda`, `servicos`) já seguem o mesmo padrão de header/container — nenhuma mudança necessária nelas.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos. Testado ao vivo: `/notificacoes` com shell completo (Tutor); fila de incidentes do Admin mostrando "Comportamento inadequado da outra parte"/"Aberto" pro incidente novo e "pet machucado"/"atraso atendimento"/"duvida pagamento" (sem underscore) pros antigos; painel do Admin mostrando "Aguardando pagamento"/"Em conversa"/"Avaliação"/"Solicitação enviada" em vez do enum cru.
+
+---
+
 ## 2026-09-01 — Iniciativa de CX: M-013 (hierarquia do detalhe da solicitação) + M-007 (preço "a partir de")
 
 **Entrega:** fecha os dois últimos itens pendentes da iniciativa de CX (ver `Mapa_Melhorias` do inventário — M-001/M-002 já entregues antes).

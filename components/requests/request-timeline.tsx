@@ -1,21 +1,4 @@
-const STATUS_LABEL: Record<string, string> = {
-  rascunho: "Rascunho",
-  solicitacao_enviada: "Solicitação enviada",
-  em_conversa: "Em conversa",
-  proposta_enviada: "Proposta enviada",
-  aguardando_pagamento: "Aguardando pagamento",
-  confirmado: "Confirmado",
-  checkin: "Check-in",
-  em_andamento: "Em andamento",
-  finalizacao: "Finalização",
-  concluido: "Concluído",
-  avaliacao: "Avaliação",
-  recusado: "Recusado",
-  expirado: "Expirado",
-  cancelado: "Cancelado",
-  incidente: "Incidente",
-  em_disputa: "Em disputa",
-};
+import { REQUEST_STATUS_LABEL as STATUS_LABEL } from "@/lib/domain/request-status-labels";
 
 type HistoryEntry = {
   id: string;

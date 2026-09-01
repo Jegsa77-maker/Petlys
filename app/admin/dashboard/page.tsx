@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { REQUEST_STATUS_LABEL } from "@/lib/domain/request-status-labels";
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
@@ -67,7 +68,7 @@ export default async function AdminDashboardPage() {
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(statusCounts).map(([status, count]) => (
                 <div key={status} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 capitalize">{status.replace(/_/g, " ")}</span>
+                  <span className="text-gray-600">{REQUEST_STATUS_LABEL[status] ?? status}</span>
                   <span className="font-semibold text-black">{count}</span>
                 </div>
               ))}

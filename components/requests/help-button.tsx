@@ -2,14 +2,7 @@
 
 import { useState } from "react";
 import { openIncident, appealIncident } from "@/lib/actions/incidents";
-import { INCIDENT_TYPE_OPTIONS, incidentTypeLabel } from "@/lib/domain/incident-types";
-
-const INCIDENT_STATUS_LABEL: Record<string, string> = {
-  aberto: "Aberto",
-  em_analise: "Em análise pelo suporte",
-  escalado: "Escalado pro Administrador",
-  resolvido: "Resolvido",
-};
+import { INCIDENT_TYPE_OPTIONS, incidentTypeLabel, INCIDENT_STATUS_LABEL } from "@/lib/domain/incident-types";
 
 type IncidentSummary = {
   id: string;

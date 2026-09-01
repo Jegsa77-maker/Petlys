@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { takeIncident, escalateIncident } from "@/lib/actions/supervisor";
 import { resolveIncident } from "@/lib/actions/admin";
+import { incidentTypeLabel, INCIDENT_STATUS_LABEL } from "@/lib/domain/incident-types";
 
 type Incident = {
   id: string;
@@ -74,15 +75,15 @@ function IncidentRow({ incident, viewerIsAdmin }: { incident: Incident; viewerIs
   return (
     <li className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-semibold text-black capitalize">{incident.type.replace(/_/g, " ")}</p>
+        <p className="text-sm font-semibold text-black">{incidentTypeLabel(incident.type)}</p>
         <div className="flex gap-1">
           {isDisputed && (
             <span className="text-xs font-semibold text-red-700 bg-red-50 px-2 py-1 rounded-full">
               Em disputa
             </span>
           )}
-          <span className="text-xs font-semibold text-teal bg-teal/10 px-2 py-1 rounded-full capitalize">
-            {status.replace(/_/g, " ")}
+          <span className="text-xs font-semibold text-teal bg-teal/10 px-2 py-1 rounded-full">
+            {INCIDENT_STATUS_LABEL[status] ?? status}
           </span>
         </div>
       </div>
