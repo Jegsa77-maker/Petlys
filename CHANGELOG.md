@@ -4,6 +4,23 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 1: perfil profissional completo (seção 6.3)
+
+**Entrega:** segunda história da Onda 1 — "Perfil profissional" (seção 6.3 do plano). Antes, a única informação de um profissional visível ao Tutor era o nome e os serviços publicados; não existia bio, foto, experiência, especializações, idiomas ou políticas próprias, nem indicador de completude pro profissional saber o que falta pra converter mais na busca.
+
+- `supabase/migrations/0017_professional_profile_details.sql` (aplicada via MCP): nova tabela `professional_profiles` (1:1 com `profiles`, chave `profile_id`) com `bio`, `experience_years`, `specializations text[]`, `languages text[]`, `policies`, `avatar_url`. RLS: leitura própria, de Admin/Supervisor, ou pública quando o profissional tem serviço ativo (mesma regra de `profiles_select_public_professional`); escrita só do próprio dono. Bucket de storage `avatars` (público) criado junto, com policies escopadas por pasta `{auth.uid()}/...`, mesmo sem upload real ainda implementado na tela.
+- `lib/validations/professional-profile.ts` e `lib/actions/professional-profile.ts` (novos): `upsertProfessionalProfile` valida e grava via `upsert` (`onConflict: profile_id`), revalida `/perfil` e `/profissional/[id]`.
+- `app/(profissional)/perfil/page.tsx` (novo) + `components/professional/professional-profile-form.tsx` (novo): tela do profissional pra editar o próprio perfil, com indicador de completude (%) calculado sobre 6 sinais (foto, bio, experiência, especializações, idiomas, ao menos 1 serviço ativo — nenhum obrigatório pra publicar) e link "Ver como o Tutor vê".
+- `app/(tutor)/profissional/[profissionalId]/page.tsx`: passa a buscar `professional_profiles` e exibir avatar (com fallback de ícone), bio, resumo de experiência/especializações/idiomas e políticas — antes só mostrava nome, serviços e avaliações.
+- `lib/supabase/middleware.ts` e `app/(profissional)/dashboard/page.tsx`: `/perfil` adicionada às rotas exclusivas de Profissional; novo atalho "Meu perfil" no painel.
+- `types/database.ts`: regenerado via `generate_typescript_types` (MCP) pra incluir `professional_profiles`. Os aliases de conveniência (`AppRole`, `ServiceCategory` etc.) que esse arquivo carregava à mão foram reaplicados no fim do arquivo, agora derivados de `Database["public"]["Enums"][...]` em vez de string literal solta — sobrevive a uma próxima regeneração sem precisar lembrar de re-digitar.
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado com sessão real (RLS, não bypass): insert e update do próprio perfil funcionam; leitura pública funciona só quando há serviço ativo; tentativa de outro usuário sobrescrever o perfil alheio é bloqueada pela RLS (`new row violates row-level security policy`). Telas `/perfil` (completude 100% com dados de teste) e `/profissional/[id]` (avatar, bio, experiência, políticas) renderizadas e conferidas com sessão de Profissional/Tutor de teste.
+
+**Não incluído nesta história:** upload real de foto (hoje é só campo de URL — o bucket `avatars` já existe pra quando isso for implementado), selos/níveis de qualidade e habilitações/documentos exigidos (seção 6.3 também menciona, ficam pra uma próxima história da Onda 1).
+
+---
+
 ## 2026-09-02 — Onda 1: prontuário completo do pet (etapas 2–5)
 
 **Contexto:** recebido `PETLYS_PILAR1_PLANO_100_PERCENT.md`, um plano bem mais amplo que a Especificação v1.2 original (incorpora Petlys Espaços, seguro, backup de emergência, operação regional, Academy — itens que a própria v1.2, seção 11, listava como fora do Pilar 1). Duas ressalvas registradas antes de executar: (1) a seção 5 desse plano ("pendências confirmadas") repete 8 itens que já tinham sido corrigidos na reconciliação de 2026-09-01 — a auditoria dele é anterior a esse merge; (2) seguir esse plano é uma mudança de escopo real (de "marketplace Tutor↔Profissional" pra "ecossistema Petlys inteiro"), confirmada explicitamente pelo usuário antes de começar a Onda 1.

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { MessageCircle, CalendarPlus, ShieldCheck } from "lucide-react";
+import { MessageCircle, CalendarPlus, ShieldCheck, UserRound } from "lucide-react";
 
 const CATEGORY_LABEL: Record<string, string> = {
   pet_sitter: "Pet sitter / cuidador",
@@ -42,13 +42,68 @@ export default async function ProfissionalPage({
     .eq("reviewee_id", profissionalId)
     .limit(10);
 
+  const { data: professionalProfile } = await supabase
+    .from("professional_profiles")
+    .select("bio, experience_years, specializations, languages, policies, avatar_url")
+    .eq("profile_id", profissionalId)
+    .maybeSingle();
+
+  const specializations = professionalProfile?.specializations ?? [];
+  const languages = professionalProfile?.languages ?? [];
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
-        <div className="flex items-center gap-2 text-xs text-teal font-semibold mb-2">
-          <ShieldCheck size={14} /> Conta verificada
+        <div className="flex items-center gap-4 mb-4">
+          <div className="h-16 w-16 rounded-full bg-gray flex items-center justify-center overflow-hidden shrink-0">
+            {professionalProfile?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={professionalProfile.avatar_url}
+                alt={profile.full_name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <UserRound size={28} className="text-gray-400" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-xs text-teal font-semibold mb-1">
+              <ShieldCheck size={14} /> Conta verificada
+            </div>
+            <h1 className="text-xl font-bold text-black">{profile.full_name}</h1>
+          </div>
         </div>
-        <h1 className="text-2xl font-bold text-black mb-1">{profile.full_name}</h1>
+
+        {professionalProfile?.bio && (
+          <p className="text-sm text-gray-700 mb-4">{professionalProfile.bio}</p>
+        )}
+
+        {(professionalProfile?.experience_years != null ||
+          specializations.length > 0 ||
+          languages.length > 0) && (
+          <div className="flex flex-col gap-1 mb-4 text-xs text-gray-600">
+            {professionalProfile?.experience_years != null && (
+              <p>
+                <span className="font-semibold text-black">Experiência:</span>{" "}
+                {professionalProfile.experience_years}{" "}
+                {professionalProfile.experience_years === 1 ? "ano" : "anos"}
+              </p>
+            )}
+            {specializations.length > 0 && (
+              <p>
+                <span className="font-semibold text-black">Especializações:</span>{" "}
+                {specializations.join(", ")}
+              </p>
+            )}
+            {languages.length > 0 && (
+              <p>
+                <span className="font-semibold text-black">Idiomas:</span> {languages.join(", ")}
+              </p>
+            )}
+          </div>
+        )}
+
         <p className="text-sm text-gray-500 mb-6">
           {reviews && reviews.length > 0
             ? `${reviews.length} avaliação(ões) de atendimentos concluídos`
@@ -94,6 +149,15 @@ export default async function ProfissionalPage({
             <p className="text-sm text-gray-400">Nenhum serviço publicado ainda.</p>
           )}
         </ul>
+
+        {professionalProfile?.policies && (
+          <>
+            <h2 className="text-sm font-semibold text-black mb-3">Políticas</h2>
+            <p className="text-sm text-gray-700 mb-6 whitespace-pre-line">
+              {professionalProfile.policies}
+            </p>
+          </>
+        )}
 
         {reviews && reviews.length > 0 && (
           <>
