@@ -221,6 +221,11 @@ export async function sendProposal(input: unknown): Promise<ActionResult> {
     requires_full_payment: parsed.data.requiresFullPayment,
     deposit_percent: parsed.data.depositPercent ?? null,
     created_by: user.id,
+    // Agenda flexível: nunca bloqueia — só registra o que o Profissional
+    // propôs além do horário que o Tutor já tinha pedido (seção 1.2).
+    proposed_scheduled_at:
+      parsed.data.scheduleChoice === "horario_exato" ? parsed.data.proposedScheduledAt : null,
+    proposed_period: parsed.data.scheduleChoice === "periodo" ? parsed.data.proposedPeriod : null,
   });
 
   if (proposalError) {
@@ -313,13 +318,43 @@ export async function acceptProposal(requestId: string, proposalId: string): Pro
     return { error: "Você não tem permissão para aceitar esta proposta." };
   }
 
-  const { error: proposalError } = await supabase
+  const { data: proposal, error: proposalError } = await supabase
     .from("proposals")
     .update({ accepted_at: new Date().toISOString() })
-    .eq("id", proposalId);
+    .eq("id", proposalId)
+    .select("proposed_scheduled_at")
+    .single();
 
   if (proposalError) {
     return { error: "Não foi possível registrar o aceite da proposta." };
+  }
+
+  // Agenda flexível (seção 1.2): se o Profissional propôs um horário
+  // exato diferente, desloca TODAS as ocorrências do contrato pela mesma
+  // diferença, preservando o espaçamento da recorrência — não mexe em
+  // nada quando a proposta só tinha um período (isso é só informativo,
+  // o horário exato se resolve pelo chat sem travar ninguém).
+  if (proposal?.proposed_scheduled_at) {
+    const { data: occurrences } = await supabase
+      .from("request_occurrences")
+      .select("id, scheduled_at, sequence_number")
+      .eq("request_id", requestId)
+      .order("sequence_number", { ascending: true });
+
+    const first = occurrences?.[0];
+    if (first) {
+      const deltaMs = new Date(proposal.proposed_scheduled_at).getTime() - new Date(first.scheduled_at).getTime();
+      if (deltaMs !== 0) {
+        await Promise.all(
+          (occurrences ?? []).map((occ) =>
+            supabase
+              .from("request_occurrences")
+              .update({ scheduled_at: new Date(new Date(occ.scheduled_at).getTime() + deltaMs).toISOString() })
+              .eq("id", occ.id)
+          )
+        );
+      }
+    }
   }
 
   const { error: statusError } = await supabase

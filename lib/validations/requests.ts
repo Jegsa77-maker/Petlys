@@ -41,14 +41,38 @@ export const sendMessageSchema = z.object({
 });
 export type SendMessageValues = z.infer<typeof sendMessageSchema>;
 
-export const sendProposalSchema = z.object({
-  requestId: z.uuid(),
-  scope: z.string().trim().min(1, "Descreva o escopo do atendimento"),
-  price: z.coerce.number().positive("Informe um valor válido"),
-  additionalFees: z.coerce.number().min(0).default(0),
-  validityHours: z.coerce.number().int().min(1, "Informe a validade da proposta em horas"),
-  requiresFullPayment: z.boolean(),
-  depositPercent: z.coerce.number().min(0).max(100).optional(),
-  cancellationPolicyText: z.string().trim().min(1, "Descreva a política de cancelamento"),
-});
+/**
+ * Agenda flexível (seção 1.2/5 da Especificação v2.0 — "a plataforma
+ * organiza e recomenda, mas não impõe agenda"): o Profissional decide se
+ * mantém o horário que o Tutor pediu, propõe um horário exato diferente,
+ * ou só um período do dia (quando ainda não sabe a hora exata) — nunca é
+ * bloqueado por conflito de agenda, só alertado (fora deste schema).
+ */
+export const scheduleChoiceSchema = z
+  .object({
+    scheduleChoice: z.enum(["manter", "horario_exato", "periodo"]).default("manter"),
+    proposedScheduledAt: z.string().optional(),
+    proposedPeriod: z.enum(["manha", "tarde", "noite"]).optional(),
+  })
+  .refine((data) => data.scheduleChoice !== "horario_exato" || !!data.proposedScheduledAt, {
+    message: "Informe o novo horário proposto",
+    path: ["proposedScheduledAt"],
+  })
+  .refine((data) => data.scheduleChoice !== "periodo" || !!data.proposedPeriod, {
+    message: "Selecione o período proposto",
+    path: ["proposedPeriod"],
+  });
+
+export const sendProposalSchema = z
+  .object({
+    requestId: z.uuid(),
+    scope: z.string().trim().min(1, "Descreva o escopo do atendimento"),
+    price: z.coerce.number().positive("Informe um valor válido"),
+    additionalFees: z.coerce.number().min(0).default(0),
+    validityHours: z.coerce.number().int().min(1, "Informe a validade da proposta em horas"),
+    requiresFullPayment: z.boolean(),
+    depositPercent: z.coerce.number().min(0).max(100).optional(),
+    cancellationPolicyText: z.string().trim().min(1, "Descreva a política de cancelamento"),
+  })
+  .and(scheduleChoiceSchema);
 export type SendProposalValues = z.infer<typeof sendProposalSchema>;

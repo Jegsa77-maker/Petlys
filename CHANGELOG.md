@@ -4,6 +4,21 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Agenda flexível na proposta + bug crítico corrigido (aceite de proposta nunca gravava)
+
+**Contexto:** discussão de produto sobre como o Profissional deveria poder negociar horário sem ficar travado por um sistema rígido de agenda — o Tutor pede um horário, o Profissional pode manter, propor outro horário exato, ou só um período do dia (manhã/tarde/noite) quando ainda não sabe a hora certa. Decisão confirmada com o usuário: negociação dentro da própria proposta formal (não uma etapa separada), com período em opções fixas (não texto livre nem faixa de horário).
+
+- `supabase/migrations/0021_agenda_flexivel_proposta.sql`: `proposals` ganha `proposed_scheduled_at` (horário exato) e `proposed_period` (manha/tarde/noite), mutuamente exclusivos (constraint). Ao aceitar uma proposta com horário exato, **todas** as ocorrências do contrato são deslocadas pela mesma diferença de tempo (preserva o espaçamento de contratos recorrentes) — proposta só com período não mexe em nada, fica só como informação visível pro Tutor, o horário exato se resolve pelo chat sem travar ninguém.
+- `components/requests/proposal-panel.tsx`: formulário de nova proposta ganha o seletor de horário (manter / horário exato / período); card de proposta exibe "Novo horário proposto" ou "Período proposto" quando aplicável.
+
+**Bug crítico encontrado e corrigido no processo:** a tabela `proposals` nunca teve política de RLS para `UPDATE` desde a criação (`0009_rls_policies.sql`) — o comentário original dizia "nova versão é sempre um novo insert, não edição", mas `acceptProposal` (que já existia) faz um `UPDATE` pra gravar `accepted_at`. Sem policy de UPDATE, o Postgres nega por padrão: **toda vez que um Tutor clicava em "Aceitar proposta", a solicitação avançava de status normalmente, mas `proposals.accepted_at` nunca era gravado de verdade** — silenciosamente, sem erro. Descoberto ao testar a agenda flexível, que precisa ler esse campo logo depois do accept.
+
+- `supabase/migrations/0022_fix_proposals_accept_rls.sql`: adiciona a policy de UPDATE (só o Tutor da solicitação, e só depois de confirmar que é ele). Como RLS filtra linhas mas não colunas, a policy sozinha deixaria o Tutor alterar `price`/`scope`/etc. via API direta — corrigido com `revoke update ... / grant update (accepted_at) ...`, restringindo em nível de coluna. Testado explicitamente: tentativa de um Tutor baixar o próprio preço via update direto agora retorna "permission denied", e aceitar (só `accepted_at`) continua funcionando.
+
+**Verificação:** `tsc --noEmit`, `eslint .` limpos. Testado com sessões reais (RLS): horário exato desloca todas as ocorrências corretamente, período não mexe em nada, constraint bloqueia os dois campos juntos, tentativa de tamper de preço bloqueada. Fluxo completo testado na UI real: Profissional envia proposta com período "Manhã", Tutor vê "Período proposto: Manhã" e clica "Aceitar proposta" — pela primeira vez de forma confirmada, o card realmente muda pra "Proposta aceita" (antes do fix, isso nunca acontecia de verdade).
+
+---
+
 ## 2026-09-01 — Criação do BACKLOG.md
 
 **Contexto:** a pedido do usuário, o item 3 da Onda 2 ("chat com mídia") foi adiado ("não é necessário agora") e ele pediu pra documentar essa lista de itens adiados pra revisão futura, em vez de deixar isso só registrado numa conversa.
