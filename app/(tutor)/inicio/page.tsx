@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Search, Bell, PawPrint, Briefcase } from "lucide-react";
+import { Search, PawPrint, Briefcase } from "lucide-react";
 
 export default async function TutorInicioPage() {
   const supabase = await createClient();
@@ -14,16 +14,11 @@ export default async function TutorInicioPage() {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [{ data: myRequests }, { count: unreadCount }, { data: roles }] = await Promise.all([
+  const [{ data: myRequests }, { data: roles }] = await Promise.all([
     supabase
       .from("requests")
       .select("id, status, created_at")
       .eq("tutor_id", user.id),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", user.id)
-      .is("read_at", null),
     supabase.from("account_roles").select("role").eq("profile_id", user.id).eq("active", true),
   ]);
 
@@ -56,17 +51,7 @@ export default async function TutorInicioPage() {
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-teal">Início</h1>
-          <Link href="/notificacoes" className="relative text-black">
-            <Bell size={22} />
-            {(unreadCount as unknown as number) > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center">
-                {unreadCount}
-              </span>
-            )}
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold text-teal">Início</h1>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg bg-white border border-gray-200 p-4">

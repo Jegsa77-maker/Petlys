@@ -4,6 +4,25 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Iniciativa de CX: M-001 (sistema responsivo) + M-002 (logo) — shell compartilhado nas 4 visões
+
+**Contexto:** usuário trouxe um protótipo de CX-alvo (`.html`) e uma paleta de cores, pedindo pra evoluir a experiência de Tutor e principalmente Profissional sem reconstruir a plataforma. Antes de mexer em qualquer coisa, foi feita uma auditoria comparando o protótipo com o código real, e depois com a planilha de inventário (`Inventario_Pilar_1_CHANGELOG5.xlsx`, atualizada a partir deste próprio CHANGELOG) — que já vem com uma aba `Mapa_Melhorias` classificando cada área como Manter/Ajustar/Adicionar. Conclusão: só 4 itens de CX estavam pendentes, todos P0, todos "Ajustar" (sem construção nova) — **M-001, M-002, M-013 (hierarquia da tela de detalhe da solicitação) e M-007 (hierarquia do perfil + preço "a partir de")**. Esta entrada fecha os dois primeiros.
+
+**Achado que motivou a prioridade:** o projeto inteiro tinha um único `layout.tsx` (o da raiz) — nenhuma das 4 visões (Tutor, Profissional, Admin, Supervisor) tinha header, navegação persistente ou logo. Cada página era um `<main>` avulso. Isso já explicava achados anteriores desta sessão (Admin/Supervisor sem link pra `/notificacoes` até serem adicionados manualmente).
+
+**Decisão de padrão (validada pela aba `Matriz_Responsiva` do inventário, não inventada):** sidebar fixa com logo+nav em telas largas (≥768px), colapsando pra cabeçalho compacto + barra inferior de navegação em celular — mesmo padrão de Notion/Linear, e exatamente o que a matriz responsiva já definia ("barra lateral ou superior" no computador, "barra inferior e cabeçalho compacto" no celular, logo sempre no canto superior esquerdo).
+
+- `public/logo-petlys.png` (novo): logo extraído do protótipo `.html` fornecido.
+- `components/shell/nav-config.tsx` (novo): navegação por papel — só rotas que já existem hoje (`find app -iname page.tsx`); nada aponta pra tela ainda não construída (ex.: Financeiro do Profissional fica de fora até a Onda 3 existir).
+- `components/shell/app-shell.tsx` (novo): um componente só, parametrizado por `role`, reaproveitado nas 4 visões — sidebar (`hidden md:flex`) e cabeçalho+barra inferior mobile (`md:hidden`) no mesmo componente, ativado por CSS puro (sem JS de detecção de dispositivo). Propositalmente não toca no `<main>` de nenhuma página existente — só embrulha `children`.
+- `app/(tutor)/layout.tsx`, `app/(profissional)/layout.tsx`, `app/admin/layout.tsx`, `app/supervisor/layout.tsx` (novos): cada um só monta `<AppShell role="...">`.
+- `components/shared/notifications-badge-link.tsx`: ganhou `iconOnly` (ícone com pontinho, pro cabeçalho mobile) — antes só existia a versão com texto.
+- Limpeza: removidos os links de notificação e "ver moderação" que tinham sido adicionados manualmente em `admin/dashboard`, `admin/incidentes`, `admin/moderacao`, `supervisor/incidentes`, `supervisor/moderacao` e `(tutor)/inicio` — o shell agora cobre isso globalmente, mantê-los seria duplicar (e no caso do `/inicio`, uma segunda consulta ao banco pro mesmo dado).
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos. Testado ao vivo nas 4 visões (Tutor, Profissional, Admin, Supervisor), em dois tamanhos de viewport (577px mobile e 1280px desktop): sidebar aparece corretamente em desktop com item ativo destacado, colapsa pra cabeçalho+barra inferior em mobile (confirmado via `getComputedStyle` que os elementos trocados ficam `display:none`, não só escondidos visualmente por acidente de viewport), notificação real (contagem não lida) funcionando nas duas variantes, conteúdo de cada página preservado sem nenhuma mudança.
+
+---
+
 ## 2026-09-01 — Auditoria de pendências antigas + bug de RLS corrigido (Supervisor resolvendo incidente sozinho)
 
 **Contexto:** a pedido do usuário, cruzei o `BACKLOG.md` com a lista de pendências mais antiga do projeto (fim desta entrada, 2026-08-31) pra achar divergências antes de seguir pra Onda 5.

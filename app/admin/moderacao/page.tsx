@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { ModerationQueue } from "@/components/admin/moderation-queue";
-import { NotificationsBadgeLink } from "@/components/shared/notifications-badge-link";
 
 export default async function AdminModeracaoPage() {
   const supabase = await createClient();
@@ -23,10 +22,7 @@ export default async function AdminModeracaoPage() {
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-1">
-          <h1 className="text-2xl font-bold text-teal">Moderação</h1>
-          <NotificationsBadgeLink />
-        </div>
+        <h1 className="text-2xl font-bold text-teal mb-1">Moderação</h1>
         <p className="text-sm text-gray-600 mb-6">
           Mensagens e avaliações sinalizadas por uma das partes.
         </p>

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { NotificationsBadgeLink } from "@/components/shared/notifications-badge-link";
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
@@ -59,10 +58,7 @@ export default async function AdminDashboardPage() {
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-teal">Painel do Administrador</h1>
-          <NotificationsBadgeLink />
-        </div>
+        <h1 className="text-2xl font-bold text-teal">Painel do Administrador</h1>
 
         <Block title="Pedidos por status">
           {Object.keys(statusCounts).length === 0 ? (
