@@ -1,7 +1,13 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { petStep1Schema, petHealthSchema, petBehaviorSchema } from "@/lib/validations/pets";
+import {
+  petStep1Schema,
+  petHealthSchema,
+  petBehaviorSchema,
+  petRoutineSchema,
+  petEmergencySchema,
+} from "@/lib/validations/pets";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -96,6 +102,46 @@ export async function updatePetBehavior(petId: string, input: unknown): Promise<
 
   if (error) {
     return { error: "Não foi possível salvar as informações de comportamento." };
+  }
+
+  revalidatePath(`/pets/${petId}`);
+  return { error: null };
+}
+
+export async function updatePetRoutine(petId: string, input: unknown): Promise<ActionResult> {
+  const parsed = petRoutineSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("pets")
+    .update({ routine_info: parsed.data })
+    .eq("id", petId);
+
+  if (error) {
+    return { error: "Não foi possível salvar as informações de rotina." };
+  }
+
+  revalidatePath(`/pets/${petId}`);
+  return { error: null };
+}
+
+export async function updatePetEmergency(petId: string, input: unknown): Promise<ActionResult> {
+  const parsed = petEmergencySchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("pets")
+    .update({ emergency_info: parsed.data })
+    .eq("id", petId);
+
+  if (error) {
+    return { error: "Não foi possível salvar as informações de emergência." };
   }
 
   revalidatePath(`/pets/${petId}`);
