@@ -4,6 +4,20 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Iniciativa de CX: M-013 (hierarquia do detalhe da solicitação) + M-007 (preço "a partir de")
+
+**Entrega:** fecha os dois últimos itens pendentes da iniciativa de CX (ver `Mapa_Melhorias` do inventário — M-001/M-002 já entregues antes).
+
+**M-013 — Detalhe da solicitação:** a tela (`/solicitacoes/[requestId]`) acumulou 4 ondas de funcionalidades empilhadas com o mesmo peso visual — sem remover nada (Matriz_Responsiva: "Não fazer: remover histórico ou exceção"), duas mudanças de baixo risco:
+- `lib/domain/request-status-copy.ts` (novo): frase em linguagem simples pra cada status, por papel de quem olha (ex.: "Você recebeu uma proposta — revise e decida." em vez de só o selo técnico "Proposta enviada"). O nome técnico do status continua existindo como selo pequeno ao lado — não foi substituído, só deixou de ser o único texto da tela.
+- Histórico passa a vir recolhido por padrão (`<details>`) — continua tudo lá, só não compete mais visualmente com a ação atual.
+
+**M-007 — Preço "a partir de":** em `/buscar` e `/profissional/[profissionalId]`, o preço de cada serviço passa a vir com "a partir de" acima do valor, sempre que há preço definido (não altera "Sob consulta") — o valor final sempre depende da proposta (pode ter adicionais), então a busca/perfil nunca deveriam sugerir um preço fechado. Sinais de confiança (nota, verificação) já apareciam perto do botão de ação no perfil — conferido, não precisou mudar.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos. Testado ao vivo: hero de status mostrando a frase certa por papel (inclusive confirmando que uma conta com os dois papéis vê o texto certo conforme é tutor ou profissional *daquela* solicitação específica, não conforme o papel ativo da sessão); histórico fechado por padrão e expandindo corretamente ao clicar; "a partir de R$ 80"/"a partir de R$ 95" confirmados na busca e no perfil público.
+
+---
+
 ## 2026-09-01 — Correção: logo sumindo na sidebar (contraste)
 
 **Achado do usuário:** o logo ficava "esquisito" na sidebar do shell (M-002). Confirmado com dados: decodifiquei o PNG pixel a pixel e a pata do logo é `rgb(~0-6, 45-102, 61-117)` — quase idêntica ao teal da sidebar (`#0b4d52` = `rgb(11,77,82)`). A pata ficava praticamente invisível contra o próprio fundo, sobrando só o contorno verde com o coração branco recortado flutuando. O cabeçalho mobile não tinha esse problema (fundo branco, contraste já bom).

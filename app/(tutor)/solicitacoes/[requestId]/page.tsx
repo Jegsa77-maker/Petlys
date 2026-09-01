@@ -13,6 +13,7 @@ import { RescheduleOccurrenceButton } from "@/components/requests/reschedule-occ
 import { EditRecurrenceForm } from "@/components/requests/edit-recurrence-form";
 import { HelpButton } from "@/components/requests/help-button";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
+import { nextActionCopy } from "@/lib/domain/request-status-copy";
 
 const STATUS_LABEL: Record<string, string> = {
   rascunho: "Rascunho",
@@ -144,21 +145,37 @@ export default async function SolicitacaoDetailPage({
     (id) => id !== request.tutor_id && id !== request.professional_id
   );
 
+  const heroCopy = nextActionCopy(request.status, viewerRole);
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto flex flex-col gap-6">
         <div>
-          <span className="inline-block rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal mb-2">
-            {STATUS_LABEL[request.status] ?? request.status}
-          </span>
-          {request.is_visita_inicial && (
-            <span className="inline-block rounded-full bg-gray px-3 py-1 text-xs font-semibold text-black mb-2 ml-2">
-              Visita inicial
-            </span>
-          )}
-          <h1 className="text-xl font-bold text-black">
+          <h1 className="text-xl font-bold text-black mb-1">
             {pets.map((p) => p.name).join(", ") || "Solicitação"}
           </h1>
+          {/* Hero de status (M-013, iniciativa de CX) — a próxima ação em
+              linguagem simples fica em destaque; o nome técnico do status
+              vira só um selo pequeno ao lado, não o título da tela. */}
+          <div className="flex items-start gap-2 mb-2">
+            {heroCopy ? (
+              <p className="text-sm font-semibold text-teal flex-1">{heroCopy}</p>
+            ) : (
+              <span className="text-xs font-semibold text-teal">
+                {STATUS_LABEL[request.status] ?? request.status}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="inline-block rounded-full bg-teal/10 px-2.5 py-0.5 text-xs font-semibold text-teal">
+              {STATUS_LABEL[request.status] ?? request.status}
+            </span>
+            {request.is_visita_inicial && (
+              <span className="inline-block rounded-full bg-gray px-2.5 py-0.5 text-xs font-semibold text-black">
+                Visita inicial
+              </span>
+            )}
+          </div>
           {request.is_recurring && (
             <div className="flex items-center gap-2 mt-1">
               <p className="text-xs text-gray-500">
@@ -304,10 +321,17 @@ export default async function SolicitacaoDetailPage({
           <RequestAttachmentsSection requestId={request.id} attachments={attachments ?? []} />
         )}
 
-        <section>
-          <h2 className="text-sm font-semibold text-black mb-2">Histórico</h2>
-          <RequestTimeline history={history ?? []} />
-        </section>
+        {/* Histórico recolhido por padrão (M-013, iniciativa de CX —
+            "recolher informação secundária" sem nunca removê-la, ver
+            Matriz_Responsiva "Conteúdo operacional"). */}
+        <details className="group">
+          <summary className="text-sm font-semibold text-gray-500 cursor-pointer list-none flex items-center gap-1">
+            <span className="transition-transform group-open:rotate-90">›</span> Histórico
+          </summary>
+          <div className="mt-2">
+            <RequestTimeline history={history ?? []} />
+          </div>
+        </details>
       </div>
     </main>
   );

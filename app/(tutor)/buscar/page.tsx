@@ -206,7 +206,16 @@ export default async function BuscarPage({
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <p className="text-sm font-semibold text-teal">
-                          {service.base_price ? `R$ ${service.base_price}` : "Sob consulta"}
+                          {service.base_price ? (
+                            <>
+                              <span className="block text-[10px] font-normal text-gray-400 leading-none">
+                                a partir de
+                              </span>
+                              R$ {service.base_price}
+                            </>
+                          ) : (
+                            "Sob consulta"
+                          )}
                         </p>
                         <div className="flex items-center gap-1 justify-end text-xs text-gray-400">
                           <Star size={12} className={rating?.avg ? "text-teal fill-teal" : ""} />

@@ -219,8 +219,17 @@ export default async function ProfissionalPage({
                   {CATEGORY_LABEL[service.category]}
                   {service.subcategory ? ` · ${service.subcategory}` : ""}
                 </p>
-                <p className="text-sm font-semibold text-teal">
-                  {service.base_price ? `R$ ${service.base_price}` : "Sob consulta"}
+                <p className="text-sm font-semibold text-teal text-right">
+                  {service.base_price ? (
+                    <>
+                      <span className="block text-[10px] font-normal text-gray-400 leading-none">
+                        a partir de
+                      </span>
+                      R$ {service.base_price}
+                    </>
+                  ) : (
+                    "Sob consulta"
+                  )}
                 </p>
               </div>
               {service.description && (
