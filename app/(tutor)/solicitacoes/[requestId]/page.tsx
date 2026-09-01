@@ -10,6 +10,7 @@ import { EvidenceUpload } from "@/components/requests/evidence-upload";
 import { RequestAttachmentsSection } from "@/components/requests/request-attachments-section";
 import { RescheduleOccurrenceButton } from "@/components/requests/reschedule-occurrence-button";
 import { EditRecurrenceForm } from "@/components/requests/edit-recurrence-form";
+import { HelpButton } from "@/components/requests/help-button";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -103,7 +104,7 @@ export default async function SolicitacaoDetailPage({
       .order("sequence_number", { ascending: true }),
     supabase
       .from("incidents")
-      .select("id, type, status")
+      .select("id, type, status, description, resolution")
       .eq("request_id", requestId)
       .order("created_at", { ascending: false }),
     supabase
@@ -225,14 +226,27 @@ export default async function SolicitacaoDetailPage({
                 <RescheduleOccurrenceButton occurrenceId={currentOccurrence.id} />
               </div>
             )}
+            {viewerRole !== "staff" && !openIncident && (
+              <div className="mt-3">
+                <HelpButton
+                  requestId={request.id}
+                  occurrenceId={currentOccurrence.id}
+                  currentIncident={null}
+                />
+              </div>
+            )}
           </section>
         )}
 
         {openIncident && (
-          <section className="rounded-lg border border-red-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-black mb-2 capitalize">
-              Incidente: {openIncident.type.replace(/_/g, " ")}
-            </h2>
+          <section className="flex flex-col gap-3">
+            {viewerRole !== "staff" ? (
+              <HelpButton requestId={request.id} currentIncident={openIncident} />
+            ) : (
+              <h2 className="text-sm font-semibold text-black capitalize">
+                Incidente: {openIncident.type.replace(/_/g, " ")}
+              </h2>
+            )}
             <EvidenceUpload incidentId={openIncident.id} requestId={request.id} uploadedBy={user.id} />
           </section>
         )}

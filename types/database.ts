@@ -253,6 +253,7 @@ export type Database = {
           assigned_to: string | null
           blocks_payout: boolean
           created_at: string
+          description: string
           id: string
           occurrence_id: string | null
           opened_by: string
@@ -267,6 +268,7 @@ export type Database = {
           assigned_to?: string | null
           blocks_payout?: boolean
           created_at?: string
+          description?: string
           id?: string
           occurrence_id?: string | null
           opened_by: string
@@ -281,6 +283,7 @@ export type Database = {
           assigned_to?: string | null
           blocks_payout?: boolean
           created_at?: string
+          description?: string
           id?: string
           occurrence_id?: string | null
           opened_by?: string
@@ -1922,11 +1925,7 @@ export const Constants = {
   },
 } as const
 
-// ============================================================================
-// Aliases de conveniência pros enums mais usados no app — não fazem parte
-// do output padrão de `generate_typescript_types`, precisam ser reaplicados
-// aqui sempre que o arquivo for regenerado a partir do Supabase.
-// ============================================================================
+// Convenience enum aliases — hand-maintained, re-appended after every type regen.
 export type AppRole = Database["public"]["Enums"]["app_role"];
 export type IncidentStatus = Database["public"]["Enums"]["incident_status"];
 export type IncidentUrgency = Database["public"]["Enums"]["incident_urgency"];

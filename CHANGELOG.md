@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 4, item 2: botão "Preciso de ajuda"
+
+**Entrega:** segundo item da Onda 4 (seção 8.2 da Especificação v2.0). A tabela `incidents`, o bloqueio automático de payout por incidente aberto (trigger de `0007_safety_and_reputation.sql`) e a intervenção do Admin/Supervisor no chat como "Suporte" (`0015_staff_chat_intervention.sql`) já existiam — faltava só a porta de entrada pro próprio Tutor/Profissional abrir um incidente, e a notificação pro suporte ficar sabendo.
+
+Discutido com o usuário antes de implementar:
+- **Fluxo confirmado:** não é um chat novo — é a mesma conversa do atendimento, com o Admin/Supervisor ganhando permissão de escrever nela (aparecendo como "Suporte") só enquanto o incidente não estiver `resolvido`. Zero código novo aqui, só confirmação de que já funcionava.
+- **Status do incidente:** mantido o enum existente (`aberto/em_analise/resolvido/escalado`), sem um "cancelado" separado — um incidente aberto por engano é só `resolvido` com uma nota no campo `resolution`.
+- **Tipo + urgência + SLA:** lista de tipos fixa no código (`lib/domain/incident-types.ts`) — Agressão/comportamento perigoso, Emergência médica, Dano à propriedade, Descumprimento do combinado, Comportamento inadequado, Outro — cada um com uma urgência padrão, escolhida automaticamente (não é mais uma decisão manual de quem abre o incidente, um campo a menos num momento de estresse). O que fica configurável pelo Admin sem deploy é o **SLA em horas por tipo**, via `platform_parameters` (mesmo padrão de `comissao_percentual`/`retencao_nao_comparecimento_percentual`) — a lista de tipos em si não é editável pelo Admin, é código.
+
+- `supabase/migrations/0028_preciso_de_ajuda.sql`: `incidents` ganha `description` (relato obrigatório em texto livre, além da classificação); trigger `incidents_notify` que notifica todo Admin/Supervisor ativo (`account_roles`) quando um incidente é aberto — ninguém é responsável designado ainda nesse momento, então é broadcast, não notificação individual.
+- `lib/domain/incident-types.ts`, `lib/validations/incidents.ts`, `lib/actions/incidents.ts` (`openIncident`): a RLS de insert já existia (`incidents_insert`, `0009_rls_policies.sql`) permitindo a própria parte abrir — a action só valida e traduz erro.
+- `components/requests/help-button.tsx`: botão "Preciso de ajuda" dentro do card "Atendimento atual"; quando já existe um incidente aberto, mostra acompanhamento (tipo, status, relato, resposta do suporte) no lugar do botão, evitando abrir dois incidentes pro mesmo problema.
+- **Gap fechado de brinde:** Admin e Supervisor não tinham nenhum jeito de chegar em `/notificacoes` (só a Home do Tutor linkava pra lá) — `components/shared/notifications-badge-link.tsx` (novo) adiciona o link com contagem de não lidas nas telas `/admin/dashboard`, `/admin/incidentes` e `/supervisor/incidentes`. `components/shared/notification-list.tsx` ganha rótulo amigável pro tipo `incidente_aberto` (antes cairia no fallback genérico, mostrando o nome técnico do evento).
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos, types regenerados. Testado ao vivo com sessões reais: Tutor abre incidente ("Comportamento inadequado da outra parte") → urgência `media` gravada automaticamente → notificação criada pra Admin e Supervisor → aparece na fila `/admin/incidentes` e em `/notificacoes` com contagem de não lida e rótulo amigável → Admin acessa a solicitação como suporte e envia mensagem no chat → mensagem aparece rotulada "Suporte" pro Tutor. Achado de metodologia de teste (não bug do app): `form_input` não disparou o `onChange` do React nesse input específico de mensagem — trocado por digitação real (`computer type`), confirmando que o app sempre funcionou certo.
+
+---
+
 ## 2026-09-01 — Onda 4, item 1: pipeline de execução por categoria no card do Kanban
 
 **Entrega:** primeiro item da Onda 4 (execução, segurança e reputação — seção 12.3 da Especificação v2.0). Discutido com o usuário antes de implementar: o enum `occurrence_status` continua único e genérico (`agendado/checkin/em_andamento/finalizacao/concluido`), cumprindo o critério de aceite da seção 15 ("um único modelo de status e histórico") — só o **rótulo exibido no card** muda por categoria de serviço, sem migration nem lógica de transição nova.

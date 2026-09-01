@@ -18,6 +18,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   proposta_recebida: <FileText size={16} />,
   avaliacao_recebida: <Star size={16} />,
   status_atendimento: <AlertTriangle size={16} />,
+  incidente_aberto: <AlertTriangle size={16} className="text-red-700" />,
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -25,6 +26,7 @@ const TYPE_LABEL: Record<string, string> = {
   proposta_recebida: "Proposta recebida",
   avaliacao_recebida: "Avaliação recebida",
   status_atendimento: "Status atualizado",
+  incidente_aberto: "Incidente aberto — Preciso de ajuda",
 };
 
 export function NotificationList({ notifications }: { notifications: Notification[] }) {
