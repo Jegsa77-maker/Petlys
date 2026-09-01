@@ -82,6 +82,14 @@ export async function upsertParameter(input: unknown): Promise<ActionResult> {
   return { error: null };
 }
 
+/**
+ * "Excluir" aqui é sempre soft-delete (status -> 'substituido'), nunca
+ * DELETE físico. platform_parameters_log referencia parameter_id sem
+ * cascade, e como toda criação já grava uma linha de log, um DELETE de
+ * verdade sempre esbarra em violação de foreign key — além de destruir
+ * histórico de auditoria que o próprio schema foi desenhado pra manter
+ * (ver parameter_lifecycle em 0001, e platform_parameters_log em 0006).
+ */
 export async function deleteParameter(id: string): Promise<ActionResult> {
   const { isAdmin } = await requireAdmin();
   if (!isAdmin) {
@@ -89,7 +97,10 @@ export async function deleteParameter(id: string): Promise<ActionResult> {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("platform_parameters").delete().eq("id", id);
+  const { error } = await supabase
+    .from("platform_parameters")
+    .update({ status: "substituido" })
+    .eq("id", id);
 
   if (error) return { error: "Não foi possível excluir o parâmetro." };
 

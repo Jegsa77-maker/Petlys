@@ -5,6 +5,7 @@ import {
   createRequestSchema,
   sendMessageSchema,
   sendProposalSchema,
+  RECURRENCE_INTERVAL_DAYS,
 } from "@/lib/validations/requests";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -61,10 +62,15 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
     return { error: "Não foi possível vincular os pets selecionados à solicitação." };
   }
 
+  // Cada ocorrência é espaçada pela frequência escolhida (seção 6.2) — sem
+  // isto, um contrato "recorrente" empilhava todas as N ocorrências na
+  // mesma data/hora do primeiro atendimento.
+  const intervalDays = RECURRENCE_INTERVAL_DAYS[parsed.data.recurrenceInterval];
+  const firstOccurrenceMs = new Date(parsed.data.firstOccurrenceAt).getTime();
   const occurrenceRows = Array.from({ length: parsed.data.occurrencesTotal }).map((_, i) => ({
     request_id: request.id,
     sequence_number: i + 1,
-    scheduled_at: parsed.data.firstOccurrenceAt,
+    scheduled_at: new Date(firstOccurrenceMs + i * intervalDays * 24 * 60 * 60 * 1000).toISOString(),
     status: "agendado" as const,
   }));
   const { error: occurrencesError } = await supabase

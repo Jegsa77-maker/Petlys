@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { takeIncident, escalateIncident } from "@/lib/actions/supervisor";
 import { resolveIncident } from "@/lib/actions/admin";
 
@@ -76,6 +78,12 @@ function IncidentRow({ incident, viewerIsAdmin }: { incident: Incident; viewerIs
       {error && <p className="text-sm text-red-600 mb-2" role="alert">{error}</p>}
 
       <div className="flex gap-2 flex-wrap">
+        <Link
+          href={`/solicitacoes/${incident.request_id}`}
+          className="flex items-center gap-1 text-xs font-semibold rounded-lg border border-gray-300 text-black px-3 py-2 hover:border-teal"
+        >
+          <MessageCircle size={14} /> Entrar na conversa
+        </Link>
         {status === "aberto" && (
           <button
             onClick={handleTake}

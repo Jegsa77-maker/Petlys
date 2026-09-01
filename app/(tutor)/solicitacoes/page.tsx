@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { Inbox, RotateCcw } from "lucide-react";
 
@@ -36,9 +37,14 @@ export default async function SolicitacoesPage() {
     .eq("active", true);
 
   const roleNames = (roles ?? []).map((r) => r.role);
-  // Se a conta tiver os dois papéis, prioriza a visão de Profissional
-  // aqui (inbox operacional) — o Tutor acessa o histórico pelo Início.
-  const viewAsProfessional = roleNames.includes("profissional");
+  const cookieStore = await cookies();
+  const activeRoleCookie = cookieStore.get("active_role")?.value;
+  // Contas com um só papel não têm ambiguidade; com os dois, o middleware
+  // já garante que o cookie está setado antes de chegar aqui (ver
+  // lib/supabase/middleware.ts — rota está em ROLE_AWARE_SHARED_PREFIXES).
+  const viewAsProfessional = roleNames.includes("profissional")
+    ? !roleNames.includes("tutor") || activeRoleCookie === "profissional"
+    : false;
 
   if (viewAsProfessional) {
     const { data: requests } = await supabase

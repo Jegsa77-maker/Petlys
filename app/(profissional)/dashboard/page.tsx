@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Inbox, Calendar, Wallet, LayoutGrid } from "lucide-react";
+import { Inbox, Calendar, Wallet, LayoutGrid, PawPrint } from "lucide-react";
 
 export default async function ProfessionalDashboardPage() {
   const supabase = await createClient();
@@ -10,7 +10,7 @@ export default async function ProfessionalDashboardPage() {
 
   if (!user) return null;
 
-  const [{ count: pendingCount }, { data: today }] = await Promise.all([
+  const [{ count: pendingCount }, { data: today }, { data: roles }] = await Promise.all([
     supabase
       .from("requests")
       .select("id", { count: "exact", head: true })
@@ -23,7 +23,10 @@ export default async function ProfessionalDashboardPage() {
       .gte("scheduled_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
       .lte("scheduled_at", new Date(new Date().setHours(23, 59, 59, 999)).toISOString())
       .order("scheduled_at", { ascending: true }),
+    supabase.from("account_roles").select("role").eq("profile_id", user.id).eq("active", true),
   ]);
+
+  const isAlsoTutor = (roles ?? []).some((r) => r.role === "tutor");
 
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
@@ -76,6 +79,15 @@ export default async function ProfessionalDashboardPage() {
               ))}
             </ul>
           </>
+        )}
+
+        {!isAlsoTutor && (
+          <Link
+            href="/escolher-perfil"
+            className="flex items-center gap-2 text-xs text-gray-500 hover:text-teal font-medium justify-center mt-6"
+          >
+            <PawPrint size={14} /> Também quero contratar serviços como Tutor
+          </Link>
         )}
       </div>
     </main>

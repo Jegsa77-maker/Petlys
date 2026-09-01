@@ -11,7 +11,7 @@ export default async function KanbanPage() {
     ? await supabase
         .from("request_occurrences")
         .select(
-          "id, request_id, scheduled_at, status, requests!inner(category, professional_id, request_pets(pets(name)))"
+          "id, request_id, scheduled_at, status, requests!inner(status, category, professional_id, request_pets(pets(name)))"
         )
         .eq("requests.professional_id", user.id)
         .in("status", ["agendado", "checkin", "em_andamento", "finalizacao", "concluido"])

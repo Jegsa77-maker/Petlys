@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Search, Bell, PawPrint } from "lucide-react";
+import { Search, Bell, PawPrint, Briefcase } from "lucide-react";
 
 export default async function TutorInicioPage() {
   const supabase = await createClient();
@@ -14,7 +14,7 @@ export default async function TutorInicioPage() {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [{ data: myRequests }, { count: unreadCount }] = await Promise.all([
+  const [{ data: myRequests }, { count: unreadCount }, { data: roles }] = await Promise.all([
     supabase
       .from("requests")
       .select("id, status, created_at")
@@ -24,7 +24,10 @@ export default async function TutorInicioPage() {
       .select("id", { count: "exact", head: true })
       .eq("profile_id", user.id)
       .is("read_at", null),
+    supabase.from("account_roles").select("role").eq("profile_id", user.id).eq("active", true),
   ]);
+
+  const isAlsoProfissional = (roles ?? []).some((r) => r.role === "profissional");
 
   const requestIds = (myRequests ?? []).map((r) => r.id);
 
@@ -90,6 +93,15 @@ export default async function TutorInicioPage() {
           <QuickLink href="/pets" label="Meus pets" />
           <QuickLink href="/solicitacoes" label="Minhas solicitações" />
         </div>
+
+        {!isAlsoProfissional && (
+          <Link
+            href="/escolher-perfil"
+            className="flex items-center gap-2 text-xs text-gray-500 hover:text-teal font-medium justify-center mt-2"
+          >
+            <Briefcase size={14} /> Também quero oferecer serviços como Profissional
+          </Link>
+        )}
       </div>
     </main>
   );

@@ -69,7 +69,7 @@ logado (`supabase login`), linkado ao projeto (`supabase link`):
 supabase db push
 ```
 
-Isso aplica, em ordem, os 12 arquivos em `supabase/migrations/` — testados
+Isso aplica, em ordem, os arquivos em `supabase/migrations/` — testados
 localmente ponta a ponta antes da entrega (schema, RLS, triggers de
 auditoria de parâmetros e de bloqueio de saque por incidente).
 
@@ -96,11 +96,11 @@ lib/
   actions/auth.ts          # Server Actions de autenticação/onboarding
   validations/auth.ts      # Schemas Zod
 types/database.ts          # Tipos gerados a partir do schema SQL real
-supabase/migrations/       # 12 migrações SQL (schema completo + RLS)
+supabase/migrations/       # 16 migrações SQL (schema completo + RLS)
 proxy.ts                   # Middleware/Proxy do Next.js (proteção de rotas)
 ```
 
-## O que já está pronto (Fase 3, etapa 1 e 2)
+## O que já está pronto (Fase 3)
 
 - Schema completo do banco (22 tabelas, RLS em 100% delas, triggers de
   auditoria e de bloqueio automático de saque por incidente) — testado
@@ -112,8 +112,28 @@ proxy.ts                   # Middleware/Proxy do Next.js (proteção de rotas)
   de 18 anos e coleta de CPF/CNPJ quando aplicável.
 - Proteção de rotas por sessão e por papel (`/admin` exige administrador,
   `/supervisor` exige supervisor ou administrador).
+- Fluxo do Tutor: busca por categoria/localização, cadastro de pet,
+  solicitação (single ou multi-pet, recorrente), chat, proposta, aceite.
+- Fluxo do Profissional: agenda/bloqueios, serviços e preços, Kanban de
+  atendimentos (check-in → em andamento → finalização → concluído),
+  avaliação bilateral ao final.
+- Painel do Administrador/Supervisor: dashboard, fila de incidentes,
+  parâmetros comerciais, gestão de supervisores.
+- Máquina de estados formal de `requests`, reforçada por trigger no banco
+  (`request_status_transitions_allowed`), incluindo o ciclo de ocorrências
+  recorrentes (concluir uma ocorrência libera o check-in da próxima).
 
 ## Próximos passos
 
-- Módulo financeiro: integração real com Pagar.me (cobrança, split, extrato, saque) — `lib/actions/payments.ts` e `payouts.ts` ainda não existem, assim como as rotas `/financeiro` do Tutor e do Profissional.
+- Integração real com Pagar.me (cobrança, split, extrato, saque) —
+  `lib/actions/payments.ts` e `payouts.ts` ainda não existem, assim como
+  as rotas `/financeiro` do Tutor e do Profissional. Hoje o avanço
+  `aguardando_pagamento → confirmado` só acontece manualmente/via seed,
+  não existe webhook de pagamento.
+- **Reagendamento de ocorrências.** Hoje a data de cada atendimento (mesmo
+  em contratos recorrentes) só é definida na criação da solicitação — não
+  existe UI nem Server Action pra alterar depois. Quando for implementado,
+  a mudança deve partir do **Tutor**, escolhendo um horário livre dentro
+  da disponibilidade já cadastrada pelo Profissional em `/agenda`
+  (`professional_availability`) — não um campo de data solto.
 - Testes automatizados (Fase 4) e pipeline de CI/CD (Fase 5).

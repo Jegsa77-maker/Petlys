@@ -4,6 +4,13 @@ import { useState } from "react";
 import { createRequest } from "@/lib/actions/requests";
 import { createRequestSchema } from "@/lib/validations/requests";
 
+const RECURRENCE_LABEL: Record<string, string> = {
+  diario: "Todo dia",
+  semanal: "Toda semana",
+  quinzenal: "A cada 15 dias",
+  mensal: "Todo mês",
+};
+
 const CATEGORY_LABEL: Record<string, string> = {
   pet_sitter: "Pet sitter / cuidador",
   passeador: "Passeador de cães",
@@ -27,6 +34,7 @@ export function NewRequestForm({
   const [isRecurring, setIsRecurring] = useState(false);
   const [isVisitaInicial, setIsVisitaInicial] = useState(false);
   const [occurrencesTotal, setOccurrencesTotal] = useState("1");
+  const [recurrenceInterval, setRecurrenceInterval] = useState("semanal");
   const [firstOccurrenceAt, setFirstOccurrenceAt] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +54,7 @@ export function NewRequestForm({
       petIds,
       isRecurring,
       occurrencesTotal: isRecurring ? occurrencesTotal : "1",
+      recurrenceInterval,
       firstOccurrenceAt,
       notes: notes || undefined,
       isVisitaInicial,
@@ -128,24 +137,41 @@ export function NewRequestForm({
       </label>
 
       {isRecurring && (
-        <div>
-          <label htmlFor="occurrencesTotal" className="block text-sm font-medium text-black mb-1">
-            Número de ocorrências
-          </label>
-          <input
-            id="occurrencesTotal"
-            type="number"
-            min={1}
-            value={occurrencesTotal}
-            onChange={(e) => setOccurrencesTotal(e.target.value)}
-            className="input"
-          />
-        </div>
+        <>
+          <div>
+            <label htmlFor="occurrencesTotal" className="block text-sm font-medium text-black mb-1">
+              Número de ocorrências
+            </label>
+            <input
+              id="occurrencesTotal"
+              type="number"
+              min={1}
+              value={occurrencesTotal}
+              onChange={(e) => setOccurrencesTotal(e.target.value)}
+              className="input"
+            />
+          </div>
+          <div>
+            <label htmlFor="recurrenceInterval" className="block text-sm font-medium text-black mb-1">
+              Frequência
+            </label>
+            <select
+              id="recurrenceInterval"
+              value={recurrenceInterval}
+              onChange={(e) => setRecurrenceInterval(e.target.value)}
+              className="input"
+            >
+              {Object.entries(RECURRENCE_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </>
       )}
 
       <div>
         <label htmlFor="firstOccurrenceAt" className="block text-sm font-medium text-black mb-1">
-          Data e hora do primeiro atendimento
+          {isRecurring ? "Data e hora do primeiro atendimento" : "Data e hora do atendimento"}
         </label>
         <input
           id="firstOccurrenceAt"
