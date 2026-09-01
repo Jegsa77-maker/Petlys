@@ -4,11 +4,15 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
-## 2026-09-01 — Decisão de roadmap: Onda 3 (financeiro real) adiada pro final
+## 2026-09-01 — Decisão de roadmap (revista duas vezes no mesmo dia): Onda 3 (financeiro real) fica pro final
 
 **Contexto:** usuário perguntou se o financeiro real (Onda 3, seção 12.2 da Especificação v2.0) precisa esperar o investimento fechar, ou se dá pra construir sem contratar o Pagar.me. Resposta técnica: a maior parte é construível em modo sandbox (chaves de teste gratuitas, sem CNPJ aprovado nem negociação comercial) — onboarding de recebedor, Pix/cartão, split, webhooks, extrato reconciliado e saque manual funcionam de ponta a ponta em sandbox. O que realmente depende de investimento/negociação são as decisões já registradas na seção 14 (conta de recebedor real com KYC, taxa de Pix negociada, prazo de liquidação, percentuais de comissão).
 
-**Decisão confirmada com o usuário:** mesmo sendo tecnicamente possível adiantar em sandbox, a Onda 3 fica **por último no roadmap**, não é a próxima onda. Ordem de execução das ondas restantes a definir com o usuário conforme o trabalho avança (candidatas: Onda 4 — execução/segurança/reputação; Onda 5 — CRM do profissional; Onda 6 — Espaços/seguro/backup/operação regional; Onda 7 — homologação/lançamento).
+**Primeira decisão:** adiar a Onda 3 pro final do roadmap.
+
+**Segunda decisão:** depois de entender que o sandbox não depende de investimento nem contrato, o usuário reverteu — a Onda 3 entraria imediatamente, construída contra o sandbox do Pagar.me. Um plano de "Fase 1" foi desenhado (checkout Pix + split + webhook + extrato básico, deixando cartão de crédito e o efeito financeiro de cancelamento/no-show pra uma "Fase 2" futura, registrada como backlog).
+
+**Decisão final (a que vale):** ao ver esse plano fatiado, o usuário apontou dois problemas e revertou de novo — desta vez pra ficar: **(1)** o Pilar 1 é pra ser entregue 100%, não em fatias que empurram cartão/cancelamento/no-show pra um backlog permanente — são parte do mesmo pacote financeiro, não itens opcionais; **(2)** os percentuais de comissão/taxa usados no plano eram só placeholders — na prática isso é configurado pelo Admin (`platform_parameters` + `components/admin/parameters-manager.tsx`, já existentes), e falta antes de tudo pensar numa **tela de conciliação para o Admin** que evite problemas de pagamento (duplicidade, split errado, saque liberado indevidamente) — a complexidade real exige um desenho único e completo, não uma entrega incremental. **A Onda 3 fica de fato pro final do roadmap, e será desenhada e construída inteira de uma vez** (Pix + cartão + split + webhooks + extrato + conciliação do Admin + cancelamento + no-show + saque) quando chegar sua vez — nenhum código foi escrito nas duas primeiras tentativas desta decisão, só a pesquisa da API do Pagar.me v5 (autenticação Basic Auth com secret key, criação de recebedor com split, cobrança Pix, webhooks) fica registrada aqui como contexto útil para quando a onda for retomada.
 
 ---
 
