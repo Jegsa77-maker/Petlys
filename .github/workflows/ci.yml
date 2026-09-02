@@ -31,7 +31,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 20 não tem WebSocket nativo — @supabase/supabase-js precisa
+          # disso pro cliente do Realtime inicializar (usado até em
+          # createClient() sem nunca chamar .channel()). 24 é o que
+          # também é usado localmente a sessão inteira.
+          node-version: 24
           cache: npm
 
       - run: npm ci
