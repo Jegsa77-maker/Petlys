@@ -4,6 +4,27 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 0 (backlog): testes automatizados, fase 2 — RLS com sessão real
+
+**Contexto:** segunda das 4 fases combinadas (Vitest → RLS → Playwright → CI). Estes testes existem especificamente porque testar RLS manualmente já achou 4 bugs reais nesta sessão (aceite de proposta que não gravava, Supervisor resolvendo incidente sozinho, co-tutor não vendo o outro, `notify()` exposto) — a ideia é parar de depender de eu lembrar de testar isso à mão.
+
+**Entrega:**
+- `tests/rls/helpers.ts` (novo): `provisionTestUser()` cria usuário de teste (`rls-test-*@plataformapet.dev`) com papel(éis) via `service_role`, sem passar por verificação de telefone/e-mail/termos — RLS é avaliada pelo Postgres na chamada da API, não pelo middleware do Next.js, então esses gates de rota são irrelevantes pra esse tipo de teste. `sessionClientFor()` gera sessão real via `generateLink` + `verifyOtp` (mesma técnica manual usada a sessão inteira). `anonClient()`/`serviceClient()` completam o trio de papéis testáveis.
+- 5 arquivos de teste em `tests/rls/`, cada um com fixture própria criada com `service_role` e limpa no `afterAll`:
+  - `pets.test.ts` — dono vê o próprio pet, outro tutor e anônimo não veem, ninguém se auto-adiciona como tutor, `created_by` não pode ser falsificado.
+  - `proposals.test.ts` — **regressão do bug de 0022**: tutor consegue aceitar (`accepted_at` grava de verdade), não consegue alterar preço via update direto, tutor de outra solicitação não consegue aceitar.
+  - `incidents.test.ts` — **regressão do bug de 0034**: Supervisor escala mas não resolve diretamente (RLS bloqueia, não só a Server Action), Admin resolve.
+  - `co-tutors.test.ts` — **regressão do bug de 0037**: os dois co-tutores veem os dois nomes, não-tutor recebe lista vazia, anônimo é bloqueado por GRANT.
+  - `security-hardening.test.ts` — **regressão de 0038/0039**: `notify()` bloqueada pra todo mundo, `flag_message` bloqueada só pra `anon`.
+
+**Bug de teste encontrado e corrigido no processo (não do app):** a primeira versão de `pets.test.ts` montava a fixture usando o client do próprio usuário de teste (não `service_role`) — o `.insert().select()` falhava porque o `pets_select` exige `is_tutor_of_pet()`, e o vínculo em `pet_tutors` só era criado *depois* do insert do pet, numa chamada separada. Corrigido usando `service_role` pra montar a fixture (bypassa RLS de propósito — o que está sob teste é o comportamento do usuário depois, não o processo de montar o cenário). Também foi encontrado, duas vezes, o mesmo padrão de resíduo: `requests.tutor_id`/`professional_id` e `pets.created_by` não têm `ON DELETE CASCADE` até `profiles` — apagar o usuário de teste antes de apagar a linha que o referencia falha silenciosamente (`admin.auth.admin.deleteUser` retorna erro, mas nada quebra visivelmente se ninguém checar). Corrigido reordenando os `afterAll` (apaga a linha filha primeiro) e deixando `cleanupTestUser` logar um aviso em vez de engolir esse tipo de erro.
+
+**Verificação:** 55 testes (37 unidade + 18 de RLS), 11 arquivos, todos passando. `tsc --noEmit` e `eslint .` limpos. Confirmado via SQL direto no projeto: zero usuário `rls-test-*` residual depois de rodar a suíte inteira duas vezes seguidas.
+
+**Não incluído nesta entrega:** Playwright (fase 3) e GitHub Actions CI (fase 4) — ficam pra continuar depois. Esta suíte de RLS também não é exaustiva de toda política do schema (seria um projeto à parte) — cobre as áreas de maior histórico de bug real desta sessão, não every policy que existe.
+
+---
+
 ## 2026-09-02 — Onda 0 (backlog): início dos testes automatizados — Vitest + unidade de domínio
 
 **Contexto:** item do `BACKLOG.md` desde a auditoria inicial (2026-08-31) — zero teste no projeto inteiro. Primeira fase, decidida com o usuário: começar por Vitest (lógica pura), depois RLS com sessão real, depois Playwright ponta a ponta, depois CI no GitHub Actions.

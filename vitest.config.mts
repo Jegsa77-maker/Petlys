@@ -14,5 +14,10 @@ export default defineConfig({
   test: {
     include: ["**/*.test.ts"],
     exclude: ["node_modules", ".next", "e2e/**"],
+    setupFiles: ["./vitest.setup.ts"],
+    // Testes de RLS (tests/rls/**) batem no Supabase remoto de verdade,
+    // criando/apagando fixture própria — rodar em série evita duas
+    // suítes disputando o mesmo e-mail de teste ao mesmo tempo.
+    fileParallelism: false,
   },
 });
