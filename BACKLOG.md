@@ -6,13 +6,15 @@ Cada item deve dizer: de onde veio, por que ficou de fora, e o tamanho aproximad
 
 ---
 
-## Onda 2 — Descoberta e contratação negociada
+## Onda 1 — Identidade, papéis, perfis e prontuário
 
-- **Chat com mídia (fotos, vídeos, documentos)** — item 3 da Onda 2 (seção 12.1 da Especificação v2.0). Hoje o chat da solicitação (`components/requests/chat-panel.tsx`, `messages` table) só aceita texto. Adiado em 2026-09-01 a pedido do usuário ("não é necessário agora"), sem crítica técnica — só não é prioridade no momento. Esforço estimado: bucket de storage próprio (padrão já estabelecido em `pet-documents`/`pet-photos`), RLS espelhando `messages_select`/`messages_insert`, componente de upload reaproveitando `FileUploadField`, e ajuste de `chat-panel.tsx` pra renderizar anexos por tipo (imagem inline, vídeo, link de documento).
+- **Revisão jurídica de Termos/Privacidade** — o texto de `lib/domain/terms.ts` é um placeholder funcional (aceite versionado já funciona tecnicamente), nunca revisado por advogado. Usuário confirmou em 2026-09-01 que vai olhar isso pessoalmente depois ("vejo depois"), sem crítica técnica. Esforço: zero de desenvolvimento — só troca de texto + bump de `CURRENT_TERMS_VERSION` quando o texto revisado chegar.
+
+## Onda 2 — Descoberta e contratação negociada
 
 - **Mapa visual na busca** — parte do item 2 da Onda 2 (busca avançada), que já entregou os filtros de preço/nota/subcategoria/espécie e favoritos (ver CHANGELOG 2026-09-01). Adiado por trazer uma dependência nova (Leaflet + tiles OpenStreetMap, sem custo de API key, mas é uma peça técnica própria com bundle size e componente client-only). Esforço estimado: `npm install leaflet react-leaflet`, componente de mapa com pins usando `professional_service_areas.center_lat/center_lng` (já existe), toggle lista/mapa em `/buscar`.
 
-- **Tela dedicada `/favoritos`** — hoje favoritos só existem como filtro (`?favoritos=1`) dentro de `/buscar`, não como uma listagem própria. Baixo esforço quando for retomado — é basicamente `/buscar?favoritos=1` com um título diferente e sem os outros filtros.
+- **Chat com mídia (fotos, vídeos, documentos)** — item 3 da Onda 2 (seção 12.1 da Especificação v2.0). Hoje o chat da solicitação (`components/requests/chat-panel.tsx`, `messages` table) só aceita texto. Adiado em 2026-09-01 a pedido do usuário ("não é necessário agora"), sem crítica técnica — só não é prioridade no momento. Esforço estimado: bucket de storage próprio (padrão já estabelecido em `pet-documents`/`pet-photos`), RLS espelhando `messages_select`/`messages_insert`, componente de upload reaproveitando `FileUploadField`, e ajuste de `chat-panel.tsx` pra renderizar anexos por tipo (imagem inline, vídeo, link de documento).
 
 ## Onda 5 — Retenção e ferramentas do Profissional
 

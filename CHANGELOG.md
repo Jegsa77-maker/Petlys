@@ -4,6 +4,16 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 2 (retomada do backlog): tela dedicada `/favoritos`
+
+**Contexto:** revisão de pendências das Ondas 1–4 a pedido do usuário. Item já registrado no `BACKLOG.md` desde a entrega de busca avançada — favoritos só existiam como filtro (`?favoritos=1`) dentro de `/buscar`, sem uma listagem própria.
+
+**Entrega:** `app/(tutor)/favoritos/page.tsx` (novo) — lista um card por profissional favoritado (não por serviço, ao contrário de `/buscar`), reaproveitando `tutor_favorites`, `FavoriteButton` e `averageRating` já existentes. Estado vazio com CTA de volta pra busca; sem sessão, mensagem pedindo login. Link "Ver favoritos" adicionado ao cabeçalho de `/buscar`.
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado com sessão real (RLS): card renderiza nome/categoria/preço/nota do profissional favoritado; botão de coração desfavorita e a lista atualiza (confirmado direto no banco); estado vazio confirmado após remover o único favorito; link "Ver favoritos" navega corretamente a partir de `/buscar`. Durante o teste, o dev server travou com o mesmo `EBUSY` de Turbopack/Windows já visto nesta sessão (`.next/dev/server/app-paths-manifest.json` bloqueado) — resolvido do mesmo jeito (parar servidor, apagar `.next/`, reiniciar), sem relação com o código desta entrega.
+
+---
+
 ## 2026-09-01 — Auditoria de CX: revisão de todas as telas contra o padrão estabelecido
 
 **Contexto:** a pedido do usuário, revisão de toda a base (não só as telas mexidas nesta sessão) contra os 4 itens de CX já entregues (M-001/M-002 shell, M-013 hierarquia, M-007 preço). Auditoria estática (grep por padrões que violam o padrão) + verificação ao vivo dos achados.

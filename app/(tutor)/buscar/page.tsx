@@ -150,7 +150,14 @@ export default async function BuscarPage({
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold text-teal mb-4">Buscar profissional</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-teal">Buscar profissional</h1>
+          {user && (
+            <Link href="/favoritos" className="text-xs font-semibold text-teal hover:underline">
+              Ver favoritos
+            </Link>
+          )}
+        </div>
 
         <div className="mb-4 flex flex-wrap gap-2 items-center">
           <UseMyLocationButton />
