@@ -10,13 +10,13 @@ Cada item deve dizer: de onde veio, por que ficou de fora, e o tamanho aproximad
 
 - **Revisão jurídica de Termos/Privacidade** — o texto de `lib/domain/terms.ts` é um placeholder funcional (aceite versionado já funciona tecnicamente), nunca revisado por advogado. Usuário confirmou em 2026-09-01 que vai olhar isso pessoalmente depois ("vejo depois"), sem crítica técnica. Esforço: zero de desenvolvimento — só troca de texto + bump de `CURRENT_TERMS_VERSION` quando o texto revisado chegar.
 
-## Onda 2 — Descoberta e contratação negociada
-
-- **Chat com mídia (fotos, vídeos, documentos)** — item 3 da Onda 2 (seção 12.1 da Especificação v2.0). Hoje o chat da solicitação (`components/requests/chat-panel.tsx`, `messages` table) só aceita texto. Adiado em 2026-09-01 a pedido do usuário ("não é necessário agora"), sem crítica técnica — só não é prioridade no momento. Esforço estimado: bucket de storage próprio (padrão já estabelecido em `pet-documents`/`pet-photos`), RLS espelhando `messages_select`/`messages_insert`, componente de upload reaproveitando `FileUploadField`, e ajuste de `chat-panel.tsx` pra renderizar anexos por tipo (imagem inline, vídeo, link de documento).
-
 ## Onda 5 — Retenção e ferramentas do Profissional
 
-Da lista original da onda (seção 12.4 da Especificação v2.0 / seção 8 do `PETLYS_PILAR1_PLANO_100_PERCENT.md`), o usuário decidiu em 2026-09-01 manter só o CRM/ferramentas do dia a dia (clientes e pets próprios, agendamento manual, link/cartão digital/QR code, indicadores de conversão/recorrência/receita) como escopo ativo da onda agora. Os demais grupos ficam adiados:
+Onda inteira adiada em 2026-09-02 — decisão do usuário de colocar tudo em backlog, incluindo o CRM básico que até então era o único escopo ativo da onda.
+
+- **CRM básico** (clientes e pets próprios, agendamento manual, link/cartão digital/QR code, indicadores de conversão/recorrência/receita) — chegou a ser discutido em profundidade antes de ir pro backlog; não perder esse contexto quando for retomado. Decisões já tomadas na discussão: mesmo app Next.js, rotas novas (`/crm/*`), acesso controlado por permissão própria (`crm_access`) desacoplada de "é profissional Petlys" — pra viabilizar uma futura venda como assinatura pra profissional fora da Petlys sem precisar retrabalhar o modelo de dados; critério de fidelidade proposto = nível "Profissional experiente" (reaproveita `lib/domain/professional-reputation.ts`, já existe); quem não é elegível vê o CRM travado com preview (incentivo), não escondido. Dúvidas ainda em aberto: o que exatamente significa "visão mais completa da plataforma" citada pelo usuário; se um cliente trazido de fora pelo profissional vira demanda formal dentro do fluxo `requests`/`proposals` (com proteção da plataforma) ou fica sempre por fora; comissão sobre cliente trazido de fora. Ver também `CHANGELOG.md` — "Decisão de produto/arquitetura: CRM do Profissional como módulo da Onda 5" (2026-09-01). Esforço estimado: médio pro básico descrito acima, assumindo as decisões de produto fechadas.
+
+- **Chat com mídia (fotos, vídeos, documentos)** — realocado em 2026-09-02: **não vai existir no chat principal da plataforma** (era item da Onda 2, seção 12.1). Se algum dia fizer sentido, é como parte do CRM (comunicação mais rica do profissional com clientes próprios), não como funcionalidade central do marketplace Tutor↔Profissional.
 
 - **Petlys Academy (trilhas e certificações) + Clube de benefícios + Programa Profissional Fundador + Comissão diferenciada por plano/nível** — grupo "carreira e engajamento". Adiado em 2026-09-01. Comissão diferenciada em particular depende de dado financeiro real (Onda 3, já adiada pro final do roadmap) pra fazer sentido — não dá pra calcular "diferenciada" sem primeiro ter a comissão padrão rodando de verdade. Academy e Clube de benefícios também dependem de decisão de conteúdo/parceria comercial antes de virarem esforço de desenvolvimento. Esforço estimado: grande — Academy precisa de modelo de conteúdo (trilhas, progresso, emissão de certificado) além do que já existe (cálculo automático de nível de carreira, seção 5); Clube de benefícios depende de parceiros externos fechados; Fundador é sobretudo critério de elegibilidade + selo, esforço pequeno isolado mas só faz sentido junto dos outros três.
 
@@ -48,5 +48,5 @@ Da lista da onda (seção 12.5 da Especificação v2.0 / seção 8 do `PETLYS_PI
 
 ---
 
-*Última atualização: 2026-09-01.*
+*Última atualização: 2026-09-02.*
 
