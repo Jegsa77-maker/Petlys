@@ -4,6 +4,27 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Decisão de escopo: Onda 5 e Onda 6 saem da plataforma; falta só a Onda 3 pra fechar o Pilar 1
+
+**Decisão do usuário:** remover a Onda 5 (retenção do Profissional) e os itens ainda pendentes da Onda 6 (Petlys Espaços, Operação regional, Seguro/garantia, Backup de emergência) do escopo de fechamento desta plataforma. Deixam de ser "backlog dentro do projeto em andamento" e viram **funcionalidades futuras**, registradas no `IDEIAS_FUTURAS.md` — exceto o CRM do Profissional, que sai **por completo**: não fica nem registrado como ideia futura desta plataforma, será tratado como iniciativa separada, a discutir no futuro (nem é certo que continue sendo Petlys).
+
+Com isso, o critério de fechamento do Pilar 1 muda: falta só a **Onda 3** (financeiro real). Onda 4 e a "proteção de conversa" da Onda 6 já estavam completas; Ondas 1 e 2 também.
+
+**Nota de consistência documental (não corrigido nesta entrada):** a `Especificacao_Pilar_1_Jornadas_v2.docx` (seção 12) e o `PETLYS_PILAR1_PLANO_100_PERCENT.md` (seção 9, "critério objetivo de Pilar 1 100%") ainda listam Petlys Espaços/seguro/backup/retenção do profissional como parte do escopo de "100%" — esses dois documentos ficam desatualizados em relação a essa decisão até serem revisados. Fica registrado aqui pra não virar divergência esquecida; atualizar a Especificação formal é tarefa separada (edição de `.docx`), não feita nesta entrada.
+
+**Histórico completo do CRM preservado aqui, pra quando a conversa for retomada** (removido do `BACKLOG.md`, não é mais "ideia futura da plataforma", mas o contexto tem valor arquitetural real):
+
+- **Decisão original (2026-09-01):** CRM avançado do Profissional modelado como tier/assinatura paga sobre a Onda 5; mesmo app Next.js, rotas `/crm/*`, acesso por flag de assinatura — nunca repositório/deploy separado (reconciliação de sessões desalinhadas escrevendo no mesmo banco já foi um problema real nesta sessão).
+- **Visão expandida (2026-09-02):** CRM descrito como tendo 4 papéis simultâneos — ferramenta operacional (clientes/agenda, inclusive fora da Petlys), motor de aquisição (ponte pra trazer cliente externo pra dentro), privilégio de fidelidade (não liberado a todo profissional desde o dia 1), produto próprio em potencial (assinatura pra profissional fora da Petlys).
+- **Decisões técnicas fechadas na discussão:** app mobile-only com PWA instalável (manifest, ícone na tela inicial); modelo de dados desacoplado do marketplace de propósito (contatos/agenda manual não tocam `requests`/`proposals`); acesso controlado por permissão própria (`crm_access`), não amarrada a "é profissional Petlys"; critério de fidelidade = nível "Profissional experiente" (reaproveitando `lib/domain/professional-reputation.ts`, já existe); preview travado com incentivo, não escondido, pra quem não é elegível.
+- **Funcionalidades levantadas:** indicadores (conversão, recorrência, "valor negociado" — nunca "faturamento", já que pagamento real não existe), cartão digital/QR apontando pro perfil público já existente, contatos/clientes próprios, agenda manual.
+- **Dúvidas nunca resolvidas:** o que exatamente significa "visão mais completa da plataforma"; se cliente trazido de fora vira demanda formal com proteção da plataforma ou fica sempre por fora; comissão sobre cliente trazido de fora; login do assinante externo futuro (conta Petlys ou sistema separado).
+- **Riscos identificados:** canibalização do marketplace (facilitar demais o "por fora" reduz solicitação formal); LGPD mesmo pra contato que nunca vira conta Petlys; frustração com o gate de fidelidade se mal comunicado; escopo sem fim ("visão mais completa" indefinida); desconfiança se o que é grátis hoje virar pago amanhã sem aviso; duplicidade de identidade se um contato próprio depois virar Tutor de verdade.
+
+Nenhum código mudou nesta entrada — só reorganização de escopo/documentação.
+
+---
+
 ## 2026-09-02 — CI verificado de ponta a ponta: 2 bugs de configuração achados e corrigidos
 
 **Contexto:** a entrega da fase 4 (abaixo) só tinha revisão manual da sintaxe do workflow — sem `act` ou executor de Actions local neste ambiente, não dava pra confirmar de verdade sem um push real. Usuário configurou os 3 secrets e pediu o push; acompanhamos juntos as execuções reais no GitHub até fechar verde.
