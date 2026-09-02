@@ -665,15 +665,11 @@ O handoff supunha que seria necessário reconstruir tudo isso do zero. Como já 
 
 ---
 
-## Pendências abertas ao final desta entrada
+## Pendências abertas ao final desta entrada — encerrada em 2026-09-02
 
-- [ ] Corrigir os achados de segurança do Supabase (funções `SECURITY DEFINER` expostas como RPC público).
-- [ ] Fixar `search_path` em `distance_km` e `set_updated_at`, e revisar as demais funções `SECURITY DEFINER`.
-- [ ] Garantir por RLS (não só por Server Action) que Supervisor não encerre incidente sozinho — hoje a policy `incidents_update` permite tanto Admin quanto Supervisor.
-- [ ] Ativar proteção contra senha vazada no Supabase Auth.
-- [ ] Reagendamento de ocorrências pelo Tutor, escolhendo horário livre do Profissional (hoje a data só é definida na criação da solicitação).
-- [ ] Escrever testes automatizados reais (unitário/integração/E2E) — não existem no projeto.
-- [ ] Configurar Redirect URLs de produção no Supabase quando o domínio Vercel existir.
-- [ ] Módulo financeiro / Pagar.me — aguardando decisões comerciais (percentuais, condições) listadas na seção 13.3 da Especificação v1.2.
-- [ ] Decidir se a rota `/dev-login` (bypass de autenticação só pra teste local, sem efeito em produção via checagem de `NODE_ENV`) deve ser removida antes do deploy ou mantida — revisar antes de ir pra produção.
-- [ ] Revisar e mergear a branch `sync-pilar1-fixes` em `main`, e enviar ao GitHub.
+Esta lista era do dia da primeira auditoria (2026-08-31) e parou de ser atualizada — virou uma segunda fonte de pendências desencontrada do `BACKLOG.md`. Auditada item a item nesta data; substituída pelas duas listas que já são a referência corrente do projeto.
+
+- Resolvidos, sem pendência: achados de segurança `SECURITY DEFINER` (`0038`/`0039`), `search_path` de `distance_km`/`set_updated_at` (`0039`), RLS de Supervisor resolvendo incidente sozinho (`0034`), reagendamento de ocorrências (Onda 2, item 7 — resolvido diferente do texto original: qualquer parte reagenda pra qualquer horário, "nunca bloqueia a agenda", confirmado com o usuário), testes automatizados (60 checks — Vitest unidade+RLS e Playwright E2E, ver entradas de fase 1–4), branch `sync-pilar1-fixes` (já mergeada em `main`).
+- Módulo financeiro/Pagar.me: virou a decisão de roadmap já registrada acima (Onda 3, fica pro final).
+- Ainda em aberto, sem dono nesta lista: proteção contra senha vazada e o restante dos achados de segurança aceitos como risco — ver `BACKLOG.md`.
+- Ainda em aberto, checklist de pré-lançamento (não bloqueiam o fechamento do Pilar 1, bloqueiam ir pra produção): Redirect URLs de produção no Supabase (depende do domínio final) e decisão sobre manter ou remover a rota `/dev-login` antes do go-live.
