@@ -4,6 +4,22 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 6: proteção de conversa (seção 2.4)
+
+**Contexto:** discutido com o usuário — objetivo é resguardar a plataforma contra combinação por fora (perda de comissão) e contra conteúdo impróprio no chat, sem bloquear envio e sem punir sozinho: revisão humana antes de qualquer ação, como a Especificação pede.
+
+**Decisão de desenho:** duas categorias, tratadas diferente.
+1. **Contato/dado sensível** (telefone, e-mail, CPF, frases de evasão tipo "me chama no whatsapp"/"por fora") — detecção por **padrão (regex)**, alta precisão, zero custo por mensagem.
+2. **Conteúdo impróprio** — lista de palavras curada (não IA/LLM): mais barata e previsível que um classificador, ao custo de não pegar tudo. Lista v1, não exaustiva, complementa (não substitui) a sinalização manual que já existe desde a Onda 4.
+
+Rejeitado de propósito: classificador de IA por mensagem — custaria dinheiro por mensagem enviada, adicionaria dependência externa nova, e a plataforma ainda não tem volume/histórico de abuso pra justificar esse investimento agora. Fica registrado como caminho futuro se o volume real mostrar que está passando coisa batido.
+
+**Entrega:** `supabase/migrations/0040_conversation_protection.sql` — trigger `auto_flag_suspicious_message()` (`BEFORE INSERT` em `messages`) que escreve em `messages.flagged_reason` (coluna que já existia desde `0004`, comentada como "reservado para o futuro orquestrador de IA" — reaproveitada, não criada agora) quando o conteúdo bate um dos padrões. **Zero mudança de frontend**: a fila de moderação (`/admin/moderacao`, `components/admin/moderation-queue.tsx`) já consulta só `flagged_reason is not null`, sem se importar se a sinalização foi manual ou automática — mensagem sinalizada automaticamente aparece do mesmo jeito, com os mesmos botões de Ocultar/Manter.
+
+**Verificação:** `tsc --noEmit`, `eslint .` limpos (nenhum arquivo TypeScript tocado). Testado com sessão real (RLS): 5 mensagens enviadas por um Tutor de teste — (1) mensagem normal sobre horário de medicação **não foi marcada** (confirma que o regex de CPF não confunde "11h e 19h" com CPF); (2) telefone marcado corretamente; (3) e-mail marcado corretamente; (4) "prefiro combinar pelo whatsapp" marcado corretamente; (5) "seu idiota" marcado corretamente. Todas as 5 mensagens foram enviadas com sucesso (não bloqueadas). Confirmado visualmente em `/admin/moderacao` como Admin: as sinalizadas aparecem na fila com o motivo automático e os botões de moderação funcionando normal.
+
+---
+
 ## 2026-09-02 — Onda 0 (backlog): achados de segurança do Supabase corrigidos (maior parte)
 
 **Contexto:** item do `BACKLOG.md` desde 2026-08-31 (achados de `get_advisors` na auditoria inicial), nunca corrigido. Investigado função por função em vez de aplicado em bloco — o pedido genérico ("SECURITY DEFINER deveria ser SECURITY INVOKER ou só chamável via trigger") não valia igual pra todas as ~26 funções flagueadas.

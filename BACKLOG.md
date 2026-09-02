@@ -26,7 +26,7 @@ Da lista original da onda (seção 12.4 da Especificação v2.0 / seção 8 do `
 
 ## Onda 6 — Infraestrutura e proteção ampliada
 
-Da lista da onda (seção 12.5 da Especificação v2.0 / seção 8 do `PETLYS_PILAR1_PLANO_100_PERCENT.md`), o usuário decidiu em 2026-09-02 adiar 4 dos 5 itens; só "proteção de conversa" fica em discussão de produto, fora deste arquivo por enquanto.
+Da lista da onda (seção 12.5 da Especificação v2.0 / seção 8 do `PETLYS_PILAR1_PLANO_100_PERCENT.md`), o usuário decidiu em 2026-09-02 adiar 4 dos 5 itens. O 5º, "proteção de conversa", foi discutido e já entregue no mesmo dia — ver `CHANGELOG.md` ("Onda 6: proteção de conversa").
 
 - **Petlys Espaços** (papel de Anfitrião, cadastro de espaço físico, busca/reserva, checklist de entrada/saída, split de pagamento a 3 vias Anfitrião+Profissional+Petlys, avaliação bilateral, fluxo próprio de incidente de espaço). Adiado em 2026-09-02. É o maior item técnico da onda — um papel de usuário inteiro novo, e um split financeiro a 3 vias que hoje não existe (o split atual é só Profissional/Petlys). Depende de decisão de produto antes de codar: modelo de comissão a 3 vias, política de danos/vistoria. Esforço estimado: grande — comparável em tamanho a uma onda inteira sozinho.
 
