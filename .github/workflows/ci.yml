@@ -36,6 +36,13 @@ jobs:
 
       - run: npm ci
 
+      - name: Gerar tipos de rota do Next.js
+        # tsc precisa de app/layout.tsx etc. já tipados (LayoutProps,
+        # PageProps...) — normalmente isso só existe depois de um `next
+        # dev`/`build` já ter rodado. Num checkout limpo (CI) esses tipos
+        # não existem ainda; `next typegen` gera só isso, sem build completo.
+        run: npx next typegen
+
       - name: Typecheck
         run: npx tsc --noEmit
 

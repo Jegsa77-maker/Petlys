@@ -30,16 +30,20 @@ test.describe("Shell — smoke por papel", () => {
     await loginAs(page, tutor.email);
     await page.getByRole("button", { name: "Entrar como Tutor" }).click();
     await expect(page).toHaveURL(/\/inicio/);
-    await expect(page.getByRole("link", { name: "Buscar", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Meus pets" })).toBeVisible();
+    // Vários links da própria tela de conteúdo apontam pro mesmo destino
+    // do menu (ex.: atalho "Buscar profissional" além do item de menu
+    // "Buscar") — checar por href em vez de texto evita ambiguidade de
+    // accessible name sem depender de qual apareceu primeiro no DOM.
+    await expect(page.locator('a[href="/buscar"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/pets"]').first()).toBeVisible();
   });
 
   test("profissional entra e vê a navegação de Profissional", async ({ page }) => {
     await loginAs(page, profissional.email);
     await page.getByRole("button", { name: "Entrar como Profissional" }).click();
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole("link", { name: "Agenda", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Atendimentos" })).toBeVisible();
+    await expect(page.locator('a[href="/agenda"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/kanban"]').first()).toBeVisible();
   });
 
   test("admin entra e vê o painel", async ({ page }) => {
