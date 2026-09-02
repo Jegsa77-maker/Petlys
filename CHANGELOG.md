@@ -4,6 +4,27 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 0 (backlog): início dos testes automatizados — Vitest + unidade de domínio
+
+**Contexto:** item do `BACKLOG.md` desde a auditoria inicial (2026-08-31) — zero teste no projeto inteiro. Primeira fase, decidida com o usuário: começar por Vitest (lógica pura), depois RLS com sessão real, depois Playwright ponta a ponta, depois CI no GitHub Actions.
+
+**Entrega:**
+- `vitest.config.mts` (novo) — resolução de path (`@/*`) nativa do Vite, sem plugin extra; roda `**/*.test.ts`, sem `jsdom` por enquanto (nada aqui testa componente React ainda).
+- `package.json`: scripts `test` (`vitest run`, pra CI) e `test:watch` (pro dia a dia).
+- 6 arquivos de teste, um por módulo de `lib/domain/`, cobrindo as funções puras mais centrais do produto:
+  - `professional-reputation.test.ts` — cálculo de nível de carreira (novo/experiente/top) e média de avaliação.
+  - `category-requirements.test.ts` — requisitos de prontuário por categoria, incluindo override vindo do Admin.
+  - `pet-prontuario-freshness.test.ts` — alerta de dado desatualizado (não alerta prontuário vazio, alerta certo em meses/anos).
+  - `occurrence-pipeline.test.ts` — rótulo de fase do Kanban por categoria, com fallback genérico.
+  - `request-status-copy.test.ts` — inclui um teste de cobertura total: todo `RequestStatus` usado no app tem as 3 visões (tutor/profissional/staff) preenchidas, pra pegar automaticamente se alguém esquecer de adicionar copy pra um status novo.
+  - `incident-types.test.ts` — rótulo/urgência de tipo de incidente, incluindo o fallback de tipo legado.
+
+**Verificação:** 37 testes, 6 arquivos, todos passando (`npx vitest run`). `tsc --noEmit` e `eslint .` limpos incluindo os arquivos de teste novos.
+
+**Não incluído nesta entrega:** testes de RLS com sessão real por papel, testes end-to-end (Playwright), pipeline de CI (GitHub Actions) — ficam pras próximas fases, nessa ordem, combinada com o usuário.
+
+---
+
 ## 2026-09-02 — Onda 6: proteção de conversa (seção 2.4)
 
 **Contexto:** discutido com o usuário — objetivo é resguardar a plataforma contra combinação por fora (perda de comissão) e contra conteúdo impróprio no chat, sem bloquear envio e sem punir sozinho: revisão humana antes de qualquer ação, como a Especificação pede.
