@@ -4,6 +4,28 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 0 (backlog): testes automatizados, fase 3 — Playwright ponta a ponta
+
+**Contexto:** terceira das 4 fases combinadas (Vitest → RLS → Playwright → CI). Diferente dos testes de RLS (batem direto na API do Supabase), estes navegam o app de verdade no navegador, incluindo o middleware do Next.js — o que exigiu um pedaço de infraestrutura novo que os testes de RLS não precisavam.
+
+**Entrega:**
+- `playwright.config.ts` (novo): projeto único (Chromium), `workers: 1`/`fullyParallel: false` de propósito — os specs autenticados compartilham o projeto Supabase remoto (sem ambiente isolado por worker), então rodar em série evita interferência entre testes concorrentes. `webServer` reaproveita o `next dev` já rodando (`reuseExistingServer`) em vez de subir um segundo servidor.
+- `e2e/helpers/auth.ts` (novo): `loginAs(page, email)` — mesma técnica de sessão real usada a sessão inteira (`generateLink` + `verifyOtp`), navegando pra `/dev-login` (rota que só existe fora de produção, `app/(auth)/dev-login/route.ts`) em vez de tentar automatizar OTP por SMS/OAuth de verdade.
+- `supabase/migrations/0041_test_helper_verify_profile.sql` (novo): `test_verify_profile(p_profile_id)`, SECURITY DEFINER, só `service_role` — os testes de RLS não precisam de telefone/e-mail verificado porque isso é gate do *middleware* do Next.js, não de RLS; specs Playwright navegam o app de verdade, então precisam. Revogado de `anon`/`authenticated` (mesmo padrão de 0038/0039/0037) — nunca deveria existir uma porta de auto-verificação pra quem já está logado.
+- `e2e/helpers/fixtures.ts` (novo): `provisionAppReadyUser()` — chama `provisionTestUser` (reaproveitado de `tests/rls/helpers.ts`) e completa com `test_verify_profile` + aceite de termos.
+- 3 specs em `e2e/`: `shell-smoke.spec.ts` (tutor/profissional/admin chegam cada um na própria home com a navegação certa — M-001/M-002), `favoritos.spec.ts` (loop completo favoritar → ver em `/favoritos` → desfavoritar → vazio) e `search-map.spec.ts` (alterna lista/mapa, confirma que o Leaflet monta).
+
+**Ajustes feitos durante o teste (achados de teste, não do app):**
+- Conta com um papel só sempre pousa em `/` (tela de "Entrar como Tutor/Profissional") — só ganha o cookie `active_role` depois de clicar o botão; os specs precisaram desse clique antes de navegar pra rotas exclusivas do papel.
+- Seletor `getByRole("link", { name: "Buscar" })` batia em dois links (o da barra lateral e o CTA "Buscar profissional" da home) — resolvido com `exact: true`. Mesma correção pra "Agenda"/"Agenda e bloqueios".
+- `FavoriteButton` atualiza a UI otimisticamente antes da Server Action (via `startTransition`) terminar de gravar — navegar pra `/favoritos` logo em seguida podia chegar antes do favorito existir de verdade no banco. Corrigido com uma pequena espera antes de navegar.
+
+**Verificação:** 5 specs, todos passando, rodados duas vezes seguidas sem flakiness. `tsc --noEmit` e `eslint .` limpos. Confirmado via SQL: zero usuário `rls-test-e2e-*` residual depois de rodar a suíte.
+
+**Não incluído nesta entrega:** GitHub Actions CI (fase 4, última) — fica pra continuar depois. Cobertura de E2E também não é exaustiva de toda jornada do produto — só as 3 áreas de CX/features entregues nesta sessão.
+
+---
+
 ## 2026-09-02 — Onda 0 (backlog): testes automatizados, fase 2 — RLS com sessão real
 
 **Contexto:** segunda das 4 fases combinadas (Vitest → RLS → Playwright → CI). Estes testes existem especificamente porque testar RLS manualmente já achou 4 bugs reais nesta sessão (aceite de proposta que não gravava, Supervisor resolvendo incidente sozinho, co-tutor não vendo o outro, `notify()` exposto) — a ideia é parar de depender de eu lembrar de testar isso à mão.
