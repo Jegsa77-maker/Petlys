@@ -4,6 +4,22 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — CI verificado de ponta a ponta: 2 bugs de configuração achados e corrigidos
+
+**Contexto:** a entrega da fase 4 (abaixo) só tinha revisão manual da sintaxe do workflow — sem `act` ou executor de Actions local neste ambiente, não dava pra confirmar de verdade sem um push real. Usuário configurou os 3 secrets e pediu o push; acompanhamos juntos as execuções reais no GitHub até fechar verde.
+
+**2 bugs reais de configuração de CI encontrados** (nenhum no código do app):
+1. **`tsc` falhava em checkout limpo**: `app/layout.tsx` usa `LayoutProps`, um tipo que o Next.js só gera depois de um `next dev`/`build` já ter rodado — localmente sempre existia, num checkout limpo de CI não. Corrigido adicionando `npx next typegen` (gera só os tipos de rota, sem build completo) antes do step de typecheck. Reproduzido e confirmado localmente simulando checkout limpo (`rm -rf .next` + `tsc`).
+2. **Vitest falhava com "Node.js detected but native WebSocket not found"**: `@supabase/supabase-js` inicializa o cliente Realtime dentro de `createClient()` mesmo sem nunca chamar `.channel()`, e isso exige WebSocket nativo (Node 22+). O workflow tinha `node-version: 20`. Corrigido subindo pra Node 24 (mesma versão usada localmente a sessão inteira) + adicionado `engines.node: ">=22"` no `package.json` documentando a exigência real.
+
+Também corrigidos, no caminho, 2 seletores frágeis em `e2e/shell-smoke.spec.ts` ("Meus pets"/"Atendimentos" batiam em mais de um link na mesma tela) — trocados por seletor de `href` em vez de texto acessível, mais robusto contra link repetido.
+
+**Resultado final confirmado no GitHub Actions**: run `#3` (commit `1ba407d`) — **Success**, 3m45s, **55/55 testes passando** (Vitest: 37 unidade + 18 RLS; Playwright: 5 E2E, incluído no mesmo job). Único aviso residual é do próprio GitHub sobre as actions padrão (`checkout@v4` etc. ainda referenciando Node 20 internamente) — infraestrutura deles, não afeta o resultado.
+
+**Também gerados automaticamente nesse processo**: `AGENTS.md`/`CLAUDE.md` — arquivos que o próprio Next.js 16 cria via `next dev`/`typegen`, avisando agentes de IA sobre breaking changes da versão. O próprio arquivo instrui a commitar, não ignorar.
+
+---
+
 ## 2026-09-02 — Onda 0 (backlog): testes automatizados, fase 4 (última) — CI no GitHub Actions
 
 **Contexto:** quarta e última das 4 fases combinadas (Vitest → RLS → Playwright → CI). Formaliza como pipeline automático o que até aqui só rodava manualmente a cada entrega desta sessão.
