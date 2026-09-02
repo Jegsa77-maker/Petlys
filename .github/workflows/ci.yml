@@ -1,0 +1,63 @@
+name: CI
+
+# Fase 4 (última) dos testes automatizados — roda tudo que já existe
+# localmente a cada push/PR: tsc, eslint, build, Vitest (unidade + RLS)
+# e Playwright (E2E).
+#
+# Atenção — limitação conhecida, registrada no BACKLOG.md: os testes de
+# RLS e E2E batem no MESMO projeto Supabase remoto usado em
+# desenvolvimento (não existe projeto/ambiente dedicado a CI ainda).
+# Cada execução cria e apaga fixture própria (prefixo rls-test-*), mas
+# ainda assim é tráfego real contra o banco de produção-de-fato do
+# projeto. Aceitável por ora — nenhuma outra parte do projeto tem
+# separação de ambiente — mas é o próximo passo natural se o volume de
+# push justificar.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Build
+        run: npm run build
+
+      - name: Testes de unidade + RLS (Vitest)
+        run: npm test
+
+      - name: Instalar navegador do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Testes E2E (Playwright)
+        run: npm run test:e2e
+
+      - name: Publicar relatório do Playwright em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

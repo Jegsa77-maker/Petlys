@@ -4,6 +4,22 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 0 (backlog): testes automatizados, fase 4 (última) — CI no GitHub Actions
+
+**Contexto:** quarta e última das 4 fases combinadas (Vitest → RLS → Playwright → CI). Formaliza como pipeline automático o que até aqui só rodava manualmente a cada entrega desta sessão.
+
+**Entrega:** `.github/workflows/ci.yml` (novo) — roda em todo push/PR pra `main`: `tsc --noEmit` → `eslint .` → `next build` → Vitest (unidade + RLS) → instala Chromium → Playwright (E2E). Publica o relatório do Playwright como artefato só quando algo falha.
+
+**Limitação conhecida, registrada de propósito (não escondida):** os testes de RLS e E2E batem no mesmo projeto Supabase remoto usado em desenvolvimento — não existe projeto/ambiente dedicado a CI. Cada execução cria e apaga sua própria fixture (prefixo `rls-test-*`), mas ainda é tráfego real contra o banco de produção-de-fato do projeto a cada push. Isso não é uma regressão introduzida agora — é a mesma característica que o projeto já tem desde sempre (nenhuma parte dele tem separação de ambiente); só está sendo formalizado em vez de rodado manualmente. Registrado no `BACKLOG.md` como próximo passo natural se o volume de push justificar um projeto Supabase só pra CI.
+
+**Ação pendente do usuário (não é código, é configuração do GitHub) — deliberadamente não feita por mim:** o workflow precisa de 3 secrets no repositório (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, os mesmos valores do `.env.local`). Não configurei isso via `gh secret set` de propósito — `SUPABASE_SERVICE_ROLE_KEY` ignora toda a segurança do banco (bypassa RLS por completo), e é uma credencial sensível demais pra eu manusear/gravar em nome do usuário sem confirmação explícita. Fica em: GitHub → repositório → Settings → Secrets and variables → Actions → New repository secret.
+
+**Verificação:** sintaxe do workflow revisada manualmente linha a linha (sem `act` ou executor de Actions local disponível neste ambiente pra rodar de verdade) — só é possível confirmar 100% depois do primeiro push com os secrets configurados. `tsc --noEmit` e `eslint .` limpos (nenhum arquivo TypeScript novo, só o YAML).
+
+**Com isso, as 4 fases da iniciativa de testes automatizados (item do `BACKLOG.md` desde 2026-08-31) estão completas**: 60 testes automatizados (37 unidade + 18 RLS + 5 E2E) rodando local e, assim que os secrets forem configurados, em CI a cada push.
+
+---
+
 ## 2026-09-02 — Onda 0 (backlog): testes automatizados, fase 3 — Playwright ponta a ponta
 
 **Contexto:** terceira das 4 fases combinadas (Vitest → RLS → Playwright → CI). Diferente dos testes de RLS (batem direto na API do Supabase), estes navegam o app de verdade no navegador, incluindo o middleware do Next.js — o que exigiu um pedaço de infraestrutura novo que os testes de RLS não precisavam.
