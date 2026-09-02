@@ -4,6 +4,18 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 1 (pendência): alerta de dado desatualizado no prontuário do pet
+
+**Contexto:** revisão de pendências das Ondas 1–4 — item citado desde a entrega original do prontuário (seção 6.2) como "fica pra depois", nunca implementado: nada avisava o Tutor se saúde/comportamento/rotina de um pet não eram revisados há muito tempo.
+
+**Entrega:**
+- `lib/domain/pet-prontuario-freshness.ts` (novo): `prontuarioStalenessLabel(pet)` — sem coluna de timestamp por seção, usa `pets.updated_at` (mantida por trigger genérico já existente em toda alteração do pet) como aproximação. Só alerta quando há conteúdo preenchido (reaproveita `isSectionFilled`, exportada de `category-requirements.ts` pra isso) — prontuário nunca preenchido continua mostrando "Pendente", não "desatualizado", que é um alerta diferente. Limiar de 6 meses (`PRONTUARIO_STALE_MONTHS`).
+- `app/(tutor)/pets/[petId]/page.tsx`: banner amarelo acima das seções do prontuário quando aplicável ("Revise o prontuário — não é atualizado há X meses/anos").
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado com sessão real e dados forçados via SQL (desabilitando o trigger de `updated_at` temporariamente pra simular idade): pet com conteúdo preenchido e 8 meses sem alteração mostrou o banner; pet com prontuário 100% vazio e 20 meses de idade não mostrou banner nenhum (mostra só "Pendente", como já era o comportamento).
+
+---
+
 ## 2026-09-01/02 — Onda 1 (pendência): catálogo de requisitos do prontuário editável pelo Admin
 
 **Contexto:** revisão de pendências das Ondas 1–4 a pedido do usuário. `CATEGORY_REQUIRED_SECTIONS` (seção 6.3/6.5) era uma constante fixa no código desde a entrega original da Onda 1 — mudar qual seção do prontuário cada categoria exige dependia de deploy.

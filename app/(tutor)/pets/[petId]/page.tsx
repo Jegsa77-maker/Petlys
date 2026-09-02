@@ -10,6 +10,7 @@ import {
   updatePetRoutine,
   updatePetEmergency,
 } from "@/lib/actions/pets";
+import { prontuarioStalenessLabel } from "@/lib/domain/pet-prontuario-freshness";
 
 const HEALTH_FIELDS: FieldDef[] = [
   { key: "veterinario", label: "Veterinário de referência" },
@@ -86,6 +87,8 @@ export default async function PetDetailPage({
     .filter((t) => t.profiles)
     .map((t) => ({ tutor_profile_id: t.tutor_profile_id, full_name: t.profiles!.full_name }));
 
+  const stalenessLabel = prontuarioStalenessLabel(pet);
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
@@ -114,6 +117,13 @@ export default async function PetDetailPage({
         <div className="mb-6">
           <PetMediaSection petId={pet.id} photoUrl={pet.photo_url} hasDocument={!!pet.document_url} />
         </div>
+
+        {stalenessLabel && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-4 text-xs text-amber-800">
+            <strong>Revise o prontuário</strong> — {stalenessLabel}. Confirme se saúde,
+            comportamento e rotina ainda refletem a realidade do {pet.name}.
+          </div>
+        )}
 
         <div className="flex flex-col gap-3 mb-6">
           <PetProfileSection

@@ -42,7 +42,7 @@ type PetProntuarioInfo = {
   emergency_info?: unknown;
 };
 
-function isSectionFilled(info: unknown): boolean {
+export function isSectionFilled(info: unknown): boolean {
   return !!info && typeof info === "object" && Object.keys(info as object).length > 0;
 }
 
