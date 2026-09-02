@@ -2,11 +2,20 @@
 
 import { useState } from "react";
 import { inviteCoTutorByEmail } from "@/lib/actions/pets";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Clock } from "lucide-react";
 
 type Tutor = { tutor_profile_id: string; full_name: string };
+type PendingInvite = { id: string; invited_email: string };
 
-export function CoTutorsSection({ petId, tutors }: { petId: string; tutors: Tutor[] }) {
+export function CoTutorsSection({
+  petId,
+  tutors,
+  pendingInvites,
+}: {
+  petId: string;
+  tutors: Tutor[];
+  pendingInvites: PendingInvite[];
+}) {
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -48,12 +57,22 @@ export function CoTutorsSection({ petId, tutors }: { petId: string; tutors: Tuto
             {t.full_name}
           </li>
         ))}
+        {pendingInvites.map((inv) => (
+          <li
+            key={inv.id}
+            className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-2 text-sm text-gray-500"
+          >
+            <Clock size={14} className="shrink-0" />
+            {inv.invited_email} — convite enviado, aguardando cadastro
+          </li>
+        ))}
       </ul>
 
       {showForm && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-xs text-gray-500">
-            A pessoa precisa já ter uma conta na plataforma com esse e-mail.
+            Se a pessoa já tem conta na Petlys, ela é vinculada na hora. Se não tiver,
+            enviamos um convite por e-mail pra ela criar a conta e virar co-tutora automaticamente.
           </p>
           <input
             type="email"
@@ -63,13 +82,13 @@ export function CoTutorsSection({ petId, tutors }: { petId: string; tutors: Tuto
             className="input"
           />
           {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
-          {success && <p className="text-xs text-teal">Co-tutor adicionado.</p>}
+          {success && <p className="text-xs text-teal">Convite enviado.</p>}
           <button
             type="submit"
             disabled={isSubmitting}
             className="rounded-lg bg-teal px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {isSubmitting ? "Adicionando..." : "Adicionar co-tutor"}
+            {isSubmitting ? "Enviando..." : "Adicionar co-tutor"}
           </button>
         </form>
       )}

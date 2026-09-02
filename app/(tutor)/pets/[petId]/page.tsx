@@ -87,6 +87,12 @@ export default async function PetDetailPage({
     .filter((t) => t.profiles)
     .map((t) => ({ tutor_profile_id: t.tutor_profile_id, full_name: t.profiles!.full_name }));
 
+  const { data: pendingInvites } = await supabase
+    .from("pet_co_tutor_invites")
+    .select("id, invited_email")
+    .eq("pet_id", petId)
+    .eq("status", "pendente");
+
   const stalenessLabel = prontuarioStalenessLabel(pet);
 
   return (
@@ -156,7 +162,7 @@ export default async function PetDetailPage({
           />
         </div>
 
-        <CoTutorsSection petId={pet.id} tutors={tutors} />
+        <CoTutorsSection petId={pet.id} tutors={tutors} pendingInvites={pendingInvites ?? []} />
 
         <p className="text-xs text-gray-500 mt-6">
           As etapas de saúde, comportamento, rotina e emergência são

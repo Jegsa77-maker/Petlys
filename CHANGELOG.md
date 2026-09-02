@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Onda 1 (pendência): convite formal de co-tutor por e-mail
+
+**Contexto:** revisão de pendências das Ondas 1–4. `inviteCoTutorByEmail` só funcionava se a outra pessoa já tivesse conta na Petlys — a própria tela avisava isso. Não havia fluxo de convite pra quem ainda não tem cadastro.
+
+**Entrega:**
+- `supabase/migrations/0036_pet_co_tutor_invites.sql`: nova tabela `pet_co_tutor_invites` (pet_id, invited_email, invited_by, status pendente/aceito/cancelado). RLS: só tutor do pet vê/cria/cancela convites dele. `accept_pending_pet_co_tutor_invites()` — SECURITY DEFINER de propósito (mesmo padrão de `appeal_incident()`, 0030): quem aceita ainda não é tutor do pet, não tem standing pra passar numa policy normal; a função só confia no e-mail já verificado em `auth.users` do próprio chamador (`auth.uid()`), nunca em valor vindo do cliente.
+- `lib/actions/pets.ts` (`inviteCoTutorByEmail`): e-mail com conta existente continua vinculando na hora (comportamento antigo); e-mail sem conta agora grava o convite e dispara `admin.auth.admin.inviteUserByEmail` — e-mail nativo do Supabase Auth, sem provedor novo. Se o envio falhar, o convite é marcado `cancelado` em vez de ficar "pendente" fantasma sem nenhum e-mail ter saído.
+- `app/(tutor)/inicio/page.tsx`: chama `accept_pending_pet_co_tutor_invites()` a cada carregamento — idempotente e silencioso, vincula automaticamente quando a pessoa convidada termina o cadastro normal (telefone, termos, papel) com o mesmo e-mail.
+- `components/pets/co-tutors-section.tsx`: mostra convites pendentes na lista ("aguardando cadastro"), texto do formulário atualizado (não fala mais que a pessoa precisa já ter conta).
+
+**Dependência de infraestrutura pra produção (registrando, não implementado aqui):** o Supabase deste projeto usa o relay de e-mail compartilhado padrão, que tem um limite de envio bem baixo (esbarrei nisso durante o teste, ver abaixo) — inviável pro volume real de convites. Antes de operar de verdade, precisa configurar um provedor de SMTP próprio (Resend, Postmark, SES) nas configurações de Auth do Supabase.
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado com sessão real (Tutor): convite pra e-mail sem conta grava a linha e chama a API corretamente — o teste bateu no limite de envio do relay padrão do Supabase (`over_email_send_rate_limit`), confirmando que a chamada está correta e o problema é de infraestrutura, não de código; o rollback pra `cancelado` quando o envio falha foi confirmado direto no banco. Como não dá pra receber e-mail de verdade neste ambiente, simulei o restante do fluxo criando um usuário de teste com o mesmo e-mail do convite (via Admin API) e fazendo-o passar pelas mesmas gates de sessão que qualquer conta nova (telefone/e-mail verificados, termos aceitos, papel tutor) — ao carregar `/inicio`, o convite virou `aceito` e o `pet_tutors` foi criado corretamente, confirmado via SQL e visualmente na tela do pet.
+
+**Achado colateral (não corrigido aqui, fora do escopo desta entrega):** a lista "Tutores vinculados" só mostra o próprio nome de quem está olhando, nunca o nome do outro co-tutor — a política de RLS de `profiles` (`profiles_select`, 0009) só libera leitura do próprio perfil ou por Admin/Supervisor, sem exceção pra co-tutores do mesmo pet. Bug pré-existente da funcionalidade original de múltiplos tutores (Onda 1), não introduzido por esta entrega — descoberto ao testar o convite com uma segunda conta de verdade.
+
+---
+
 ## 2026-09-02 — Onda 1 (pendência): alerta de dado desatualizado no prontuário do pet
 
 **Contexto:** revisão de pendências das Ondas 1–4 — item citado desde a entrega original do prontuário (seção 6.2) como "fica pra depois", nunca implementado: nada avisava o Tutor se saúde/comportamento/rotina de um pet não eram revisados há muito tempo.

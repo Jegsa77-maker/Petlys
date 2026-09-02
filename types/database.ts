@@ -596,6 +596,51 @@ export type Database = {
           },
         ]
       }
+      pet_co_tutor_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          invited_by: string
+          invited_email: string
+          pet_id: string
+          status: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_by: string
+          invited_email: string
+          pet_id: string
+          status?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_by?: string
+          invited_email?: string
+          pet_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pet_co_tutor_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_co_tutor_invites_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pet_tutors: {
         Row: {
           added_at: string
@@ -1723,6 +1768,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_pending_pet_co_tutor_invites: { Args: never; Returns: number }
       appeal_incident: {
         Args: { p_incident_id: string; p_reason: string }
         Returns: undefined

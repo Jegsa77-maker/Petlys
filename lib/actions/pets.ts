@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { siteOrigin } from "@/lib/actions/auth";
 import {
   petStep1Schema,
   petHealthSchema,
@@ -183,36 +184,84 @@ export async function updatePetDocument(petId: string, documentPath: string): Pr
 }
 
 /**
- * Convida outro tutor (por e-mail já cadastrado na plataforma) a ter
- * acesso completo ao pet — múltiplos tutores por pet (seção 2.2).
- * O co-tutor precisa já ter conta criada; não enviamos convite por
- * e-mail externo no MVP, só vinculamos contas existentes.
+ * Convida outro tutor a ter acesso completo ao pet — múltiplos tutores
+ * por pet (seção 2.2). Dois caminhos:
+ *  1. E-mail já tem conta na Petlys -> vincula na hora, igual sempre foi.
+ *  2. E-mail não tem conta -> convite formal (pendência da Onda 1, seção
+ *     6.2): grava a intenção em `pet_co_tutor_invites` e dispara o e-mail
+ *     de convite nativo do Supabase Auth (sem provedor de e-mail novo).
+ *     `accept_pending_pet_co_tutor_invites()` vincula automaticamente
+ *     quando a pessoa completa o cadastro normal (telefone, termos,
+ *     papel) com esse mesmo e-mail — chamado em app/(tutor)/inicio/page.tsx.
  */
 export async function inviteCoTutorByEmail(petId: string, email: string): Promise<ActionResult> {
   if (!email.trim()) {
     return { error: "Informe o e-mail do co-tutor." };
   }
+  const cleanEmail = email.trim().toLowerCase();
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
 
   const { data: targetProfile } = await supabase
     .from("profiles")
     .select("id")
-    .eq("email", email.trim().toLowerCase())
+    .eq("email", cleanEmail)
     .maybeSingle();
 
-  if (!targetProfile) {
-    return {
-      error: "Não encontramos ninguém com esse e-mail na plataforma. A pessoa precisa criar uma conta primeiro.",
-    };
+  if (targetProfile) {
+    const { error } = await supabase
+      .from("pet_tutors")
+      .insert({ pet_id: petId, tutor_profile_id: targetProfile.id });
+
+    if (error) {
+      return { error: "Não foi possível adicionar o co-tutor. Talvez já esteja vinculado." };
+    }
+
+    revalidatePath(`/pets/${petId}`);
+    return { error: null };
   }
 
-  const { error } = await supabase
-    .from("pet_tutors")
-    .insert({ pet_id: petId, tutor_profile_id: targetProfile.id });
+  const { data: existingInvite } = await supabase
+    .from("pet_co_tutor_invites")
+    .select("id")
+    .eq("pet_id", petId)
+    .eq("invited_email", cleanEmail)
+    .eq("status", "pendente")
+    .maybeSingle();
 
-  if (error) {
-    return { error: "Não foi possível adicionar o co-tutor. Talvez já esteja vinculado." };
+  if (existingInvite) {
+    return { error: "Já existe um convite pendente para esse e-mail neste pet." };
+  }
+
+  const { error: insertError } = await supabase
+    .from("pet_co_tutor_invites")
+    .insert({ pet_id: petId, invited_email: cleanEmail, invited_by: user.id });
+
+  if (insertError) {
+    return { error: "Não foi possível registrar o convite. Verifique se você é tutor deste pet." };
+  }
+
+  const serviceClient = createServiceRoleClient();
+  const { error: inviteError } = await serviceClient.auth.admin.inviteUserByEmail(cleanEmail, {
+    redirectTo: `${await siteOrigin()}/callback`,
+  });
+
+  if (inviteError) {
+    // Não deixa o convite registrado como "pendente" se o e-mail nunca
+    // chegou a sair — evita um convite fantasma que nunca vai ser aceito.
+    await supabase
+      .from("pet_co_tutor_invites")
+      .update({ status: "cancelado" })
+      .eq("pet_id", petId)
+      .eq("invited_email", cleanEmail)
+      .eq("status", "pendente");
+    return { error: "Não foi possível enviar o convite por e-mail. Tente novamente." };
   }
 
   revalidatePath(`/pets/${petId}`);

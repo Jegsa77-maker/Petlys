@@ -19,7 +19,7 @@ type SignUpResult = { error: string | null; needsEmailConfirmation?: boolean };
 
 const INTERNAL_EMAIL_DOMAIN = "@internal.plataformapet";
 
-async function siteOrigin() {
+export async function siteOrigin() {
   const h = await headers();
   return h.get("origin") ?? `https://${h.get("host")}`;
 }

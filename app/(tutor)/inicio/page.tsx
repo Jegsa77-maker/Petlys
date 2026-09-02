@@ -10,6 +10,13 @@ export default async function TutorInicioPage() {
 
   if (!user) return null;
 
+  // Convite formal de co-tutor (pendência da Onda 1, seção 6.2) — se essa
+  // conta acabou de ser criada a partir de um convite por e-mail, vincula
+  // agora que a pessoa já passou pelo cadastro normal (telefone, termos,
+  // papel). Idempotente e silencioso: nada acontece se não houver convite
+  // pendente pra esse e-mail.
+  await supabase.rpc("accept_pending_pet_co_tutor_invites");
+
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
