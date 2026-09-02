@@ -5,6 +5,23 @@
  * pelo Admin é um item maior, fora do escopo desta história (ver
  * Especificação v2.0, seção 12.4 "catálogo administrável").
  */
+/**
+ * Rótulo de cada categoria de serviço — existia repetido em pelo menos 8
+ * arquivos (busca, favoritos, perfil público, formulário de solicitação,
+ * catálogo de serviços, habilitações...). Consolidado aqui a partir da
+ * revisão de pendências de 2026-09-01; não foi feita a migração dos 8
+ * arquivos existentes nesta entrega (fora do escopo do item que motivou
+ * esta constante) — novos usos devem importar daqui, não duplicar de novo.
+ */
+export const SERVICE_CATEGORY_LABEL: Record<string, string> = {
+  pet_sitter: "Pet sitter / cuidador",
+  passeador: "Passeador de cães",
+  hospedagem_creche: "Hospedagem / creche",
+  adestrador: "Adestrador / comportamentalista",
+  banho_tosa: "Banho e tosa",
+  veterinario_domiciliar: "Veterinário domiciliar",
+};
+
 export const SERVICE_SUBCATEGORIES: Record<string, string[]> = {
   pet_sitter: ["Cuidado na casa do tutor", "Cuidado na casa do profissional", "Visitas pontuais"],
   passeador: ["Passeio individual", "Passeio em grupo", "Passeio para filhotes"],

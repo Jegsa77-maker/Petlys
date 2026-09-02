@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01/02 — Onda 1 (pendência): catálogo de requisitos do prontuário editável pelo Admin
+
+**Contexto:** revisão de pendências das Ondas 1–4 a pedido do usuário. `CATEGORY_REQUIRED_SECTIONS` (seção 6.3/6.5) era uma constante fixa no código desde a entrega original da Onda 1 — mudar qual seção do prontuário cada categoria exige dependia de deploy.
+
+**Entrega:**
+- `lib/domain/service-catalog.ts`: novo `SERVICE_CATEGORY_LABEL` — achado colateral da revisão, esse rótulo estava duplicado em pelo menos 8 arquivos; consolidado aqui, mas **os 8 arquivos existentes não foram migrados** nesta entrega (fora do escopo do item), só o novo componente já nasce usando a versão única.
+- `lib/domain/category-requirements.ts`: `missingProntuarioSections` ganhou um 3º parâmetro opcional (mapa de requisitos), com o default sendo a própria constante — mantém compatibilidade, mas permite injetar a versão vinda do banco.
+- `lib/domain/category-requirements-store.ts` (novo): `getCategoryRequiredSections(supabase)` lê `platform_parameters` (`chave1='requisitos_prontuario'`) e monta o mapa — categoria sem nenhuma linha configurada cai no default de fábrica (nunca fica "sem exigência nenhuma" por ausência de configuração). Arquivo separado do domain puro de propósito: depende de um client do Supabase, não pode ser importado por componente client-side.
+- `components/admin/prontuario-requirements-manager.tsx` (novo): matriz categoria × seção em `/admin/parametros`, reaproveitando 100% a infraestrutura de `platform_parameters` já existente (`upsertParameter`/`deleteParameter`, RLS admin-only, log de auditoria automático via trigger) — nenhuma tabela ou action nova. Desmarcar = soft-delete (`status='substituido'`, mesmo padrão de qualquer outro parâmetro).
+- `supabase/migrations/0035_seed_prontuario_requirements.sql`: semeia os 11 pares categoria/seção que já valiam como default de fábrica, pra o Admin ver o estado real ao abrir a tela em vez de uma matriz vazia. Se o banco não tiver nenhum administrador ainda, o insert não grava nada (sem dono válido pra `atualizado_por`) — a aplicação continua funcionando pelo fallback de código até alguém configurar.
+- `app/(tutor)/solicitacoes/nova/page.tsx` e `lib/actions/requests.ts` (`createRequest`): passam a buscar o mapa configurado via `getCategoryRequiredSections` em vez de usar a constante direto — front (aviso ao Tutor) e back (bloqueio real do envio) usam a mesma fonte.
+
+**Bug encontrado e corrigido durante o teste:** a primeira versão do componente guardava um id "otimista" falso (`pending-categoria-secao`) pra uma linha recém-criada, sem nunca trocar pelo id real gerado pelo banco. Desmarcar essa linha em seguida chamava `deleteParameter` com um id inválido — parecia funcionar na tela (o checkbox desmarcava), mas nunca gravava no banco, e reabrir a tela mostrava a linha ainda marcada. Corrigido resincronizando o estado local a partir dos props sempre que `router.refresh()` traz a lista atualizada com os ids de verdade (padrão "ajustar estado durante a renderização" do React, não `useEffect` + `setState`, que o próprio lint acusou como anti-padrão).
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado com sessão real (Admin): marcar/desmarcar uma célula grava e desfaz no banco (confirmado via SQL direto, incluindo o log de auditoria automático), estado sobrevive a reload. Testado o efeito ponta a ponta como Tutor: com "Passeador de cães" exigindo Comportamento+Emergência (config atual), formulário de nova solicitação mostrou corretamente "falta Comportamento, Emergência e autorizações" pra um pet com só Saúde preenchida.
+
+---
+
 ## 2026-09-01 — Onda 2 (retomada do backlog): mapa visual na busca
 
 **Contexto:** segunda metade do item 2 da Onda 2 (busca avançada) — os filtros de preço/nota/subcategoria/espécie e favoritos já tinham sido entregues; o mapa ficou registrado no `BACKLOG.md` por trazer uma dependência nova.

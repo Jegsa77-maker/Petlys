@@ -7,6 +7,8 @@ import { createRequestSchema } from "@/lib/validations/requests";
 import {
   missingProntuarioSections,
   PRONTUARIO_SECTION_LABEL,
+  CATEGORY_REQUIRED_SECTIONS,
+  type ProntuarioSection,
 } from "@/lib/domain/category-requirements";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 import type { ServiceCategory } from "@/types/database";
@@ -39,6 +41,7 @@ type PetOption = {
 export function NewRequestForm({
   professionalId,
   pets,
+  requiredSections = CATEGORY_REQUIRED_SECTIONS,
   initialIsVisitaInicial = false,
   initialCategory = "",
   initialPetIds = [],
@@ -47,6 +50,8 @@ export function NewRequestForm({
 }: {
   professionalId: string;
   pets: PetOption[];
+  /** Configurável pelo Admin (`/admin/parametros`) — default de fábrica quando não informado. */
+  requiredSections?: Record<ServiceCategory, ProntuarioSection[]>;
   initialIsVisitaInicial?: boolean;
   /** "Contratar novamente" (seção 12.3, item 6 da Onda 4) — reaproveita categoria, pets, endereço e respostas de um atendimento anterior. Data e consentimento nunca vêm pré-preenchidos: são específicos de cada pedido. */
   initialCategory?: string;
@@ -80,10 +85,10 @@ export function NewRequestForm({
     return selectedPets
       .map((pet) => ({
         pet,
-        missing: missingProntuarioSections(pet, category as ServiceCategory),
+        missing: missingProntuarioSections(pet, category as ServiceCategory, requiredSections),
       }))
       .filter((entry) => entry.missing.length > 0);
-  }, [category, petIds, pets]);
+  }, [category, petIds, pets, requiredSections]);
 
   const hasBlockingRequirements = missingByPet.length > 0;
 

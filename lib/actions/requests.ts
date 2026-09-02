@@ -14,6 +14,7 @@ import {
   missingProntuarioSections,
   PRONTUARIO_SECTION_LABEL,
 } from "@/lib/domain/category-requirements";
+import { getCategoryRequiredSections } from "@/lib/domain/category-requirements-store";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -50,8 +51,9 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
     .select("id, name, health_info, behavior_info, routine_info, emergency_info")
     .in("id", parsed.data.petIds);
 
+  const requiredSections = await getCategoryRequiredSections(supabase);
   for (const pet of selectedPets ?? []) {
-    const missing = missingProntuarioSections(pet, parsed.data.category);
+    const missing = missingProntuarioSections(pet, parsed.data.category, requiredSections);
     if (missing.length > 0) {
       const labels = missing.map((s) => PRONTUARIO_SECTION_LABEL[s]).join(", ");
       return {

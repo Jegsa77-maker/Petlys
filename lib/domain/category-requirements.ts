@@ -8,9 +8,14 @@ import type { ServiceCategory } from "@/types/database";
  * enviar uma solicitação — ex.: um passeador precisa saber se o pet foge ou
  * puxa a guia; um pet sitter/hospedagem precisa da rotina completa.
  *
- * Isto é intencionalmente uma lista curta e explícita, não configurável
- * pelo Admin ainda — a versão "catálogo administrável" (seção 6.3/6.5) fica
- * para uma próxima história.
+ * Serve como *default* de fábrica — desde a pendência resolvida em
+ * 2026-09-01, o Admin pode sobrescrever isso por categoria em
+ * `/admin/parametros` (`components/admin/prontuario-requirements-manager.tsx`,
+ * linhas de `platform_parameters` com `chave1='requisitos_prontuario'`).
+ * Ver `lib/domain/category-requirements-store.ts` para a versão que lê o
+ * banco — esta constante continua sendo o fallback usado quando o Admin
+ * nunca configurou nada pra uma categoria (nunca fica "sem exigência
+ * nenhuma" por ausência de configuração).
  */
 export type ProntuarioSection = "health" | "behavior" | "routine" | "emergency";
 
@@ -47,7 +52,8 @@ function isSectionFilled(info: unknown): boolean {
  */
 export function missingProntuarioSections(
   pet: PetProntuarioInfo,
-  category: ServiceCategory
+  category: ServiceCategory,
+  requiredSections: Record<ServiceCategory, ProntuarioSection[]> = CATEGORY_REQUIRED_SECTIONS
 ): ProntuarioSection[] {
   const sectionField: Record<ProntuarioSection, unknown> = {
     health: pet.health_info,
@@ -55,6 +61,6 @@ export function missingProntuarioSections(
     routine: pet.routine_info,
     emergency: pet.emergency_info,
   };
-  const required = CATEGORY_REQUIRED_SECTIONS[category] ?? [];
+  const required = requiredSections[category] ?? [];
   return required.filter((section) => !isSectionFilled(sectionField[section]));
 }

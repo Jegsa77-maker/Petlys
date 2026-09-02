@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NewRequestForm } from "@/components/requests/new-request-form";
+import { getCategoryRequiredSections } from "@/lib/domain/category-requirements-store";
 import { redirect } from "next/navigation";
 
 export default async function NovaSolicitacaoPage({
@@ -28,6 +29,10 @@ export default async function NovaSolicitacaoPage({
   const pets = (petLinks ?? [])
     .map((link) => link.pets)
     .filter((p): p is NonNullable<typeof p> => p !== null);
+
+  // Requisitos do prontuário por categoria — configurável pelo Admin desde
+  // 2026-09-01 (ver components/admin/prontuario-requirements-manager.tsx).
+  const requiredSections = await getCategoryRequiredSections(supabase);
 
   // "Contratar novamente" (seção 12.3, item 6 da Onda 4) — reaproveita
   // categoria, pets, endereço e respostas de um atendimento concluído
@@ -66,6 +71,7 @@ export default async function NovaSolicitacaoPage({
         <NewRequestForm
           professionalId={profissional}
           pets={pets}
+          requiredSections={requiredSections}
           initialIsVisitaInicial={visitaInicial === "1"}
           initialCategory={initialCategory}
           initialPetIds={initialPetIds}
