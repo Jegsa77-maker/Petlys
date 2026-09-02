@@ -4,6 +4,20 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-01 — Onda 2 (retomada do backlog): mapa visual na busca
+
+**Contexto:** segunda metade do item 2 da Onda 2 (busca avançada) — os filtros de preço/nota/subcategoria/espécie e favoritos já tinham sido entregues; o mapa ficou registrado no `BACKLOG.md` por trazer uma dependência nova.
+
+**Entrega:**
+- `npm install leaflet react-leaflet` (+ `@types/leaflet` como dev dependency). Sem custo de API key — tiles do OpenStreetMap.
+- `components/search/results-map.tsx` (novo): mapa com um pin por profissional (não por serviço), usando o centro da área de atendimento já cadastrada (`professional_service_areas.center_lat/center_lng` — não é a localização exata do profissional, é o centro que ele configurou). Ícone próprio (pin teal com pata) em vez do marcador padrão do Leaflet, que não resolve os PNGs certo com o bundler do Next.js (problema conhecido do react-leaflet). Popup com nome, categoria, preço e link "Ver perfil". Pin diferente (ponto sólido) pra localização do próprio Tutor quando ele compartilhou.
+- `components/search/search-view-toggle.tsx` (novo): alterna lista/mapa como estado local (não entra na URL — é preferência transitória, não filtro compartilhável). A lista continua sendo o mesmo card renderizado no servidor; o mapa é carregado sob demanda via `next/dynamic({ ssr: false })`, porque o Leaflet acessa `window` e quebraria a renderização no servidor.
+- `app/(tutor)/buscar/page.tsx`: a busca de `professional_service_areas` deixou de ser condicional a "Tutor compartilhou localização" — agora roda sempre que há resultado, porque o mapa precisa dos pins mesmo sem filtro de distância ativo (a lógica de filtro por raio continua igual, só passou a reaproveitar a mesma consulta).
+
+**Verificação:** `tsc --noEmit` e `eslint .` limpos. Testado ao vivo (sessão real): alternância lista/mapa funcionando, tiles do OpenStreetMap carregando de verdade, 2 pins renderizados (batendo com as 2 áreas de atendimento cadastradas no seed), popup mostrando nome/categoria/preço/link do profissional correto ao clicar no pin.
+
+---
+
 ## 2026-09-01 — Onda 2 (retomada do backlog): tela dedicada `/favoritos`
 
 **Contexto:** revisão de pendências das Ondas 1–4 a pedido do usuário. Item já registrado no `BACKLOG.md` desde a entrega de busca avançada — favoritos só existiam como filtro (`?favoritos=1`) dentro de `/buscar`, sem uma listagem própria.

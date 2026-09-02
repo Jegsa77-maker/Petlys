@@ -12,8 +12,6 @@ Cada item deve dizer: de onde veio, por que ficou de fora, e o tamanho aproximad
 
 ## Onda 2 — Descoberta e contratação negociada
 
-- **Mapa visual na busca** — parte do item 2 da Onda 2 (busca avançada), que já entregou os filtros de preço/nota/subcategoria/espécie e favoritos (ver CHANGELOG 2026-09-01). Adiado por trazer uma dependência nova (Leaflet + tiles OpenStreetMap, sem custo de API key, mas é uma peça técnica própria com bundle size e componente client-only). Esforço estimado: `npm install leaflet react-leaflet`, componente de mapa com pins usando `professional_service_areas.center_lat/center_lng` (já existe), toggle lista/mapa em `/buscar`.
-
 - **Chat com mídia (fotos, vídeos, documentos)** — item 3 da Onda 2 (seção 12.1 da Especificação v2.0). Hoje o chat da solicitação (`components/requests/chat-panel.tsx`, `messages` table) só aceita texto. Adiado em 2026-09-01 a pedido do usuário ("não é necessário agora"), sem crítica técnica — só não é prioridade no momento. Esforço estimado: bucket de storage próprio (padrão já estabelecido em `pet-documents`/`pet-photos`), RLS espelhando `messages_select`/`messages_insert`, componente de upload reaproveitando `FileUploadField`, e ajuste de `chat-panel.tsx` pra renderizar anexos por tipo (imagem inline, vídeo, link de documento).
 
 ## Onda 5 — Retenção e ferramentas do Profissional

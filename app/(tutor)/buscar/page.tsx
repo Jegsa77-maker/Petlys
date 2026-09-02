@@ -5,6 +5,8 @@ import type { ServiceCategory } from "@/types/database";
 import { UseMyLocationButton } from "@/components/shared/use-my-location-button";
 import { SearchFiltersForm } from "@/components/search/search-filters-form";
 import { FavoriteButton } from "@/components/search/favorite-button";
+import { SearchViewToggle } from "@/components/search/search-view-toggle";
+import type { MapPin } from "@/components/search/results-map";
 import { haversineKm } from "@/lib/geo";
 import { averageRating } from "@/lib/domain/professional-reputation";
 
@@ -74,27 +76,43 @@ export default async function BuscarPage({
 
   let filteredServices = services ?? [];
   const distanceByProfessional: Record<string, number> = {};
+  // Área de atendimento de cada profissional (lat/lng do centro) — buscada
+  // sempre que há resultado, não só quando o Tutor compartilha localização,
+  // porque o mapa visual (item 2 da Onda 2) precisa dos pins mesmo sem
+  // filtro de distância ativo.
+  const areaByProfessional = new Map<string, { lat: number; lng: number }>();
 
   const userLat = lat ? Number(lat) : null;
   const userLng = lng ? Number(lng) : null;
 
-  if (userLat !== null && userLng !== null && filteredServices.length > 0) {
+  if (filteredServices.length > 0) {
     const professionalIds = [...new Set(filteredServices.map((s) => s.professional_id))];
     const { data: areas } = await supabase
       .from("professional_service_areas")
       .select("professional_id, center_lat, center_lng, radius_km")
       .in("professional_id", professionalIds);
 
-    const withinRange = new Set<string>();
     (areas ?? []).forEach((area) => {
-      const dist = haversineKm(userLat, userLng, area.center_lat, area.center_lng);
-      if (dist <= area.radius_km) {
-        withinRange.add(area.professional_id);
-        distanceByProfessional[area.professional_id] = dist;
+      // Um profissional pode ter mais de uma área cadastrada — fica só a
+      // primeira como referência do pin, igual ao critério de "serviço
+      // principal" já usado na tela de favoritos.
+      if (!areaByProfessional.has(area.professional_id)) {
+        areaByProfessional.set(area.professional_id, { lat: area.center_lat, lng: area.center_lng });
       }
     });
 
-    filteredServices = filteredServices.filter((s) => withinRange.has(s.professional_id));
+    if (userLat !== null && userLng !== null) {
+      const withinRange = new Set<string>();
+      (areas ?? []).forEach((area) => {
+        const dist = haversineKm(userLat, userLng, area.center_lat, area.center_lng);
+        if (dist <= area.radius_km) {
+          withinRange.add(area.professional_id);
+          distanceByProfessional[area.professional_id] = dist;
+        }
+      });
+
+      filteredServices = filteredServices.filter((s) => withinRange.has(s.professional_id));
+    }
   }
 
   // Nota média agregada (seção 12.3, item 5 da Onda 4) — buscada sempre
@@ -147,6 +165,26 @@ export default async function BuscarPage({
     filteredServices = filteredServices.filter((s) => favoriteProfessionalIds.has(s.professional_id));
   }
 
+  // Um pin por profissional (não por serviço) — mesmo critério de
+  // deduplicação da tela de favoritos.
+  const pins: MapPin[] = [];
+  const seenInMap = new Set<string>();
+  filteredServices.forEach((service) => {
+    if (seenInMap.has(service.professional_id)) return;
+    const area = areaByProfessional.get(service.professional_id);
+    if (!area) return;
+    seenInMap.add(service.professional_id);
+    pins.push({
+      professionalId: service.professional_id,
+      name: service.profiles?.full_name ?? "Profissional",
+      categoryLabel: `${CATEGORY_LABEL[service.category]}${service.subcategory ? ` · ${service.subcategory}` : ""}`,
+      basePrice: service.base_price,
+      lat: area.lat,
+      lng: area.lng,
+    });
+  });
+  const userLocation: [number, number] | null = userLat !== null && userLng !== null ? [userLat, userLng] : null;
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
@@ -188,6 +226,7 @@ export default async function BuscarPage({
             </p>
           </div>
         ) : (
+          <SearchViewToggle pins={pins} userLocation={userLocation} list={
           <ul className="flex flex-col gap-3">
             {filteredServices.map((service) => {
               const dist = distanceByProfessional[service.professional_id];
@@ -247,6 +286,7 @@ export default async function BuscarPage({
               );
             })}
           </ul>
+          } />
         )}
       </div>
     </main>
