@@ -1794,6 +1794,13 @@ export type Database = {
         Args: { p_reason: string; p_review_id: string }
         Returns: undefined
       }
+      get_pet_co_tutor_names: {
+        Args: { p_pet_id: string }
+        Returns: {
+          full_name: string
+          tutor_profile_id: string
+        }[]
+      }
       has_role: {
         Args: { target_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean

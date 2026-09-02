@@ -4,6 +4,18 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-02 — Correção: co-tutores não viam o nome um do outro
+
+**Contexto:** achado colateral registrado na entrada anterior ("convite formal de co-tutor") — bug pré-existente da funcionalidade original de múltiplos tutores por pet (Onda 1), não introduzido pela entrega do convite, só descoberto ao testá-la com uma segunda conta real. `app/(tutor)/pets/[petId]/page.tsx` lia `pet_tutors` com join em `profiles(full_name)`; `profiles_select` (0009_rls_policies.sql) só libera leitura do próprio perfil ou por Admin/Supervisor, então o join sempre voltava `null` pro perfil do outro tutor, e o `.filter((t) => t.profiles)` descartava essa linha — cada co-tutor só via a si mesmo na lista "Tutores vinculados".
+
+**Entrega:**
+- `supabase/migrations/0037_fix_co_tutor_name_visibility.sql`: função `get_pet_co_tutor_names(p_pet_id)`, SECURITY DEFINER. Decisão deliberada de **não ampliar `profiles_select`**: RLS filtra linha inteira, não coluna — uma policy "co-tutor pode ler o perfil do outro" liberaria a linha completa via PostgREST (e-mail, telefone, CPF/CNPJ...), não só o nome. A função só devolve `tutor_profile_id` + `full_name` dos tutores de um pet específico, e só responde algo se quem chama já é tutor desse mesmo pet — do contrário retorna vazio.
+- `app/(tutor)/pets/[petId]/page.tsx`: troca o join direto por `supabase.rpc("get_pet_co_tutor_names", ...)`.
+
+**Verificação:** `tsc --noEmit`, `eslint .` e `next build` limpos (34 rotas). Testado com duas sessões reais (RLS, não bypass): pet com 2 tutores — cada um via a lista completa com os dois nomes, de ambos os lados. Testado negativo direto via RPC (script com sessão real, não SQL de admin): uma terceira conta que não é tutora desse pet recebeu array vazio, sem erro; a mesma chamada como tutor real trouxe só `tutor_profile_id`/`full_name`, nunca e-mail/telefone/CPF (estruturalmente impossível vazar mais que isso — a assinatura da função só declara essas duas colunas de retorno).
+
+---
+
 ## 2026-09-02 — Onda 1 (pendência): convite formal de co-tutor por e-mail
 
 **Contexto:** revisão de pendências das Ondas 1–4. `inviteCoTutorByEmail` só funcionava se a outra pessoa já tivesse conta na Petlys — a própria tela avisava isso. Não havia fluxo de convite pra quem ainda não tem cadastro.

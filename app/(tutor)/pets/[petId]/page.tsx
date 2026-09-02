@@ -78,14 +78,13 @@ export default async function PetDetailPage({
     notFound();
   }
 
-  const { data: tutorLinks } = await supabase
-    .from("pet_tutors")
-    .select("tutor_profile_id, profiles(full_name)")
-    .eq("pet_id", petId);
-
-  const tutors = (tutorLinks ?? [])
-    .filter((t) => t.profiles)
-    .map((t) => ({ tutor_profile_id: t.tutor_profile_id, full_name: t.profiles!.full_name }));
+  // RPC em vez de join direto em profiles: profiles_select (0009) só
+  // libera o próprio perfil ou Admin/Supervisor — um co-tutor nunca lia o
+  // nome do outro, cada um só via a si mesmo na lista (bug encontrado ao
+  // testar o convite de co-tutor, corrigido em
+  // 0037_fix_co_tutor_name_visibility.sql). A função SECURITY DEFINER só
+  // devolve nome, nunca e-mail/telefone/cpf do outro tutor.
+  const { data: tutors } = await supabase.rpc("get_pet_co_tutor_names", { p_pet_id: petId });
 
   const { data: pendingInvites } = await supabase
     .from("pet_co_tutor_invites")
@@ -162,7 +161,7 @@ export default async function PetDetailPage({
           />
         </div>
 
-        <CoTutorsSection petId={pet.id} tutors={tutors} pendingInvites={pendingInvites ?? []} />
+        <CoTutorsSection petId={pet.id} tutors={tutors ?? []} pendingInvites={pendingInvites ?? []} />
 
         <p className="text-xs text-gray-500 mt-6">
           As etapas de saúde, comportamento, rotina e emergência são
