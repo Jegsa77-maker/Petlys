@@ -14,6 +14,16 @@ Cada item deve dizer: de onde veio, por que ficou de fora, e o tamanho aproximad
 
 - **Tela dedicada `/favoritos`** — hoje favoritos só existem como filtro (`?favoritos=1`) dentro de `/buscar`, não como uma listagem própria. Baixo esforço quando for retomado — é basicamente `/buscar?favoritos=1` com um título diferente e sem os outros filtros.
 
+## Onda 5 — Retenção e ferramentas do Profissional
+
+Da lista original da onda (seção 12.4 da Especificação v2.0 / seção 8 do `PETLYS_PILAR1_PLANO_100_PERCENT.md`), o usuário decidiu em 2026-09-01 manter só o CRM/ferramentas do dia a dia (clientes e pets próprios, agendamento manual, link/cartão digital/QR code, indicadores de conversão/recorrência/receita) como escopo ativo da onda agora. Os demais grupos ficam adiados:
+
+- **Petlys Academy (trilhas e certificações) + Clube de benefícios + Programa Profissional Fundador + Comissão diferenciada por plano/nível** — grupo "carreira e engajamento". Adiado em 2026-09-01. Comissão diferenciada em particular depende de dado financeiro real (Onda 3, já adiada pro final do roadmap) pra fazer sentido — não dá pra calcular "diferenciada" sem primeiro ter a comissão padrão rodando de verdade. Academy e Clube de benefícios também dependem de decisão de conteúdo/parceria comercial antes de virarem esforço de desenvolvimento. Esforço estimado: grande — Academy precisa de modelo de conteúdo (trilhas, progresso, emissão de certificado) além do que já existe (cálculo automático de nível de carreira, seção 5); Clube de benefícios depende de parceiros externos fechados; Fundador é sobretudo critério de elegibilidade + selo, esforço pequeno isolado mas só faz sentido junto dos outros três.
+
+- **Rede de indicação + duplas/grupos de cobertura para férias e emergências** — grupo "comunidade e resiliência". Adiado em 2026-09-01. Rede de indicação precisa de decisão de recompensa (crédito? desconto de comissão? depende de novo da Onda 3). Cobertura entre profissionais precisa de decisão operacional prévia: quem responde pelo atendimento em caso de incidente durante a cobertura, como fica o split financeiro entre o profissional titular e o substituto — não é só tela, é modelo de negócio a decidir antes (ver seção 14 da Especificação). Esforço estimado: médio-alto, mas bloqueado por decisão de produto antes de codar.
+
+- **Suporte a múltiplos usuários por perfil de estabelecimento + serviços especializados/novas fontes de renda** — grupo "estrutural". Adiado em 2026-09-01. Múltiplos usuários por perfil exige mudança no modelo de conta hoje 1 perfil = 1 usuário (`profiles`/`account_roles`), com decisão de permissões internas (quem pode ver financeiro, quem pode responder chat, etc.) — mudança estrutural, não incremental. "Serviços especializados/novas fontes de renda" ainda nem tem definição funcional (o que seria um serviço especializado concretamente) — precisa virar história antes de virar estimativa de esforço.
+
 ## Onda 0 — Reconciliar e proteger a base
 
 - **Achados de segurança do Supabase** — funções `SECURITY DEFINER` expostas como RPC público (`apply_account_suspension`, `enforce_and_log_status_transition`, etc.), `search_path` não fixo em `distance_km`/`set_updated_at`, proteção contra senha vazada desligada no Auth. Identificados em 2026-08-31, nunca corrigidos — aparecem em todo `get_advisors` desde então sem regressão nova. Esforço estimado: revisar cada função uma a uma (a maioria deveria ser `SECURITY INVOKER` ou só chamável via trigger, não via API REST), mais um `alter function ... set search_path = public` nas duas funções auxiliares.
@@ -23,3 +33,4 @@ Cada item deve dizer: de onde veio, por que ficou de fora, e o tamanho aproximad
 ---
 
 *Última atualização: 2026-09-01.*
+
