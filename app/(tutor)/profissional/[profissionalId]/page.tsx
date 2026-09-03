@@ -183,7 +183,7 @@ export default async function ProfissionalPage({
             <CalendarPlus size={16} /> Solicitar atendimento
           </Link>
           <Link
-            href={`/solicitacoes/nova?profissional=${profissionalId}&conversa=1`}
+            href={`/solicitacoes/conversar?profissional=${profissionalId}`}
             className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-teal px-3 py-3 text-sm font-semibold text-teal hover:bg-teal/5"
           >
             <MessageCircle size={16} /> Conversar

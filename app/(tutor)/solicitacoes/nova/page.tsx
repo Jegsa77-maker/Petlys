@@ -6,9 +6,14 @@ import { redirect } from "next/navigation";
 export default async function NovaSolicitacaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ profissional?: string; visitaInicial?: string; repetir?: string }>;
+  searchParams: Promise<{
+    profissional?: string;
+    visitaInicial?: string;
+    repetir?: string;
+    continuar?: string;
+  }>;
 }) {
-  const { profissional, visitaInicial, repetir } = await searchParams;
+  const { profissional, visitaInicial, repetir, continuar } = await searchParams;
 
   if (!profissional) {
     redirect("/buscar");
@@ -59,6 +64,30 @@ export default async function NovaSolicitacaoPage({
     }
   }
 
+  // Formalizando uma conversa prévia (ver startConversation em
+  // lib/actions/requests.ts) — reaproveita a mesma linha de `requests` em
+  // vez de criar uma nova, preservando o chat já existente. Mesma checagem
+  // de propriedade de "repetir": nunca confia só no que vem pela URL.
+  let continuarRequestId: string | undefined;
+  if (continuar && user) {
+    const { data: prechat } = await supabase
+      .from("requests")
+      .select("category, tutor_id, professional_id, status, is_conversa_previa")
+      .eq("id", continuar)
+      .single();
+
+    if (
+      prechat &&
+      prechat.tutor_id === user.id &&
+      prechat.professional_id === profissional &&
+      prechat.status === "rascunho" &&
+      prechat.is_conversa_previa
+    ) {
+      initialCategory = prechat.category;
+      continuarRequestId = continuar;
+    }
+  }
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
@@ -77,6 +106,7 @@ export default async function NovaSolicitacaoPage({
           initialPetIds={initialPetIds}
           initialAddress={initialAddress}
           initialCategoryAnswers={initialCategoryAnswers}
+          continuarRequestId={continuarRequestId}
         />
       </div>
     </main>

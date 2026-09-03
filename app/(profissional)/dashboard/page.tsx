@@ -15,7 +15,9 @@ export default async function ProfessionalDashboardPage() {
       .from("requests")
       .select("id", { count: "exact", head: true })
       .eq("professional_id", user.id)
-      .in("status", ["solicitacao_enviada", "em_conversa", "proposta_enviada"]),
+      .or(
+        "status.in.(solicitacao_enviada,em_conversa,proposta_enviada),and(status.eq.rascunho,is_conversa_previa.eq.true)"
+      ),
     supabase
       .from("request_occurrences")
       .select("id, scheduled_at, status, requests!inner(professional_id)")

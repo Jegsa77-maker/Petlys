@@ -1735,6 +1735,7 @@ export type Database = {
           commission_percent_snapshot: number | null
           created_at: string
           id: string
+          is_conversa_previa: boolean
           is_recurring: boolean
           is_visita_inicial: boolean
           occurrences_total: number
@@ -1753,6 +1754,7 @@ export type Database = {
           commission_percent_snapshot?: number | null
           created_at?: string
           id?: string
+          is_conversa_previa?: boolean
           is_recurring?: boolean
           is_visita_inicial?: boolean
           occurrences_total?: number
@@ -1771,6 +1773,7 @@ export type Database = {
           commission_percent_snapshot?: number | null
           created_at?: string
           id?: string
+          is_conversa_previa?: boolean
           is_recurring?: boolean
           is_visita_inicial?: boolean
           occurrences_total?: number
@@ -2068,6 +2071,13 @@ export type Database = {
         Returns: {
           full_name: string
           tutor_profile_id: string
+        }[]
+      }
+      get_request_other_party_name: {
+        Args: { p_request_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
         }[]
       }
       has_role: {

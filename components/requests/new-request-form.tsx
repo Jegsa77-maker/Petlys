@@ -47,6 +47,7 @@ export function NewRequestForm({
   initialPetIds = [],
   initialAddress = "",
   initialCategoryAnswers = {},
+  continuarRequestId,
 }: {
   professionalId: string;
   pets: PetOption[];
@@ -58,6 +59,9 @@ export function NewRequestForm({
   initialPetIds?: string[];
   initialAddress?: string;
   initialCategoryAnswers?: Record<string, string>;
+  /** Formalizando uma conversa prévia (ver startConversation) — createRequest
+      atualiza essa request já existente em vez de criar uma nova. */
+  continuarRequestId?: string;
 }) {
   const [category, setCategory] = useState(initialCategory);
   const [petIds, setPetIds] = useState<string[]>(initialPetIds);
@@ -109,6 +113,7 @@ export function NewRequestForm({
       prontuarioConsent,
       address: address || undefined,
       categoryAnswers,
+      existingRequestId: continuarRequestId,
     });
 
     if (!parsed.success) {

@@ -19,11 +19,18 @@ export function ChatPanel({
   messages,
   currentUserId,
   staffSenderIds = [],
+  otherPartyName,
+  otherPartyAvatarUrl,
 }: {
   requestId: string;
   messages: Message[];
   currentUserId: string;
   staffSenderIds?: string[];
+  /** Nome/avatar de quem está do outro lado — usado na conversa prévia
+      (Onda "conversa antes de solicitar"), onde ainda não há pets/categoria
+      pra deixar isso óbvio pelo resto da tela. */
+  otherPartyName?: string | null;
+  otherPartyAvatarUrl?: string | null;
 }) {
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,18 +43,38 @@ export function ChatPanel({
     if (!content.trim()) return;
 
     setIsSubmitting(true);
-    const result = await sendMessage({ requestId, content });
-    setIsSubmitting(false);
-
-    if (result?.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await sendMessage({ requestId, content });
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setContent("");
+    } finally {
+      // Sempre libera o botão de novo, mesmo se sendMessage lançar uma
+      // exceção em vez de devolver {error} (bug real encontrado: sem o
+      // finally, uma falha não tratada deixava isSubmitting preso em
+      // true pra sempre, travando "Enviar" pro resto da sessão do
+      // componente).
+      setIsSubmitting(false);
     }
-    setContent("");
   }
 
   return (
     <div className="flex flex-col gap-3">
+      {otherPartyName && (
+        <div className="flex items-center gap-2">
+          {otherPartyAvatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={otherPartyAvatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-mint text-white flex items-center justify-center text-xs font-bold">
+              {otherPartyName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <p className="text-sm font-semibold text-black">{otherPartyName}</p>
+        </div>
+      )}
       <div className="flex flex-col gap-2 max-h-80 overflow-y-auto rounded-lg border border-gray-200 bg-white p-3">
         {messages.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">

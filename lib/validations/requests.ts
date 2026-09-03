@@ -37,8 +37,24 @@ export const createRequestSchema = z.object({
   // Profissional a decidir, não uma barreira de envio.
   address: z.string().trim().max(300).optional(),
   categoryAnswers: z.record(z.string(), z.string().trim().max(1000)).default({}),
+  // Preenchido quando o formulário completo nasce de uma conversa prévia
+  // (ver startConversationSchema abaixo) — createRequest atualiza essa
+  // request já existente em vez de criar uma nova, preservando o chat.
+  existingRequestId: z.uuid().optional(),
 });
 export type CreateRequestValues = z.infer<typeof createRequestSchema>;
+
+/**
+ * "Conversar" no perfil do profissional (chat antes de formalizar uma
+ * solicitação completa) — cria uma `requests` mínima em rascunho, só com
+ * categoria (obrigatória no schema de requests). Nenhuma mudança de RLS: o
+ * chat já funciona em qualquer status, ver 0042_conversa_previa.sql.
+ */
+export const startConversationSchema = z.object({
+  professionalId: z.uuid("Profissional inválido"),
+  category: z.enum(SERVICE_CATEGORIES, { message: "Selecione o assunto da conversa" }),
+});
+export type StartConversationValues = z.infer<typeof startConversationSchema>;
 
 // Pedido de ajuste (seção 12.1, item 5 da Onda 2) — Tutor devolve a
 // proposta pro Profissional com o que quer mudar, sem precisar recusar de

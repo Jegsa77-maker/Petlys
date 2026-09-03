@@ -11,6 +11,16 @@ type ViewerRole = "tutor" | "profissional" | "staff";
  * funcional.
  */
 const NEXT_ACTION: Partial<Record<RequestStatus, Record<ViewerRole, string>>> = {
+  // "Conversa prévia" (chat antes de formalizar, ver 0042_conversa_previa.sql)
+  // é hoje o único jeito comum de uma request legítima ficar em rascunho por
+  // um tempo — um rascunho comum abandonado no meio do formulário completo
+  // nunca é visitado de novo (não aparece com id nenhum lugar clicável), então
+  // não precisa de um texto separado pra esse caso raro.
+  rascunho: {
+    tutor: "Converse à vontade — quando quiser, envie um pedido completo.",
+    profissional: "O tutor só está tirando uma dúvida ainda. Responda quando puder.",
+    staff: "Conversa antes de uma solicitação formal.",
+  },
   solicitacao_enviada: {
     tutor: "Aguardando o profissional responder.",
     profissional: "Nova solicitação — dê uma olhada e responda.",

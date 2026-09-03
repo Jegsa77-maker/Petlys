@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-03 — 2 erros de CX achados navegando como Tutor: chat direto pré-solicitação + botão "Enviar" travado
+
+**Contexto:** usuário navegando pessoalmente pela visão Tutor (com as contas de teste liberadas na entrada anterior) achou 2 problemas reais.
+
+**Bug 1 — "Conversar" no perfil do profissional levava pra uma solicitação, não pra um chat.** Investigado: o botão apontava pro mesmo formulário de `/solicitacoes/nova` que "Solicitar atendimento", só com um parâmetro (`conversa=1`) que não fazia nada — os dois botões eram idênticos na prática. Perguntado ao usuário se queria só corrigir o rótulo ou ter chat de verdade antes de formalizar: **escolheu chat de verdade**.
+
+**Entrega — "conversa prévia":** `supabase/migrations/0055_conversa_previa.sql` — `requests.is_conversa_previa` (novo) + índice único (`tutor_id, professional_id) where status='rascunho' and is_conversa_previa` (no máximo uma conversa aberta por par). **Achado-chave que evitou reescrever RLS:** `is_party_of_request()` (usada por `messages_select`/`messages_insert`) só olha `tutor_id`/`professional_id`, nunca `status` — bastou criar uma `requests` de verdade em rascunho (só com categoria, sem pets/data/endereço) pro chat já funcionar, zero policy nova. Segue o mesmo padrão já usado pra "visita inicial" (outra linha de `requests`, nunca tabela paralela).
+
+- `lib/actions/requests.ts`: `startConversation` (cria/reaproveita o rascunho, evita duplicar em clique repetido — corrida tratada via retry no `unique_violation`), `endPreChatConversation` (`rascunho -> cancelado`; não reaproveita `declineRequest` porque `'recusado'` não é transição válida a partir de `rascunho`), `createRequest` ganhou `existingRequestId` opcional (formalizar vira `update` na mesma linha, preservando o chat, em vez de criar uma request nova).
+- Nova função `get_request_other_party_name(request_id)` (security definer, mesmo padrão de `get_pet_co_tutor_names`) — o chat nunca precisou mostrar nome/avatar da outra parte até agora (pets/categoria sempre deixavam claro quem era quem); RLS normal de `profiles` não libera isso na direção Profissional→Tutor. **Mesmo achado de segurança da entrada anterior:** grant caiu em `PUBLIC` de novo, corrigido com `revoke ... from public` + `grant ... to authenticated` explícito, confirmado via `has_function_privilege`.
+- Telas novas: `/solicitacoes/conversar` (escolha de categoria) + `StartConversationForm`/`EndConversationButton`. `app/(tutor)/solicitacoes/[requestId]/page.tsx`: oculta Proposta/Ajuda/Anexos numa conversa prévia, mostra "Quero solicitar de verdade" (reaproveita a request existente, mesmo padrão de "Contratar novamente") e nome da outra parte no cabeçalho do chat. Listas do Tutor e do Profissional (`/solicitacoes`, dashboard do Profissional) atualizadas pra mostrar/contar conversas prévias — sem isso o Profissional nunca ficaria sabendo que alguém quis conversar.
+
+**Bug 2 — botão "Enviar" do chat travava desabilitado.** `components/requests/chat-panel.tsx`: `await sendMessage(...)` não estava em `try/finally` — uma exceção não tratada (rede, serialização) pulava o `setIsSubmitting(false)`, travando o botão pro resto da sessão do componente. Corrigido com `try/finally`.
+
+**Verificação:** `tsc --noEmit`/`eslint .`/`next build` limpos (37 rotas, incluindo `/solicitacoes/conversar`). 74/74 testes passando (68 anteriores + 6 novos, `tests/rls/conversa-previa.test.ts` — inclui teste de regressão confirmando que mensagem funciona em `rascunho` e que a transição inválida `rascunho->recusado` é rejeitada pela trigger). Fluxo completo testado ao vivo no navegador com sessão real: perfil do profissional → "Conversar" → categoria → chat (nome da outra parte no cabeçalho, mensagens iam e vinham sem travar o botão) → "Quero solicitar de verdade" → formulário com categoria pré-preenchida. Dado de teste limpo depois.
+
+---
+
 ## 2026-09-03 — Preparação de beta fechado: confirmação manual de pagamento
 
 **Contexto:** usuário quer testar a jornada completa com pessoas reais (Tutor/Profissional) antes da Onda 3 (financeiro real) existir. Sem isso, `acceptProposal` deixa a solicitação presa em `aguardando_pagamento` pra sempre — nada avança sem o webhook do gateway confirmar, que ainda não existe.

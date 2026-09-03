@@ -13,6 +13,7 @@ import { RescheduleOccurrenceButton } from "@/components/requests/reschedule-occ
 import { EditRecurrenceForm } from "@/components/requests/edit-recurrence-form";
 import { HelpButton } from "@/components/requests/help-button";
 import { ConfirmPaymentButton } from "@/components/requests/confirm-payment-button";
+import { EndConversationButton } from "@/components/requests/end-conversation-button";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 import { nextActionCopy } from "@/lib/domain/request-status-copy";
 import { REQUEST_STATUS_LABEL as STATUS_LABEL } from "@/lib/domain/request-status-labels";
@@ -35,7 +36,7 @@ export default async function SolicitacaoDetailPage({
   const { data: request } = await supabase
     .from("requests")
     .select(
-      "id, tutor_id, professional_id, category, status, is_recurring, occurrences_total, is_visita_inicial, address, category_answers, recurrence_interval"
+      "id, tutor_id, professional_id, category, status, is_recurring, occurrences_total, is_visita_inicial, is_conversa_previa, address, category_answers, recurrence_interval"
     )
     .eq("id", requestId)
     .single();
@@ -56,6 +57,11 @@ export default async function SolicitacaoDetailPage({
         ? "profissional"
         : "staff";
   const otherPartyId = viewerRole === "tutor" ? request.professional_id : request.tutor_id;
+
+  // "Conversa prévia" (chat antes de solicitar, ver 0042_conversa_previa.sql
+  // + startConversation): rascunho que nasceu do botão "Conversar" no
+  // perfil do profissional, não do formulário completo de nova solicitação.
+  const isPreChat = request.status === "rascunho" && request.is_conversa_previa;
 
   // Só usado pelo botão temporário de confirmação manual de pagamento
   // (beta fechado, sem Onda 3 ainda) — ver ConfirmPaymentButton.
@@ -80,6 +86,7 @@ export default async function SolicitacaoDetailPage({
     { data: incidents },
     { data: reviews },
     { data: attachments },
+    { data: otherPartyRows },
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -118,7 +125,13 @@ export default async function SolicitacaoDetailPage({
       .select("id, url, created_at")
       .eq("request_id", requestId)
       .order("created_at", { ascending: true }),
+    // Pra staff, a função sempre devolve vazio (auth.uid() não bate com
+    // tutor_id nem professional_id) — mais simples que ramificar aqui.
+    supabase.rpc("get_request_other_party_name", { p_request_id: requestId }),
   ]);
+
+  const otherPartyName = otherPartyRows?.[0]?.full_name ?? null;
+  const otherPartyAvatarUrl = otherPartyRows?.[0]?.avatar_url ?? null;
 
   const pets = (petLinks ?? [])
     .map((link) => link.pets)
@@ -152,7 +165,9 @@ export default async function SolicitacaoDetailPage({
       <div className="max-w-md mx-auto flex flex-col gap-6">
         <div>
           <h1 className="text-xl font-bold text-black mb-1">
-            {pets.map((p) => p.name).join(", ") || "Solicitação"}
+            {isPreChat
+              ? `Conversa com ${otherPartyName ?? (viewerRole === "tutor" ? "o profissional" : "o tutor")}`
+              : pets.map((p) => p.name).join(", ") || "Solicitação"}
           </h1>
           {/* Hero de status (M-013, iniciativa de CX) — a próxima ação em
               linguagem simples fica em destaque; o nome técnico do status
@@ -209,7 +224,22 @@ export default async function SolicitacaoDetailPage({
               Contratar novamente
             </Link>
           )}
+          {isPreChat && (
+            <p className="text-xs text-gray-500 mt-2 bg-gray/50 rounded-lg px-3 py-2">
+              Isso ainda é só uma conversa — nenhuma solicitação foi criada.
+            </p>
+          )}
         </div>
+
+        {isPreChat && viewerRole === "tutor" && (
+          <Link
+            href={`/solicitacoes/nova?profissional=${request.professional_id}&continuar=${request.id}`}
+            className="rounded-lg bg-teal px-4 py-3 text-center text-sm font-semibold text-white hover:opacity-90"
+          >
+            Quero solicitar de verdade
+          </Link>
+        )}
+        {isPreChat && viewerRole !== "staff" && <EndConversationButton requestId={request.id} />}
 
         {viewerRole === "staff" && (
           <p className="text-xs text-gray-500 bg-gray/50 rounded-lg px-3 py-2">
@@ -221,7 +251,7 @@ export default async function SolicitacaoDetailPage({
           <ConfirmPaymentButton requestId={request.id} />
         )}
 
-        {viewerRole !== "staff" && (
+        {viewerRole !== "staff" && !isPreChat && (
           <section>
             <h2 className="text-sm font-semibold text-black mb-2">Proposta</h2>
             <ProposalPanel
@@ -266,7 +296,7 @@ export default async function SolicitacaoDetailPage({
           </section>
         )}
 
-        {viewerRole !== "staff" && (
+        {viewerRole !== "staff" && !isPreChat && (
           <HelpButton
             requestId={request.id}
             occurrenceId={currentOccurrence?.id}
@@ -320,10 +350,12 @@ export default async function SolicitacaoDetailPage({
             messages={messages ?? []}
             currentUserId={user.id}
             staffSenderIds={staffSenderIds}
+            otherPartyName={isPreChat ? otherPartyName : null}
+            otherPartyAvatarUrl={isPreChat ? otherPartyAvatarUrl : null}
           />
         </section>
 
-        {viewerRole !== "staff" && (
+        {viewerRole !== "staff" && !isPreChat && (
           <RequestAttachmentsSection requestId={request.id} attachments={attachments ?? []} />
         )}
 

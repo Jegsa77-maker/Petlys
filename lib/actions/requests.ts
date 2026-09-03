@@ -8,6 +8,7 @@ import {
   requestAdjustmentSchema,
   rescheduleOccurrenceSchema,
   updateRecurrenceSchema,
+  startConversationSchema,
   RECURRENCE_INTERVAL_DAYS,
 } from "@/lib/validations/requests";
 import {
@@ -82,26 +83,48 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
     originRequestId = priorVisita?.id ?? null;
   }
 
-  const { data: request, error: requestError } = await supabase
-    .from("requests")
-    .insert({
-      tutor_id: user.id,
-      professional_id: parsed.data.professionalId,
-      category: parsed.data.category,
-      status: "rascunho",
-      is_recurring: parsed.data.isRecurring,
-      occurrences_total: parsed.data.occurrencesTotal,
-      recurrence_interval: parsed.data.isRecurring ? parsed.data.recurrenceInterval : null,
-      is_visita_inicial: parsed.data.isVisitaInicial,
-      origin_request_id: originRequestId,
-      address: parsed.data.address || null,
-      category_answers: parsed.data.categoryAnswers,
-      // Consentimento é validado pelo schema (prontuarioConsent === true) —
-      // aqui só registramos o carimbo de quando foi dado (seção 6.4).
-      prontuario_shared_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
+  // Campos comuns aos dois caminhos (nova request ou formalização de uma
+  // conversa prévia já existente, ver startConversation abaixo).
+  const requestFields = {
+    category: parsed.data.category,
+    is_recurring: parsed.data.isRecurring,
+    occurrences_total: parsed.data.occurrencesTotal,
+    recurrence_interval: parsed.data.isRecurring ? parsed.data.recurrenceInterval : null,
+    is_visita_inicial: parsed.data.isVisitaInicial,
+    origin_request_id: originRequestId,
+    address: parsed.data.address || null,
+    category_answers: parsed.data.categoryAnswers,
+    // Consentimento é validado pelo schema (prontuarioConsent === true) —
+    // aqui só registramos o carimbo de quando foi dado (seção 6.4).
+    prontuario_shared_at: new Date().toISOString(),
+  };
+
+  let request: { id: string } | null;
+  let requestError;
+
+  if (parsed.data.existingRequestId) {
+    // Formalizando uma conversa prévia (rascunho já existente, chat
+    // preservado) em vez de criar uma request nova do zero — o tutor
+    // precisa ser o dono e ela ainda precisa estar em rascunho.
+    const result = await supabase
+      .from("requests")
+      .update(requestFields)
+      .eq("id", parsed.data.existingRequestId)
+      .eq("tutor_id", user.id)
+      .eq("status", "rascunho")
+      .select("id")
+      .single();
+    request = result.data;
+    requestError = result.error;
+  } else {
+    const result = await supabase
+      .from("requests")
+      .insert({ tutor_id: user.id, professional_id: parsed.data.professionalId, status: "rascunho", ...requestFields })
+      .select("id")
+      .single();
+    request = result.data;
+    requestError = result.error;
+  }
 
   if (requestError || !request) {
     return { error: "Não foi possível criar a solicitação. Tente novamente." };
@@ -154,6 +177,119 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
 
   revalidatePath("/solicitacoes");
   redirect(`/solicitacoes/${request.id}`);
+}
+
+/**
+ * "Conversar" no perfil do profissional — chat livre antes de formalizar
+ * uma solicitação completa. Não é uma tabela nova: cria uma `requests`
+ * mínima em rascunho (só categoria, sem pets/data/endereço), marcada
+ * `is_conversa_previa`, seguindo o mesmo padrão já usado pra visita
+ * inicial (outra linha de `requests`, nunca uma tabela paralela). O chat
+ * já funciona nesse status sem nenhuma mudança de RLS — `is_party_of_request`
+ * não olha `status` (0042_conversa_previa.sql).
+ */
+export async function startConversation(input: unknown): Promise<ActionResult> {
+  const parsed = startConversationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  // Já existe uma conversa aberta com esse profissional? Reaproveita em
+  // vez de duplicar (clique repetido no botão "Conversar").
+  const { data: existing } = await supabase
+    .from("requests")
+    .select("id")
+    .eq("tutor_id", user.id)
+    .eq("professional_id", parsed.data.professionalId)
+    .eq("status", "rascunho")
+    .eq("is_conversa_previa", true)
+    .maybeSingle();
+
+  if (existing) {
+    redirect(`/solicitacoes/${existing.id}`);
+  }
+
+  const { data: created, error } = await supabase
+    .from("requests")
+    .insert({
+      tutor_id: user.id,
+      professional_id: parsed.data.professionalId,
+      category: parsed.data.category,
+      status: "rascunho",
+      is_conversa_previa: true,
+    })
+    .select("id")
+    .single();
+
+  if (error || !created) {
+    // Corrida: duas abas criando ao mesmo tempo esbarram no índice único
+    // (requests_one_open_prechat_idx) — busca de novo e redireciona pra
+    // a que ganhou, em vez de mostrar erro pro usuário.
+    const { data: retryExisting } = await supabase
+      .from("requests")
+      .select("id")
+      .eq("tutor_id", user.id)
+      .eq("professional_id", parsed.data.professionalId)
+      .eq("status", "rascunho")
+      .eq("is_conversa_previa", true)
+      .maybeSingle();
+    if (retryExisting) {
+      redirect(`/solicitacoes/${retryExisting.id}`);
+    }
+    return { error: "Não foi possível iniciar a conversa. Tente novamente." };
+  }
+
+  redirect(`/solicitacoes/${created.id}`);
+}
+
+/**
+ * Encerra uma conversa prévia sem formalizar (tutor ou profissional
+ * desistiram de seguir). Não reaproveita `declineRequest`: ele grava
+ * status "recusado", que não é uma transição válida a partir de
+ * "rascunho" (só solicitacao_enviada/em_conversa/proposta_enviada ->
+ * recusado estão liberadas na máquina de estados) — aqui o destino
+ * certo é "cancelado" (rascunho -> cancelado já é permitido, 0012).
+ */
+export async function endPreChatConversation(requestId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: request } = await supabase
+    .from("requests")
+    .select("tutor_id, professional_id, status")
+    .eq("id", requestId)
+    .single();
+
+  if (!request || (request.tutor_id !== user.id && request.professional_id !== user.id)) {
+    return { error: "Você não faz parte dessa conversa." };
+  }
+  if (request.status !== "rascunho") {
+    return { error: "Essa conversa já virou uma solicitação." };
+  }
+
+  const { error } = await supabase.from("requests").update({ status: "cancelado" }).eq("id", requestId);
+  if (error) {
+    return { error: "Não foi possível encerrar a conversa. Tente novamente." };
+  }
+
+  revalidatePath("/solicitacoes");
+  revalidatePath(`/solicitacoes/${requestId}`);
+  return { error: null };
 }
 
 /**
