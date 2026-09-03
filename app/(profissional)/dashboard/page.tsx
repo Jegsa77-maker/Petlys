@@ -57,7 +57,7 @@ export default async function ProfessionalDashboardPage() {
           <QuickLink href="/agenda" icon={<Calendar size={16} />} label="Agenda e bloqueios" />
           <QuickLink href="/servicos" icon={<Inbox size={16} />} label="Serviços e preços" />
           <QuickLink href="/kanban" icon={<LayoutGrid size={16} />} label="Kanban de atendimentos" />
-          <QuickLink href="/financeiro" icon={<Wallet size={16} />} label="Financeiro (em breve)" disabled />
+          <QuickLink href="/financeiro" icon={<Wallet size={16} />} label="Financeiro" />
         </div>
 
         {today && today.length > 0 && (

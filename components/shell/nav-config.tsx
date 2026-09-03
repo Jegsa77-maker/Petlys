@@ -13,6 +13,7 @@ import {
   Flag,
   SlidersHorizontal,
   Users,
+  Wallet,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -26,9 +27,9 @@ export type NavItem = {
 
 /**
  * Navegação por papel (M-001, iniciativa de CX) — só rotas que já
- * existem hoje (`find app -iname page.tsx`); nada aqui aponta pra uma
- * tela que ainda não foi construída (ex.: Financeiro do Profissional
- * fica de fora até a Onda 3 existir de verdade).
+ * existem hoje (`find app -iname page.tsx`). "Financeiro" do Profissional
+ * entrou junto com a Onda 3 (fundação sem gateway, Etapa 1 — onboarding
+ * de recebedor); o extrato completo chega nas próximas etapas.
  */
 export const NAV_BY_ROLE: Record<ShellRole, NavItem[]> = {
   tutor: [
@@ -42,6 +43,7 @@ export const NAV_BY_ROLE: Record<ShellRole, NavItem[]> = {
     { href: "/agenda", label: "Agenda", icon: CalendarDays },
     { href: "/kanban", label: "Atendimentos", icon: Kanban },
     { href: "/servicos", label: "Serviços", icon: Wrench },
+    { href: "/financeiro", label: "Financeiro", icon: Wallet },
     { href: "/perfil", label: "Perfil", icon: UserRound },
   ],
   admin: [

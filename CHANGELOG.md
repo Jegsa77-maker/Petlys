@@ -4,6 +4,39 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-03 — Onda 3: fundação sem gateway (schema completo + Etapa 1 — onboarding de recebedor)
+
+**Contexto:** decisão de começar a Onda 3 (financeiro real via Pagar.me) confirmada pelo usuário, mas a chave de sandbox ainda depende de acesso externo (onboarding comercial do lado do Pagar.me, fora do meu controle). Em vez de esperar, separei o que é **puro schema/lógica interna** (não depende de nenhuma chamada real ao gateway) do que **precisa da chave** — e construí a fundação inteira agora. Plano completo (6 etapas: onboarding → Pix → cartão → cancelamento/no-show/chargeback → saque → conciliação do Admin) documentado e revisado com pesquisa direta na documentação oficial do Pagar.me antes de qualquer código (nomes de evento, rotas, estrutura de split — não assumido de memória).
+
+**3 achados de pesquisa que já mudaram o desenho antes de escrever qualquer linha:**
+1. `charge.chargedback` está **descontinuado até 30/09/2026** — o evento certo é `chargeback.received`.
+2. A rota de saque `/recipients/{id}/withdrawals` está sendo descontinuada em favor de **Transferências** (`/transfers`).
+3. **Não existe webhook de transferência/saque** — confirmação de saque concluído só por polling (`GET /transfers/{id}`), diferente do resto do fluxo (Pix/cartão/chargeback), que é por webhook.
+
+**Schema aplicado (migrations via MCP, todas gateway-independentes — puro Postgres):**
+- `platform_parameters`: novo status `agendado` + função `promote_scheduled_parameters()` (security definer, chamada por `pg_cron` a cada 10 min) — resolve uma limitação real encontrada (o campo `vigencia_inicio` existia mas não tinha nenhum mecanismo de agendamento; hoje um parâmetro nasce `ativo` na hora, sem jeito de programar uma mudança futura sem já substituir o valor vigente).
+- `professional_recipients` (onboarding de recebedor), `webhook_events` (idempotência de webhook via `gateway_event_id` unique), `checkout_sessions` (cartão), `chargebacks`, `reconciliation_flags` + `detect_reconciliation_issues()` (as 4 categorias de divergência da spec: duplicidade, split incorreto, webhook divergente, saque indevido — `pg_cron` de hora em hora).
+- Campos novos em `payments` (método, `gateway_order_id`, valor do profissional, snapshot do split) e `payouts` (`failure_reason`).
+- Corrigido um gap real na máquina de estados: faltavam as transições `em_andamento→cancelado` e `finalizacao→cancelado` — sem isso, cancelar ou reportar no-show com o atendimento já em andamento quebraria na trigger do banco assim que o efeito financeiro passasse a ser real (Etapa 4).
+- Todas as tabelas novas seguem o padrão já estabelecido: RLS habilitada, sem policy de insert/update para `authenticated` nas que só devem ser escritas por `service_role`/funções internas.
+
+**Achado de segurança novo, categoria diferente da já documentada (`BACKLOG.md`):** as duas funções `security definer` novas (`promote_scheduled_parameters`, `detect_reconciliation_issues`) apareceram expostas a `anon`/`authenticated` no `get_advisors` mesmo depois de um `revoke execute ... from anon, authenticated` dentro da própria migration. Investigado com `information_schema.routine_privileges`: desta vez o grant era pra **`PUBLIC`** (não direto a `anon`/`authenticated`, que foi o padrão descoberto em 0038/0039) — corrigido com `revoke execute ... from public`, confirmado via `has_function_privilege`.
+
+**Etapa 1 completa (onboarding de recebedor):**
+- `lib/services/pagarme.ts` (novo — primeiro `lib/services/*` do projeto): client HTTP único, todas as chamadas ao gateway isoladas aqui. Escrito contra a doc oficial, incluindo split (`split_rules`), estorno com split de estorno (recurso real e documentado, não suposição), transferência e verificação de assinatura de webhook — esta última marcada explicitamente como não confirmada (header/algoritmo exatos dependem do painel autenticado do sandbox).
+- `lib/actions/payments.ts` (`submitRecipientOnboarding`, `getRecipientStatus`) + `lib/validations/payments.ts`: onboarding só grava em `professional_recipients` depois que a chamada ao gateway teria sucesso (aqui, falha com uma mensagem clara porque a chave não existe ainda — comportamento correto e testado).
+- `app/(profissional)/financeiro/page.tsx` (nova rota) + `components/professional/recipient-onboarding-form.tsx`. `nav-config.tsx` e o `QuickLink` do dashboard do Profissional atualizados (o comentário que dizia "fica de fora até a Onda 3 existir" não vale mais). `/financeiro` adicionada às rotas exclusivas de Profissional no middleware.
+
+**2 bugs reais encontrados e corrigidos durante o teste (não são achados teóricos):**
+1. `pagarmeFetch` escondia o erro de "chave não configurada" dentro do `catch` genérico de falha de rede, mostrando "Falha de rede ao chamar o Pagar.me" em vez da mensagem certa — pego testando o formulário de verdade no navegador (sessão real, `/dev-login`), corrigido movendo a leitura da chave pra fora do bloco de rede.
+2. Teste de `promote_scheduled_parameters()` usava o `profile_id` de um usuário de teste efêmero como `atualizado_por` — como `platform_parameters`/`platform_parameters_log` referenciam `profiles` sem `ON DELETE CASCADE`, isso deixou 3 usuários de teste presos (impossíveis de apagar) depois de rodar a suíte algumas vezes. Corrigido usando um admin real e permanente nesse campo. Achado colateral confirmado no processo: **`platform_parameters` não pode ser fisicamente apagado nunca** (a própria trigger de auditoria quebra com violação de FK ao tentar logar a exclusão de uma linha que acabou de sumir) — é por isso que `deleteParameter()` já era soft-delete only; o teste passou a fazer o mesmo (`status: 'substituido'`) em vez de tentar `DELETE`.
+
+**Verificação:** `tsc --noEmit`, `eslint .` e `next build` limpos (35 rotas, incluindo `/financeiro`). 68/68 testes passando (55 anteriores + 13 novos: RLS de `professional_recipients`/`webhook_events`/idempotência/`promote_scheduled_parameters`, unidade de `verifyWebhookSignature`). Fluxo completo testado no navegador com sessão real (Profissional de teste, verificado e com termos aceitos via `test_verify_profile`): formulário preenchido, submetido, erro correto exibido (chave não configurada). Confirmado por SQL: zero usuário/linha residual depois da limpeza.
+
+**Não incluído nesta entrega (dependem da chave do Pagar.me, que ainda não existe):** qualquer chamada real ao gateway (criar recebedor de fato, Pix, cartão, webhook real, estorno, saque); Etapas 2–6 continuam só com o schema pronto, sem a Server Action/UI de cada uma ainda.
+
+---
+
 ## 2026-09-02 — Decisão de escopo: Onda 5 e Onda 6 saem da plataforma; falta só a Onda 3 pra fechar o Pilar 1
 
 **Decisão do usuário:** remover a Onda 5 (retenção do Profissional) e os itens ainda pendentes da Onda 6 (Petlys Espaços, Operação regional, Seguro/garantia, Backup de emergência) do escopo de fechamento desta plataforma. Deixam de ser "backlog dentro do projeto em andamento" e viram **funcionalidades futuras**, registradas no `IDEIAS_FUTURAS.md` — exceto o CRM do Profissional, que sai **por completo**: não fica nem registrado como ideia futura desta plataforma, será tratado como iniciativa separada, a discutir no futuro (nem é certo que continue sendo Petlys).

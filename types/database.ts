@@ -163,6 +163,102 @@ export type Database = {
           },
         ]
       }
+      chargebacks: {
+        Row: {
+          amount: number
+          debited_amount: number | null
+          id: string
+          incident_id: string | null
+          payment_id: string
+          reported_at: string
+          request_id: string
+          resolved_at: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          debited_amount?: number | null
+          id?: string
+          incident_id?: string | null
+          payment_id: string
+          reported_at?: string
+          request_id: string
+          resolved_at?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          debited_amount?: number | null
+          id?: string
+          incident_id?: string | null
+          payment_id?: string
+          reported_at?: string
+          request_id?: string
+          resolved_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chargebacks_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chargebacks_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chargebacks_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkout_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          gateway_checkout_id: string | null
+          id: string
+          payment_url: string | null
+          request_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          gateway_checkout_id?: string | null
+          id?: string
+          payment_url?: string | null
+          request_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          gateway_checkout_id?: string | null
+          id?: string
+          payment_url?: string | null
+          request_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_sessions_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_unlocks: {
         Row: {
           professional_id: string
@@ -506,9 +602,13 @@ export type Database = {
           amount: number
           commission_amount: number
           created_at: string
+          gateway_order_id: string | null
+          gateway_split_snapshot: Json | null
           gateway_transaction_id: string | null
           id: string
           paid_at: string | null
+          payment_method: string | null
+          professional_amount: number | null
           request_id: string
           status: Database["public"]["Enums"]["payment_status"]
         }
@@ -516,9 +616,13 @@ export type Database = {
           amount: number
           commission_amount?: number
           created_at?: string
+          gateway_order_id?: string | null
+          gateway_split_snapshot?: Json | null
           gateway_transaction_id?: string | null
           id?: string
           paid_at?: string | null
+          payment_method?: string | null
+          professional_amount?: number | null
           request_id: string
           status?: Database["public"]["Enums"]["payment_status"]
         }
@@ -526,9 +630,13 @@ export type Database = {
           amount?: number
           commission_amount?: number
           created_at?: string
+          gateway_order_id?: string | null
+          gateway_split_snapshot?: Json | null
           gateway_transaction_id?: string | null
           id?: string
           paid_at?: string | null
+          payment_method?: string | null
+          professional_amount?: number | null
           request_id?: string
           status?: Database["public"]["Enums"]["payment_status"]
         }
@@ -546,6 +654,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          failure_reason: string | null
           gateway_transfer_id: string | null
           id: string
           paid_at: string | null
@@ -558,6 +667,7 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          failure_reason?: string | null
           gateway_transfer_id?: string | null
           id?: string
           paid_at?: string | null
@@ -570,6 +680,7 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          failure_reason?: string | null
           gateway_transfer_id?: string | null
           id?: string
           paid_at?: string | null
@@ -1058,6 +1169,62 @@ export type Database = {
           },
         ]
       }
+      professional_recipients: {
+        Row: {
+          agencia: string | null
+          agencia_dv: string | null
+          bank_code: string | null
+          conta: string | null
+          conta_dv: string | null
+          conta_tipo: string | null
+          created_at: string
+          gateway_recipient_id: string | null
+          profile_id: string
+          rejection_reason: string | null
+          status: Database["public"]["Enums"]["recipient_status"]
+          transfer_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          agencia_dv?: string | null
+          bank_code?: string | null
+          conta?: string | null
+          conta_dv?: string | null
+          conta_tipo?: string | null
+          created_at?: string
+          gateway_recipient_id?: string | null
+          profile_id: string
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["recipient_status"]
+          transfer_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          agencia_dv?: string | null
+          bank_code?: string | null
+          conta?: string | null
+          conta_dv?: string | null
+          conta_tipo?: string | null
+          created_at?: string
+          gateway_recipient_id?: string | null
+          profile_id?: string
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["recipient_status"]
+          transfer_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_recipients_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_service_addons: {
         Row: {
           created_at: string
@@ -1309,6 +1476,74 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: false
             referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliation_flags: {
+        Row: {
+          category: Database["public"]["Enums"]["reconciliation_category"]
+          details: Json
+          detected_at: string
+          id: string
+          payment_id: string | null
+          payout_id: string | null
+          request_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["reconciliation_category"]
+          details?: Json
+          detected_at?: string
+          id?: string
+          payment_id?: string | null
+          payout_id?: string | null
+          request_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["reconciliation_category"]
+          details?: Json
+          detected_at?: string
+          id?: string
+          payment_id?: string | null
+          payout_id?: string | null
+          request_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_flags_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_flags_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "payouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_flags_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_flags_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1763,6 +1998,39 @@ export type Database = {
           },
         ]
       }
+      webhook_events: {
+        Row: {
+          error: string | null
+          gateway_event_id: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          type: string
+          verified: boolean
+        }
+        Insert: {
+          error?: string | null
+          gateway_event_id: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          type: string
+          verified?: boolean
+        }
+        Update: {
+          error?: string | null
+          gateway_event_id?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          type?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1777,6 +2045,7 @@ export type Database = {
         Args: { other_profile_id: string }
         Returns: boolean
       }
+      detect_reconciliation_issues: { Args: never; Returns: undefined }
       dismiss_message_flag: {
         Args: { p_message_id: string }
         Returns: undefined
@@ -1812,6 +2081,7 @@ export type Database = {
         Args: { p_payload: Json; p_profile_id: string; p_type: string }
         Returns: undefined
       }
+      promote_scheduled_parameters: { Args: never; Returns: undefined }
       set_message_hidden: {
         Args: { p_hidden: boolean; p_message_id: string }
         Returns: undefined
@@ -1839,13 +2109,14 @@ export type Database = {
         | "cancelado"
         | "nao_compareceu"
       parameter_action: "criacao" | "edicao" | "exclusao"
-      parameter_lifecycle: "ativo" | "substituido"
+      parameter_lifecycle: "ativo" | "substituido" | "agendado"
       payment_status:
         | "pendente"
         | "processando"
         | "pago"
         | "estornado"
         | "falhou"
+        | "contestado"
       payout_status:
         | "agendado"
         | "retido"
@@ -1854,6 +2125,12 @@ export type Database = {
         | "pago"
         | "bloqueado"
       pet_size: "pequeno" | "medio" | "grande" | "gigante"
+      recipient_status: "pendente" | "ativo" | "rejeitado" | "desabilitado"
+      reconciliation_category:
+        | "duplicidade_pagamento"
+        | "split_incorreto"
+        | "webhook_divergente"
+        | "saque_indevido"
       request_status:
         | "rascunho"
         | "solicitacao_enviada"
@@ -2020,13 +2297,14 @@ export const Constants = {
         "nao_compareceu",
       ],
       parameter_action: ["criacao", "edicao", "exclusao"],
-      parameter_lifecycle: ["ativo", "substituido"],
+      parameter_lifecycle: ["ativo", "substituido", "agendado"],
       payment_status: [
         "pendente",
         "processando",
         "pago",
         "estornado",
         "falhou",
+        "contestado",
       ],
       payout_status: [
         "agendado",
@@ -2037,6 +2315,13 @@ export const Constants = {
         "bloqueado",
       ],
       pet_size: ["pequeno", "medio", "grande", "gigante"],
+      recipient_status: ["pendente", "ativo", "rejeitado", "desabilitado"],
+      reconciliation_category: [
+        "duplicidade_pagamento",
+        "split_incorreto",
+        "webhook_divergente",
+        "saque_indevido",
+      ],
       request_status: [
         "rascunho",
         "solicitacao_enviada",
@@ -2068,6 +2353,7 @@ export const Constants = {
   },
 } as const
 
+
 // Convenience enum aliases — hand-maintained, re-appended after every type regen.
 export type AppRole = Database["public"]["Enums"]["app_role"];
 export type IncidentStatus = Database["public"]["Enums"]["incident_status"];
@@ -2079,6 +2365,8 @@ export type ParameterLifecycle = Database["public"]["Enums"]["parameter_lifecycl
 export type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 export type PayoutStatus = Database["public"]["Enums"]["payout_status"];
 export type PetSize = Database["public"]["Enums"]["pet_size"];
+export type ReconciliationCategory = Database["public"]["Enums"]["reconciliation_category"];
+export type RecipientStatus = Database["public"]["Enums"]["recipient_status"];
 export type RequestStatus = Database["public"]["Enums"]["request_status"];
 export type ServiceCategory = Database["public"]["Enums"]["service_category"];
 export type SuspensionStatus = Database["public"]["Enums"]["suspension_status"];

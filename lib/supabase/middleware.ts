@@ -10,7 +10,7 @@ const SUSPENDED_PATH = "/conta-suspensa";
 // as duas misturadas, só a do "papel ativo" escolhido em / (ver
 // lib/actions/auth.ts:setActiveRole e app/page.tsx).
 const TUTOR_ONLY_PREFIXES = ["/inicio", "/pets", "/buscar", "/profissional"];
-const PROFISSIONAL_ONLY_PREFIXES = ["/dashboard", "/agenda", "/kanban", "/servicos", "/perfil"];
+const PROFISSIONAL_ONLY_PREFIXES = ["/dashboard", "/agenda", "/kanban", "/servicos", "/perfil", "/financeiro"];
 // Compartilhadas entre os dois papéis (o conteúdo muda conforme o papel
 // ativo), mas exigem que a conta já tenha escolhido um papel quando tem
 // os dois — sem isso não há como saber qual visão renderizar.
