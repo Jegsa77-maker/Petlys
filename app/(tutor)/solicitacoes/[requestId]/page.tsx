@@ -12,6 +12,7 @@ import { RequestAttachmentsSection } from "@/components/requests/request-attachm
 import { RescheduleOccurrenceButton } from "@/components/requests/reschedule-occurrence-button";
 import { EditRecurrenceForm } from "@/components/requests/edit-recurrence-form";
 import { HelpButton } from "@/components/requests/help-button";
+import { ConfirmPaymentButton } from "@/components/requests/confirm-payment-button";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 import { nextActionCopy } from "@/lib/domain/request-status-copy";
 import { REQUEST_STATUS_LABEL as STATUS_LABEL } from "@/lib/domain/request-status-labels";
@@ -55,6 +56,20 @@ export default async function SolicitacaoDetailPage({
         ? "profissional"
         : "staff";
   const otherPartyId = viewerRole === "tutor" ? request.professional_id : request.tutor_id;
+
+  // Só usado pelo botão temporário de confirmação manual de pagamento
+  // (beta fechado, sem Onda 3 ainda) — ver ConfirmPaymentButton.
+  const { data: adminRole } =
+    viewerRole === "staff"
+      ? await supabase
+          .from("account_roles")
+          .select("role")
+          .eq("profile_id", user.id)
+          .eq("role", "administrador")
+          .eq("active", true)
+          .maybeSingle()
+      : { data: null };
+  const isAdmin = Boolean(adminRole);
 
   const [
     { data: messages },
@@ -198,9 +213,12 @@ export default async function SolicitacaoDetailPage({
 
         {viewerRole === "staff" && (
           <p className="text-xs text-gray-500 bg-gray/50 rounded-lg px-3 py-2">
-            Você está vendo essa solicitação como suporte — visível só por
-            haver um incidente vinculado.
+            Você está vendo essa solicitação como suporte.
           </p>
+        )}
+
+        {viewerRole === "staff" && isAdmin && request.status === "aguardando_pagamento" && (
+          <ConfirmPaymentButton requestId={request.id} />
         )}
 
         {viewerRole !== "staff" && (

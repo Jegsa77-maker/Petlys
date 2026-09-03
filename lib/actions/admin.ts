@@ -312,3 +312,46 @@ export async function resolveIncident(
   revalidatePath("/incidentes");
   return { error: null };
 }
+
+/**
+ * ⚠️ Mecanismo temporário de beta fechado, sem Onda 3 (financeiro real)
+ * ainda existir: `acceptProposal` deixa a solicitação em
+ * "aguardando_pagamento" esperando o webhook do gateway confirmar — que
+ * não existe ainda. Pra destravar o teste com pessoas reais (pagamento
+ * combinado por fora, Pix direto entre as partes), o Admin confirma
+ * manualmente aqui. A transição `aguardando_pagamento -> confirmado` já
+ * é permitida pela máquina de estados (0012) — nenhuma migration nova.
+ *
+ * Remover esta action (ou trocar por confirmação real via webhook) assim
+ * que a Onda 3 tiver a Etapa 2 (Pix) funcionando de ponta a ponta.
+ */
+export async function confirmPaymentManually(requestId: string): Promise<ActionResult> {
+  const { user, isAdmin } = await requireAdmin();
+  if (!user || !isAdmin) {
+    return { error: "Apenas o Administrador pode confirmar pagamento manualmente." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: request } = await supabase
+    .from("requests")
+    .select("status")
+    .eq("id", requestId)
+    .single();
+
+  if (request?.status !== "aguardando_pagamento") {
+    return { error: "Essa solicitação não está aguardando pagamento." };
+  }
+
+  const { error } = await supabase
+    .from("requests")
+    .update({ status: "confirmado" })
+    .eq("id", requestId);
+
+  if (error) {
+    return { error: "Não foi possível confirmar o pagamento. Tente novamente." };
+  }
+
+  revalidatePath(`/solicitacoes/${requestId}`);
+  return { error: null };
+}

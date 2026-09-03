@@ -4,6 +4,18 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-03 — Preparação de beta fechado: confirmação manual de pagamento
+
+**Contexto:** usuário quer testar a jornada completa com pessoas reais (Tutor/Profissional) antes da Onda 3 (financeiro real) existir. Sem isso, `acceptProposal` deixa a solicitação presa em `aguardando_pagamento` pra sempre — nada avança sem o webhook do gateway confirmar, que ainda não existe.
+
+**Entrega:** `confirmPaymentManually` (`lib/actions/admin.ts`, admin-only) — transição manual `aguardando_pagamento -> confirmado` (já permitida pela máquina de estados desde 0012, nenhuma migration nova). `ConfirmPaymentButton` aparece em `/solicitacoes/[requestId]` só pro Admin, só quando a solicitação está `aguardando_pagamento`, com aviso explícito de que é mecanismo de beta (pagamento combinado por fora entre as partes) — marcado no código pra ser removido/substituído assim que a Etapa 2 da Onda 3 (Pix) funcionar de ponta a ponta.
+
+**Também:** senha definida nas 3 contas de teste reutilizáveis já existentes (`teste.dual@`, `teste.admin@`, `teste.supervisor@plataformapet.dev`) pra o usuário navegar o app pessoalmente pelo `localhost:3000` e procurar erros de CX, sem precisar de mim pra cada login.
+
+**Verificação:** `tsc --noEmit`/`eslint .` limpos, 68/68 testes continuam passando (nenhum teste novo — é UI/permissão simples). Testado ao vivo: login com senha funcionando nas 3 contas.
+
+---
+
 ## 2026-09-03 — Onda 3: fundação sem gateway (schema completo + Etapa 1 — onboarding de recebedor)
 
 **Contexto:** decisão de começar a Onda 3 (financeiro real via Pagar.me) confirmada pelo usuário, mas a chave de sandbox ainda depende de acesso externo (onboarding comercial do lado do Pagar.me, fora do meu controle). Em vez de esperar, separei o que é **puro schema/lógica interna** (não depende de nenhuma chamada real ao gateway) do que **precisa da chave** — e construí a fundação inteira agora. Plano completo (6 etapas: onboarding → Pix → cartão → cancelamento/no-show/chargeback → saque → conciliação do Admin) documentado e revisado com pesquisa direta na documentação oficial do Pagar.me antes de qualquer código (nomes de evento, rotas, estrutura de split — não assumido de memória).
