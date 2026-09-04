@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { REQUEST_STATUS_LABEL } from "@/lib/domain/request-status-labels";
+import { CoverageMapLoader } from "@/components/admin/coverage-map-loader";
+import type { CoveragePoint } from "@/components/admin/coverage-map";
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
@@ -14,6 +16,7 @@ export default async function AdminDashboardPage() {
     { count: incidentsOpen },
     { count: incidentsResolved },
     { count: certificationsPending },
+    { data: coverageRows },
   ] = await Promise.all([
     supabase.from("requests").select("status"),
     supabase.from("payments").select("amount, commission_amount, status"),
@@ -40,7 +43,17 @@ export default async function AdminDashboardPage() {
       .from("professional_certifications")
       .select("id", { count: "exact", head: true })
       .eq("status", "pendente"),
+    supabase.rpc("admin_kpi_geo_coverage"),
   ]);
+
+  const coveragePoints: CoveragePoint[] = (coverageRows ?? []).map((row) => ({
+    cityLabel: row.city_label,
+    uf: row.uf,
+    lat: row.lat,
+    lng: row.lng,
+    tutores: row.tutores,
+    profissionais: row.profissionais,
+  }));
 
   const statusCounts: Record<string, number> = {};
   (statusRows ?? []).forEach((r) => {
@@ -109,6 +122,19 @@ export default async function AdminDashboardPage() {
               Revisar
             </Link>
           </div>
+        </Block>
+
+        <Block title="Cobertura geográfica">
+          {coveragePoints.length === 0 ? (
+            <EmptyRow />
+          ) : (
+            <CoverageMapLoader points={coveragePoints} />
+          )}
+          <p className="text-xs text-gray-400 mt-2">
+            Um círculo por cidade — tutores e profissionais contados separadamente, sem mostrar
+            endereço exato de ninguém. Ajuda a identificar regiões com demanda ou oferta sem
+            cobertura, pra priorizar investimento em marketing.
+          </p>
         </Block>
       </div>
     </main>

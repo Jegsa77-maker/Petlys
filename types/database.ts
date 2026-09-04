@@ -163,6 +163,76 @@ export type Database = {
           },
         ]
       }
+      analytics_events: {
+        Row: {
+          campaign: string | null
+          category: Database["public"]["Enums"]["service_category"] | null
+          created_at: string
+          event_name: string
+          id: string
+          medium: string | null
+          metadata: Json
+          professional_id: string | null
+          profile_id: string | null
+          request_id: string | null
+          session_id: string
+          source: string | null
+          uf: string | null
+        }
+        Insert: {
+          campaign?: string | null
+          category?: Database["public"]["Enums"]["service_category"] | null
+          created_at?: string
+          event_name: string
+          id?: string
+          medium?: string | null
+          metadata?: Json
+          professional_id?: string | null
+          profile_id?: string | null
+          request_id?: string | null
+          session_id: string
+          source?: string | null
+          uf?: string | null
+        }
+        Update: {
+          campaign?: string | null
+          category?: Database["public"]["Enums"]["service_category"] | null
+          created_at?: string
+          event_name?: string
+          id?: string
+          medium?: string | null
+          metadata?: Json
+          professional_id?: string | null
+          profile_id?: string | null
+          request_id?: string | null
+          session_id?: string
+          source?: string | null
+          uf?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_events_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chargebacks: {
         Row: {
           amount: number
@@ -1548,6 +1618,30 @@ export type Database = {
           },
         ]
       }
+      reference_cities: {
+        Row: {
+          id: number
+          lat: number
+          lng: number
+          nome: string
+          uf: string
+        }
+        Insert: {
+          id?: number
+          lat: number
+          lng: number
+          nome: string
+          uf: string
+        }
+        Update: {
+          id?: number
+          lat?: number
+          lng?: number
+          nome?: string
+          uf?: string
+        }
+        Relationships: []
+      }
       request_attachments: {
         Row: {
           created_at: string
@@ -2121,10 +2215,22 @@ export type Database = {
     }
     Functions: {
       accept_pending_pet_co_tutor_invites: { Args: never; Returns: number }
+      admin_kpi_geo_coverage: {
+        Args: { p_category?: Database["public"]["Enums"]["service_category"] }
+        Returns: {
+          city_label: string
+          lat: number
+          lng: number
+          profissionais: number
+          tutores: number
+          uf: string
+        }[]
+      }
       appeal_incident: {
         Args: { p_incident_id: string; p_reason: string }
         Returns: undefined
       }
+      cep_to_uf: { Args: { zip: string }; Returns: string }
       contact_is_unlocked: {
         Args: { other_profile_id: string }
         Returns: boolean

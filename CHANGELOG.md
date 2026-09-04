@@ -4,6 +4,33 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Dashboard de KPIs do Admin (itens 19-20): fundação + mapa de cobertura por cidade
+
+**Contexto:** usuário trouxe um pacote do "funcional" (ChatGPT) com especificação funcional (41 KPIs em 6 áreas) e um mockup navegável pro dashboard de KPIs do Admin, que estava pausado esperando essa definição. Discutimos os pontos ambíguos antes de codar (registrado em `C:\Users\jeffe\.claude\plans\groovy-questing-nest.md`): os 3 KPIs que dependiam de rastreamento de origem/aquisição entram já na V1 (não ficam esperando o "ON"); "tutor ativo" = criou solicitação OU enviou mensagem no período; janela de recorrência/retenção = 30 dias. No meio da conversa, o usuário pediu um mapa múndi de cobertura (tutores/profissionais por cidade) — essa parte saiu primeiro, por ser a mais concreta e verificável de ponta a ponta; o restante dos ~41 KPIs (RPCs de resumo/funil/financeiro/série temporal + shell de abas) fica pra continuação.
+
+### Fundação de schema
+
+- `cep_to_uf(zip)` (`0060`): deriva UF a partir do CEP via faixas oficiais dos Correios — região do dashboard é **UF, não cidade** (schema não tem coluna de cidade em lugar nenhum; cidade exigiria API de geocoding ou campo novo nos formulários, nenhum dos dois feito agora). Função pura, grant público (mesmo tratamento de `distance_km`).
+- Índices que faltavam pra range de data: `requests(created_at)`, `request_status_history(to_status, created_at)`, `request_occurrences(scheduled_at/completed_at)` — nenhuma dessas colunas tinha índice até agora.
+- `analytics_events` (`0061`): log write-only pros KPIs de funil/aquisição que ainda vão entrar (busca→perfil, perfil→solicitação, origem dos cadastros). Insert liberado pra `anon`+`authenticated` (é só telemetria), select só Admin/Supervisor, sem update/delete (log imutável). Ainda sem instrumentação (nenhum ponto do app grava nela ainda) — isso é próxima etapa.
+- `reference_cities` (`0062`): ~100 cidades brasileiras curadas (27 capitais + principais metrópoles/regiões) com lat/lng, pra rotular a cidade mais próxima de um ponto — select público, tabela sem dado de pessoa.
+
+### Mapa de cobertura geográfica
+
+Pedido do usuário: "mapa múndi com os pontos onde temos clientes (tutores e profissionais), cores diferentes por cidade, com números totais, pra investir em marketing em regiões fora do radar." O projeto já tinha tudo pra isso — reaproveitado o padrão de `components/search/results-map.tsx` (Leaflet + OpenStreetMap, sem chave de API).
+
+- `admin_kpi_geo_coverage(p_category)` (`0063`, fix de bug em `0064`): casa cada tutor (`profiles.address_lat/lng`) e profissional (`professional_service_areas.center_lat/lng` — área configurada, não endereço) com a cidade de referência mais próxima via `distance_km`; ponto a mais de 50km de qualquer cidade cai num balde "UF — outras cidades" em vez de forçar errado. **Decisão:** agrega por cidade (nunca um pino por pessoa) — protege endereço residencial exato do tutor e evita poluição visual em escala de mapa múndi. `security definer`, checa `is_admin_or_supervisor()`, `revoke`/`grant` conferidos com `has_function_privilege`.
+- `components/admin/coverage-map.tsx` (+ `coverage-map-loader.tsx` pro `next/dynamic({ssr:false})`, Leaflet acessa `window`): um círculo por cidade pra tutores (teal) e outro pra profissionais (laranja), levemente deslocados, com o número escrito dentro do próprio círculo — não escondido em popup.
+- Adicionado ao fim de `app/admin/dashboard/page.tsx` (dashboard existente, ainda sem o redesenho de abas das 6 áreas — isso vem na próxima etapa).
+
+**Bug pego ao testar no browser:** `column reference "lat" is ambiguous` — `RETURNS TABLE` cria variáveis PL/pgSQL com os mesmos nomes das colunas de saída (`lat`, `lng`, `uf`...), e uma CTE interna (`combined`) selecionava essas colunas sem qualificar o alias de origem. Corrigido em `0064_fix_admin_kpi_geo_coverage_ambiguous_column.sql`.
+
+**Verificação:** `tsc --noEmit`/`eslint .`/`next build` limpos (36 rotas). 96/96 testes (85 anteriores + 11 novos: `tests/rls/analytics-events.test.ts`, `tests/rls/admin-kpi-geo-coverage.test.ts` — grants, `cep_to_uf` com CEPs reais de 4 capitais, bloqueio de não-admin). Testado ao vivo como `teste.admin@plataformapet.dev`: confirmado via inspeção de DOM que a RPC retornou os 2 profissionais de teste (São Paulo e Osasco) e os 2 marcadores renderizaram com a contagem certa — screenshot do navegador ficou instável nessa região específica da tela (bug de captura da ferramenta, não do app; confirmado comparando `getBoundingClientRect`/`elementFromPoint` reais contra o resultado da RPC).
+
+**Próxima etapa (não incluída aqui):** os ~4 RPCs de KPI restantes (resumo executivo/crescimento/demanda/qualidade, funil por coorte, financeiro, série temporal semanal), o shell de 6 abas + filtros (período/região/categoria), `recharts`, e a instrumentação dos 6 eventos de funil em `analytics_events` (a tabela já existe, ainda não recebe escrita de lugar nenhum).
+
+---
+
 ## 2026-09-03 — Backlog externo: financeiro pausado, mudança de escopo pós-acordo + indicação/substituição de profissional (itens 23-29)
 
 **Contexto:** usuário trouxe uma lista de 39 itens de backlog de uma conversa com "o funcional" (ChatGPT). Cruzamento feito item a item contra o que já estava no radar — a maior parte do financeiro (itens 1-18) já estava mapeada nas 6 etapas da Onda 3, com pedaços já construídos (onboarding, split codado, bloqueio de saque, conciliação). Decisão do usuário: **financeiro fica pro final**, depois do resto da aplicação estar pronto; itens 21-22 (origem do tutor/circulação entre profissionais, território de CRM) ficam de fora, como já decidido antes; dashboard de KPIs (19-20) aguarda especificação do usuário; infraestrutura (30-39) fica pro fim também. Entra agora: **itens 23-29**.
