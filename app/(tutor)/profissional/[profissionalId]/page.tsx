@@ -8,6 +8,7 @@ import {
   PROFESSIONAL_LEVEL_LABEL,
 } from "@/lib/domain/professional-reputation";
 import { FavoriteButton } from "@/components/search/favorite-button";
+import { trackEventServer } from "@/lib/analytics/track-server";
 
 const CATEGORY_LABEL: Record<string, string> = {
   pet_sitter: "Pet sitter / cuidador",
@@ -47,6 +48,14 @@ export default async function ProfissionalPage({
     )
     .eq("professional_id", profissionalId)
     .eq("active", true);
+
+  // Perfil confirmado que existe — dispara aqui, não antes do notFound()
+  // acima, pra não contar visita a um profissional inexistente.
+  void trackEventServer("professional_profile_view", {
+    professional_id: profissionalId,
+    profile_id: user?.id,
+    category: services?.[0]?.category,
+  });
 
   const { data: reviews } = await supabase
     .from("reviews")

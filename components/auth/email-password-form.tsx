@@ -11,6 +11,7 @@ import {
   signUpSchema,
   requestPasswordResetSchema,
 } from "@/lib/validations/auth";
+import { trackEvent } from "@/lib/analytics/track";
 
 type Mode = "entrar" | "criar" | "esqueci";
 
@@ -27,6 +28,20 @@ export function EmailPasswordForm() {
     setMode(next);
     setError(null);
     setNotice(null);
+
+    // Atribuição de canal (UTM) capturada aqui, no clique em "Criar
+    // conta" — não numa página de "landing" anônima separada, mais
+    // simples e suficiente já que ainda não existe indicação/convite
+    // (itens 21-22 do backlog, fora de escopo).
+    if (next === "criar") {
+      const params = new URLSearchParams(window.location.search);
+      trackEvent("signup_started", {
+        source: params.get("utm_source") ?? undefined,
+        medium: params.get("utm_medium") ?? undefined,
+        campaign: params.get("utm_campaign") ?? undefined,
+        metadata: { referrer: document.referrer || null },
+      });
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

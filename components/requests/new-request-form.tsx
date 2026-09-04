@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { createRequest } from "@/lib/actions/requests";
 import { createRequestSchema } from "@/lib/validations/requests";
+import { trackEvent } from "@/lib/analytics/track";
 import {
   missingProntuarioSections,
   PRONTUARIO_SECTION_LABEL,
@@ -76,6 +77,16 @@ export function NewRequestForm({
   const [prontuarioConsent, setProntuarioConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Uma vez por montagem do formulário — não a cada troca de categoria.
+  useEffect(() => {
+    trackEvent("request_started", {
+      professional_id: professionalId,
+      category: initialCategory ? (initialCategory as ServiceCategory) : undefined,
+      metadata: { entry: continuarRequestId ? "conversa_previa" : "formulario_completo" },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function togglePet(id: string) {
     setPetIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));

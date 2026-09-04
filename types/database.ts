@@ -2215,6 +2215,28 @@ export type Database = {
     }
     Functions: {
       accept_pending_pet_co_tutor_invites: { Args: never; Returns: number }
+      admin_kpi_delta: {
+        Args: { p_current: number; p_previous: number }
+        Returns: Json
+      }
+      admin_kpi_financeiro: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["service_category"]
+          p_from: string
+          p_to: string
+          p_uf?: string
+        }
+        Returns: Json
+      }
+      admin_kpi_funnel: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["service_category"]
+          p_from: string
+          p_to: string
+          p_uf?: string
+        }
+        Returns: Json
+      }
       admin_kpi_geo_coverage: {
         Args: { p_category?: Database["public"]["Enums"]["service_category"] }
         Returns: {
@@ -2224,6 +2246,28 @@ export type Database = {
           profissionais: number
           tutores: number
           uf: string
+        }[]
+      }
+      admin_kpi_summary: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["service_category"]
+          p_from: string
+          p_to: string
+          p_uf?: string
+        }
+        Returns: Json
+      }
+      admin_kpi_timeseries: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["service_category"]
+          p_from: string
+          p_metric: string
+          p_to: string
+          p_uf?: string
+        }
+        Returns: {
+          bucket: string
+          value: number
         }[]
       }
       appeal_incident: {

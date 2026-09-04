@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { startConversation } from "@/lib/actions/requests";
+import { trackEvent } from "@/lib/analytics/track";
 
 // Mesmo rótulo de components/requests/new-request-form.tsx — o projeto já
 // duplica isso em vários lugares (ver lib/domain/service-catalog.ts,
@@ -20,6 +21,11 @@ export function StartConversationForm({ professionalId }: { professionalId: stri
   const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    trackEvent("request_started", { professional_id: professionalId, metadata: { entry: "conversa_previa" } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

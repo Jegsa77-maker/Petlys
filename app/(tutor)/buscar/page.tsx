@@ -9,6 +9,7 @@ import { SearchViewToggle } from "@/components/search/search-view-toggle";
 import type { MapPin } from "@/components/search/results-map";
 import { haversineKm } from "@/lib/geo";
 import { averageRating } from "@/lib/domain/professional-reputation";
+import { trackEventServer } from "@/lib/analytics/track-server";
 
 const CATEGORY_LABEL: Record<ServiceCategory, string> = {
   pet_sitter: "Pet sitter / cuidador",
@@ -73,6 +74,16 @@ export default async function BuscarPage({
   }
 
   const { data: services } = await query.limit(60);
+
+  // Evento agregado por busca (não por card individual — impressão por
+  // card exigiria converter a lista pra client component com
+  // IntersectionObserver, fora de escopo por enquanto). Alimenta o KPI
+  // de funil "busca -> perfil".
+  void trackEventServer("search_result_view", {
+    profile_id: user?.id,
+    category: categoria && isServiceCategory(categoria) ? categoria : undefined,
+    metadata: { result_count: services?.length ?? 0 },
+  });
 
   let filteredServices = services ?? [];
   const distanceByProfessional: Record<string, number> = {};

@@ -4,6 +4,39 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Dashboard de KPIs do Admin (itens 19-20): as 6 áreas completas + funil de instrumentação
+
+**Continuação da entrada anterior** (fundação + mapa de cobertura). Fechado agora o resto do dashboard: os ~4 RPCs de KPI que faltavam, a tela de 6 abas de verdade (recharts), e a instrumentação dos eventos de funil que a `analytics_events` estava esperando.
+
+### RPCs de KPI
+
+- `admin_kpi_summary` (`0065`): payload jsonb único com os KPIs de visão executiva/crescimento/oferta-demanda/qualidade (~26 KPIs). Cada valor vem com `delta_pct` vs. o período anterior de mesmo tamanho — é assim que "crescimento da base ativa" e o "+X%" de todo card do mockup funcionam, sem precisar de uma janela fixa separada. Recorrência do tutor e retenção do profissional usam a janela de 30 dias combinada com o usuário, calculada via `lag() over (partition by tutor/profissional order by completed_at)`.
+- `admin_kpi_funnel` (`0066`): funil **por coorte de entrada** (regra explícita da especificação externa — nunca mistura eventos de períodos diferentes). Passos reais (solicitação→proposta→aceite→paga→concluída) já funcionam; os 2 passos "C" (busca→perfil, perfil→solicitação) leem de `analytics_events`, que só passou a receber dado nesta mesma entrega (ver instrumentação abaixo).
+- `admin_kpi_financeiro` (`0067`): GMV/comissão/repasses/cancelamentos/chargebacks/divergências de conciliação — mesma lógica que já existia no dashboard antigo, ampliada e movida pra SQL. Continua perto de zero até a Onda 3 rodar de verdade (beta usa confirmação manual).
+- `admin_kpi_timeseries` (`0068`): série semanal (`solicitacoes`/`concluidos`/`gmv`/`confirmados`) pro gráfico de barras.
+- Todas seguem o padrão já estabelecido: `security definer`, checagem de `is_admin_or_supervisor()` no corpo, `revoke`/`grant` explícitos.
+- Testadas contra dado real do banco (script ad-hoc com sessão de `teste.admin@plataformapet.dev`, não só a assinatura) antes de considerar prontas — sem isso o bug do `cep_to_uf`/`admin_kpi_geo_coverage` da entrega anterior teria se repetido em pelo menos uma das quatro.
+
+### Instrumentação do funil (a tabela `analytics_events` finalmente recebe escrita)
+
+- `lib/analytics/{events,track,track-server}.ts`: wrappers finos de insert, nunca lançam erro nem travam a UI.
+- Cookie `plys_sid` (1 ano, não-httpOnly) garantido em toda requisição por `lib/supabase/middleware.ts` — é o `session_id` de todo evento, autenticado ou não. Como não existe navegação anônima no app (só `/login` é público), isso só importa mesmo pro clique em "Criar conta".
+- 6 pontos de disparo: `search_result_view` (`buscar/page.tsx`), `professional_profile_view` (`profissional/[id]/page.tsx`), `request_started` (mount de `new-request-form.tsx` e `start-conversation-form.tsx`), `request_submitted` (`createRequest`, antes do redirect), `signup_started` (clique em "Criar conta", já capturando UTM de `location.search`), `signup_completed` (fim de `chooseProfile` — copia `source/medium/campaign` do `signup_started` da mesma sessão, sem precisar de join depois).
+
+### UI — as 6 abas de verdade
+
+- `npm install recharts` (única dependência nova).
+- `app/admin/dashboard/page.tsx` reescrito: busca as 5 RPCs (+ contagem de habilitações pendentes) num `Promise.all` só, passa tudo pronto pro client. Erro de qualquer uma das 3 principais mostra uma mensagem amigável em vez de quebrar a página (usa o `error.tsx`/`loading.tsx` que o grupo `/admin` já tinha, nenhum novo precisou ser criado).
+- `components/admin/dashboard-shell.tsx`: as 6 abas (Visão executiva/Crescimento/Oferta e demanda/Funil/Financeiro/Qualidade e segurança), filtros de período/região/serviço que empurram pra URL (mesmo padrão de `search-filters-form.tsx`) — dado já vem todo carregado, trocar de aba é só visibilidade local. Gráfico de barras semanal com `recharts`; funil renderizado como barras horizontais (mais fiel ao mockup do que forçar o `FunnelChart` do recharts). Mapa de cobertura (entrega anterior) agora vive dentro dessa mesma tela, visível em qualquer aba.
+- `components/admin/kpi-card.tsx`: valor + delta. Sem os selos "Fonte existente/Exige regra" do mockup — só "Aguardando Onda 3" nos cards financeiros.
+- Verificado ao vivo trocando de aba e de filtro (região=SP recalculou os números na hora, confirmando que o ciclo filtro→URL→RPC→render funciona de ponta a ponta).
+
+**Verificação:** `tsc --noEmit`/`eslint .`/`next build` limpos (ainda 36 rotas). 96/96 testes. Navegação real como `teste.admin@plataformapet.dev` confirmando as 6 abas, o gráfico semanal, o funil e a troca de filtro — tudo com número batendo com o que o script de teste ad-hoc já tinha validado direto na RPC.
+
+**Não incluído nesta entrega:** os eventos `search_result_view`/`professional_profile_view` recém-instrumentados ainda não têm volume real pra aparecer nos KPIs "busca→perfil"/"perfil→solicitação" (aparecem como `—` até alguém navegar de verdade em produção) — é esperado, não é bug.
+
+---
+
 ## 2026-09-04 — Dashboard de KPIs do Admin (itens 19-20): fundação + mapa de cobertura por cidade
 
 **Contexto:** usuário trouxe um pacote do "funcional" (ChatGPT) com especificação funcional (41 KPIs em 6 áreas) e um mockup navegável pro dashboard de KPIs do Admin, que estava pausado esperando essa definição. Discutimos os pontos ambíguos antes de codar (registrado em `C:\Users\jeffe\.claude\plans\groovy-questing-nest.md`): os 3 KPIs que dependiam de rastreamento de origem/aquisição entram já na V1 (não ficam esperando o "ON"); "tutor ativo" = criou solicitação OU enviou mensagem no período; janela de recorrência/retenção = 30 dias. No meio da conversa, o usuário pediu um mapa múndi de cobertura (tutores/profissionais por cidade) — essa parte saiu primeiro, por ser a mais concreta e verificável de ponta a ponta; o restante dos ~41 KPIs (RPCs de resumo/funil/financeiro/série temporal + shell de abas) fica pra continuação.

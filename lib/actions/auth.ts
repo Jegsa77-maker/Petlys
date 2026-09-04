@@ -13,6 +13,7 @@ import {
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
+import { trackEventServer } from "@/lib/analytics/track-server";
 
 type ActionResult = { error: string | null };
 type SignUpResult = { error: string | null; needsEmailConfirmation?: boolean };
@@ -233,6 +234,31 @@ export async function chooseProfile(input: ChooseProfileValues): Promise<ActionR
     if (rolesError) {
       return { error: "Não foi possível salvar seu(s) perfil(is). Tente novamente." };
     }
+  }
+
+  // Aqui é onde a conta vira funcionalmente usável (primeira account_roles
+  // gravada) — o mesmo ponto que o middleware usa como corte pra parar de
+  // redirecionar pra /escolher-perfil. Copia source/medium/campaign do
+  // signup_started dessa mesma sessão anônima (plys_sid) em vez de fazer
+  // join depois: mais simples, e o dado já está aqui.
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get("plys_sid")?.value;
+  if (sessionId) {
+    const { data: started } = await supabase
+      .from("analytics_events")
+      .select("source, medium, campaign")
+      .eq("session_id", sessionId)
+      .eq("event_name", "signup_started")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    void trackEventServer("signup_completed", {
+      profile_id: user.id,
+      source: started?.source ?? undefined,
+      medium: started?.medium ?? undefined,
+      campaign: started?.campaign ?? undefined,
+    });
   }
 
   revalidatePath("/", "layout");

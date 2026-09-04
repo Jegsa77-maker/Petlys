@@ -5,6 +5,8 @@ import { CURRENT_TERMS_VERSION } from "@/lib/domain/terms";
 
 const PUBLIC_PATHS = ["/login", "/callback", "/dev-login", "/redefinir-senha", "/confirmar-email"];
 const SUSPENDED_PATH = "/conta-suspensa";
+const ANON_SESSION_COOKIE = "plys_sid";
+const ANON_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 // Telas exclusivas de cada papel — uma conta com os dois papéis nunca vê
 // as duas misturadas, só a do "papel ativo" escolhido em / (ver
@@ -33,6 +35,25 @@ function resolveActiveRole(roleNames: string[], cookieValue: string | undefined)
   if (hasTutor) return "tutor";
   if (hasProfissional) return "profissional";
   return null;
+}
+
+/**
+ * Garante um id anônimo estável (cookie de 1 ano, não-httpOnly — o
+ * client-side de analytics precisa ler o mesmo valor) em toda resposta
+ * que sai daqui, autenticada ou não. É o `session_id` de todo evento em
+ * `analytics_events` — dá pra ligar um evento pré-cadastro (ex.:
+ * `signup_started`) ao `profile_id` que nasce logo depois, mesmo sem
+ * usuário nenhum ainda existir na hora do evento.
+ */
+function withAnonSession(request: NextRequest, res: NextResponse): NextResponse {
+  if (!request.cookies.get(ANON_SESSION_COOKIE)) {
+    res.cookies.set(ANON_SESSION_COOKIE, crypto.randomUUID(), {
+      maxAge: ANON_SESSION_MAX_AGE_SECONDS,
+      sameSite: "lax",
+      path: "/",
+    });
+  }
+  return res;
 }
 
 /**
@@ -77,7 +98,7 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return withAnonSession(request, NextResponse.redirect(url));
   }
 
   if (user && !isPublic) {
@@ -87,7 +108,7 @@ export async function updateSession(request: NextRequest) {
     // pessoa suspensa conseguia simplesmente escolher um papel novo e
     // voltar a ter acesso completo).
     if (path === SUSPENDED_PATH) {
-      return response;
+      return withAnonSession(request, response);
     }
 
     const { data: suspension } = await supabase
@@ -101,7 +122,7 @@ export async function updateSession(request: NextRequest) {
     if (suspension) {
       const url = request.nextUrl.clone();
       url.pathname = SUSPENDED_PATH;
-      return NextResponse.redirect(url);
+      return withAnonSession(request, NextResponse.redirect(url));
     }
 
     const { data: profile } = await supabase
@@ -115,7 +136,7 @@ export async function updateSession(request: NextRequest) {
     if (!isVerified && path !== "/verificar-telefone") {
       const url = request.nextUrl.clone();
       url.pathname = "/verificar-telefone";
-      return NextResponse.redirect(url);
+      return withAnonSession(request, NextResponse.redirect(url));
     }
 
     // Aceite versionado de Termos/Privacidade (seção 6.1) — obrigatório pra
@@ -132,7 +153,7 @@ export async function updateSession(request: NextRequest) {
       if (!acceptance) {
         const url = request.nextUrl.clone();
         url.pathname = "/aceitar-termos";
-        return NextResponse.redirect(url);
+        return withAnonSession(request, NextResponse.redirect(url));
       }
     }
 
@@ -146,7 +167,7 @@ export async function updateSession(request: NextRequest) {
       if (!roles || roles.length === 0) {
         const url = request.nextUrl.clone();
         url.pathname = "/escolher-perfil";
-        return NextResponse.redirect(url);
+        return withAnonSession(request, NextResponse.redirect(url));
       }
 
       const roleNames = roles.map((r) => r.role);
@@ -154,7 +175,7 @@ export async function updateSession(request: NextRequest) {
       if (path.startsWith("/admin") && !roleNames.includes("administrador")) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
-        return NextResponse.redirect(url);
+        return withAnonSession(request, NextResponse.redirect(url));
       }
 
       if (
@@ -164,7 +185,7 @@ export async function updateSession(request: NextRequest) {
       ) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
-        return NextResponse.redirect(url);
+        return withAnonSession(request, NextResponse.redirect(url));
       }
 
       const activeRole = resolveActiveRole(roleNames, request.cookies.get("active_role")?.value);
@@ -186,10 +207,10 @@ export async function updateSession(request: NextRequest) {
       ) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
-        return NextResponse.redirect(url);
+        return withAnonSession(request, NextResponse.redirect(url));
       }
     }
   }
 
-  return response;
+  return withAnonSession(request, response);
 }

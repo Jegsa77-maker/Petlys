@@ -20,6 +20,7 @@ import {
   PRONTUARIO_SECTION_LABEL,
 } from "@/lib/domain/category-requirements";
 import { getCategoryRequiredSections } from "@/lib/domain/category-requirements-store";
+import { trackEventServer } from "@/lib/analytics/track-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { ServiceCategory } from "@/types/database";
@@ -194,6 +195,14 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
   if (statusError) {
     return { error: "Solicitação montada, mas houve um erro ao enviá-la. Tente novamente." };
   }
+
+  void trackEventServer("request_submitted", {
+    profile_id: user.id,
+    professional_id: parsed.data.professionalId,
+    request_id: request.id,
+    category: parsed.data.category,
+    metadata: { existing_request_id: parsed.data.existingRequestId ?? null },
+  });
 
   revalidatePath("/solicitacoes");
   redirect(`/solicitacoes/${request.id}`);

@@ -1,50 +1,66 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { REQUEST_STATUS_LABEL } from "@/lib/domain/request-status-labels";
-import { CoverageMapLoader } from "@/components/admin/coverage-map-loader";
+import { DashboardShell } from "@/components/admin/dashboard-shell";
 import type { CoveragePoint } from "@/components/admin/coverage-map";
+import type { AdminKpiSummary, AdminKpiFunnel, AdminKpiFinanceiro } from "@/components/admin/kpi-types";
+import type { ServiceCategory } from "@/types/database";
 
-export default async function AdminDashboardPage() {
+function toDateStr(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ periodo?: string; uf?: string; categoria?: string }>;
+}) {
+  const { periodo = "30", uf = "", categoria = "" } = await searchParams;
   const supabase = await createClient();
 
+  const days = Number(periodo) || 30;
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - (days - 1));
+
+  const pFrom = toDateStr(from);
+  const pTo = toDateStr(to);
+  const pCategory = categoria ? (categoria as ServiceCategory) : undefined;
+  const pUf = uf || undefined;
+
   const [
-    { data: statusRows },
-    { data: payments },
-    { data: payouts },
-    { count: tutorCount },
-    { count: professionalCount },
-    { count: incidentsOpen },
-    { count: incidentsResolved },
-    { count: certificationsPending },
+    { data: summary, error: summaryError },
+    { data: funnel, error: funnelError },
+    { data: financeiro, error: financeiroError },
+    { data: timeseriesRows },
     { data: coverageRows },
+    { count: habilitacoesPendentes },
   ] = await Promise.all([
-    supabase.from("requests").select("status"),
-    supabase.from("payments").select("amount, commission_amount, status"),
-    supabase.from("payouts").select("amount, status"),
-    supabase
-      .from("account_roles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "tutor")
-      .eq("active", true),
-    supabase
-      .from("account_roles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "profissional")
-      .eq("active", true),
-    supabase
-      .from("incidents")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["aberto", "em_analise", "escalado"]),
-    supabase
-      .from("incidents")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "resolvido"),
-    supabase
-      .from("professional_certifications")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pendente"),
-    supabase.rpc("admin_kpi_geo_coverage"),
+    supabase.rpc("admin_kpi_summary", { p_from: pFrom, p_to: pTo, p_category: pCategory, p_uf: pUf }),
+    supabase.rpc("admin_kpi_funnel", { p_from: pFrom, p_to: pTo, p_category: pCategory, p_uf: pUf }),
+    supabase.rpc("admin_kpi_financeiro", { p_from: pFrom, p_to: pTo, p_category: pCategory, p_uf: pUf }),
+    supabase.rpc("admin_kpi_timeseries", {
+      p_metric: "solicitacoes",
+      p_from: pFrom,
+      p_to: pTo,
+      p_category: pCategory,
+      p_uf: pUf,
+    }),
+    supabase.rpc("admin_kpi_geo_coverage", { p_category: pCategory }),
+    supabase.from("professional_certifications").select("id", { count: "exact", head: true }).eq("status", "pendente"),
   ]);
+
+  if (summaryError || funnelError || financeiroError) {
+    console.error("[admin/dashboard]", { summaryError, funnelError, financeiroError });
+    return (
+      <main className="min-h-screen bg-offwhite px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-2xl font-bold text-teal mb-4">Painel do Administrador</h1>
+          <p className="text-sm text-red-600">
+            Não foi possível carregar os KPIs agora. Tente recarregar a página.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   const coveragePoints: CoveragePoint[] = (coverageRows ?? []).map((row) => ({
     cityLabel: row.city_label,
@@ -55,110 +71,25 @@ export default async function AdminDashboardPage() {
     profissionais: row.profissionais,
   }));
 
-  const statusCounts: Record<string, number> = {};
-  (statusRows ?? []).forEach((r) => {
-    statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
-  });
-
-  const gmv = (payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
-  const comissao = (payments ?? []).reduce((sum, p) => sum + Number(p.commission_amount), 0);
-  const retido = (payouts ?? [])
-    .filter((p) => p.status === "retido")
-    .reduce((sum, p) => sum + Number(p.amount), 0);
-  const repassado = (payouts ?? [])
-    .filter((p) => p.status === "pago")
-    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const timeseries = (timeseriesRows ?? []).map((row) => ({
+    bucket: new Date(row.bucket).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    value: Number(row.value),
+  }));
 
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
-      <div className="max-w-2xl mx-auto flex flex-col gap-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6">
         <h1 className="text-2xl font-bold text-teal">Painel do Administrador</h1>
-
-        <Block title="Pedidos por status">
-          {Object.keys(statusCounts).length === 0 ? (
-            <EmptyRow />
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(statusCounts).map(([status, count]) => (
-                <div key={status} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">{REQUEST_STATUS_LABEL[status] ?? status}</span>
-                  <span className="font-semibold text-black">{count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Block>
-
-        <Block title="Financeiro">
-          <div className="grid grid-cols-2 gap-3">
-            <Metric label="GMV" value={`R$ ${gmv.toFixed(2)}`} />
-            <Metric label="Comissão arrecadada" value={`R$ ${comissao.toFixed(2)}`} />
-            <Metric label="Retido no gateway" value={`R$ ${retido.toFixed(2)}`} />
-            <Metric label="Já repassado" value={`R$ ${repassado.toFixed(2)}`} />
-          </div>
-          <p className="text-xs text-gray-400 mt-2">
-            Zerado até a integração com o Pagar.me entrar em produção.
-          </p>
-        </Block>
-
-        <Block title="Usuários">
-          <div className="grid grid-cols-2 gap-3">
-            <Metric label="Tutores ativos" value={String(tutorCount ?? 0)} />
-            <Metric label="Profissionais ativos" value={String(professionalCount ?? 0)} />
-          </div>
-        </Block>
-
-        <Block title="Incidentes e disputas">
-          <div className="grid grid-cols-2 gap-3">
-            <Metric label="Abertos" value={String(incidentsOpen ?? 0)} />
-            <Metric label="Resolvidos" value={String(incidentsResolved ?? 0)} />
-          </div>
-        </Block>
-
-        <Block title="Habilitações">
-          <div className="flex items-center justify-between">
-            <Metric label="Pendentes de revisão" value={String(certificationsPending ?? 0)} />
-            <Link href="/admin/habilitacoes" className="text-sm font-semibold text-teal hover:underline">
-              Revisar
-            </Link>
-          </div>
-        </Block>
-
-        <Block title="Cobertura geográfica">
-          {coveragePoints.length === 0 ? (
-            <EmptyRow />
-          ) : (
-            <CoverageMapLoader points={coveragePoints} />
-          )}
-          <p className="text-xs text-gray-400 mt-2">
-            Um círculo por cidade — tutores e profissionais contados separadamente, sem mostrar
-            endereço exato de ninguém. Ajuda a identificar regiões com demanda ou oferta sem
-            cobertura, pra priorizar investimento em marketing.
-          </p>
-        </Block>
+        <DashboardShell
+          filters={{ periodo, uf, categoria }}
+          summary={summary as unknown as AdminKpiSummary}
+          funnel={funnel as unknown as AdminKpiFunnel}
+          financeiro={financeiro as unknown as AdminKpiFinanceiro}
+          timeseries={timeseries}
+          coveragePoints={coveragePoints}
+          habilitacoesPendentes={habilitacoesPendentes ?? 0}
+        />
       </div>
     </main>
   );
-}
-
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-lg border border-gray-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-black mb-3">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-lg font-bold text-teal">{value}</p>
-    </div>
-  );
-}
-
-function EmptyRow() {
-  return <p className="text-sm text-gray-400">Nenhum dado ainda.</p>;
 }
