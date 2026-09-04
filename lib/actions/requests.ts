@@ -9,6 +9,10 @@ import {
   rescheduleOccurrenceSchema,
   updateRecurrenceSchema,
   startConversationSchema,
+  declineRequestSchema,
+  substituteProfessionalSchema,
+  proposeScopeChangeSchema,
+  respondScopeChangeSchema,
   RECURRENCE_INTERVAL_DAYS,
 } from "@/lib/validations/requests";
 import {
@@ -18,6 +22,7 @@ import {
 import { getCategoryRequiredSections } from "@/lib/domain/category-requirements-store";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { ServiceCategory } from "@/types/database";
 
 type ActionResult = { error: string | null };
 
@@ -69,7 +74,22 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
   // real existir (Onda 3). Silencioso: não bloqueia nem exige nada do
   // Tutor, só registra a relação quando ela existe.
   let originRequestId: string | null = null;
-  if (!parsed.data.isVisitaInicial) {
+  if (parsed.data.existingRequestId) {
+    // Preserva o link já gravado no rascunho — startConversation/
+    // acceptReferral/substituteProfessional criam esse rascunho com
+    // origin_request_id preenchido antes do tutor chegar aqui. Sem isso, o
+    // auto-lookup de visita inicial abaixo roda de novo e sobrescreve com
+    // null (bug real encontrado: esse par tutor/novo-profissional nunca
+    // teve visita inicial, então o lookup nunca acharia nada e apagaria o
+    // vínculo de indicação/substituição).
+    const { data: draft } = await supabase
+      .from("requests")
+      .select("origin_request_id")
+      .eq("id", parsed.data.existingRequestId)
+      .single();
+    originRequestId = draft?.origin_request_id ?? null;
+  }
+  if (!originRequestId && !parsed.data.isVisitaInicial) {
     const { data: priorVisita } = await supabase
       .from("requests")
       .select("id")
@@ -417,7 +437,12 @@ export async function sendProposal(input: unknown): Promise<ActionResult> {
  * Profissional recusa a solicitação. Recusa é ilimitada e sem penalidade
  * (seção 5, estado 8 "Decisão") — justificativa é sempre opcional.
  */
-export async function declineRequest(requestId: string, reason?: string): Promise<ActionResult> {
+export async function declineRequest(input: unknown): Promise<ActionResult> {
+  const parsed = declineRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -429,33 +454,451 @@ export async function declineRequest(requestId: string, reason?: string): Promis
 
   const { data: request } = await supabase
     .from("requests")
-    .select("id, professional_id")
-    .eq("id", requestId)
+    .select("id, professional_id, category")
+    .eq("id", parsed.data.requestId)
     .single();
 
   if (!request || request.professional_id !== user.id) {
     return { error: "Você não tem permissão para recusar esta solicitação." };
   }
 
+  if (parsed.data.referredProfessionalId) {
+    const eligible = await isEligibleColleague(
+      supabase,
+      request.category,
+      parsed.data.referredProfessionalId,
+      user.id
+    );
+    if (!eligible) {
+      return { error: "Profissional indicado não está disponível para esta categoria." };
+    }
+  }
+
   const { error } = await supabase
     .from("requests")
-    .update({ status: "recusado" })
-    .eq("id", requestId);
+    .update({
+      status: "recusado",
+      referred_professional_id: parsed.data.referredProfessionalId ?? null,
+    })
+    .eq("id", parsed.data.requestId);
 
   if (error) {
     return { error: "Não foi possível recusar a solicitação." };
   }
 
-  if (reason) {
+  if (parsed.data.reason || parsed.data.referredProfessionalId) {
+    const suffix = parsed.data.referredProfessionalId
+      ? " Um colega foi indicado como alternativa."
+      : "";
     await supabase.from("messages").insert({
-      request_id: requestId,
+      request_id: parsed.data.requestId,
       sender_id: user.id,
-      content: `Solicitação recusada. Motivo: ${reason}`,
+      content: `Solicitação recusada.${parsed.data.reason ? ` Motivo: ${parsed.data.reason}.` : ""}${suffix}`,
     });
   }
 
   revalidatePath("/solicitacoes");
-  revalidatePath(`/solicitacoes/${requestId}`);
+  revalidatePath(`/solicitacoes/${parsed.data.requestId}`);
+  return { error: null };
+}
+
+/**
+ * Colega da mesma categoria, com serviço ativo, diferente de quem está
+ * indicando/sendo substituído (itens 25-26 e 29). Consulta simplificada —
+ * a sofisticação de distância/nota de /buscar não é necessária aqui.
+ */
+async function isEligibleColleague(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  category: ServiceCategory,
+  candidateId: string,
+  excludeProfessionalId: string
+): Promise<boolean> {
+  if (candidateId === excludeProfessionalId) return false;
+  const { data } = await supabase
+    .from("professional_services")
+    .select("id")
+    .eq("professional_id", candidateId)
+    .eq("category", category)
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/**
+ * Rascunho de conversa prévia vinculado à request original via
+ * origin_request_id (mesmo padrão de startConversation, 0055) —
+ * reaproveitado por acceptReferral e substituteProfessional. No máximo um
+ * rascunho aberto por par (tutor, profissional); corrida tratada com retry
+ * no índice único.
+ */
+async function createLinkedPrechat(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tutorId: string,
+  professionalId: string,
+  category: ServiceCategory,
+  originRequestId: string
+): Promise<{ id: string } | null> {
+  const { data: existing } = await supabase
+    .from("requests")
+    .select("id")
+    .eq("tutor_id", tutorId)
+    .eq("professional_id", professionalId)
+    .eq("status", "rascunho")
+    .eq("is_conversa_previa", true)
+    .maybeSingle();
+  if (existing) return existing;
+
+  const { data: created } = await supabase
+    .from("requests")
+    .insert({
+      tutor_id: tutorId,
+      professional_id: professionalId,
+      category,
+      status: "rascunho",
+      is_conversa_previa: true,
+      origin_request_id: originRequestId,
+    })
+    .select("id")
+    .single();
+  if (created) return created;
+
+  const { data: retry } = await supabase
+    .from("requests")
+    .select("id")
+    .eq("tutor_id", tutorId)
+    .eq("professional_id", professionalId)
+    .eq("status", "rascunho")
+    .eq("is_conversa_previa", true)
+    .maybeSingle();
+  return retry ?? null;
+}
+
+/**
+ * Profissionais elegíveis pra indicação/substituição — mesma categoria,
+ * serviço ativo, exceto o próprio. Usado pela UI de indicação (decline) e
+ * de substituição pós-aceite.
+ */
+export async function listEligibleColleagues(category: ServiceCategory, excludeProfessionalId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("professional_services")
+    .select("professional_id, profiles(id, full_name)")
+    .eq("category", category)
+    .eq("active", true)
+    .neq("professional_id", excludeProfessionalId);
+
+  const seen = new Set<string>();
+  const colleagues = (data ?? [])
+    .filter((r) => r.profiles && !seen.has(r.profiles.id) && seen.add(r.profiles.id))
+    .map((r) => ({ id: r.profiles!.id, fullName: r.profiles!.full_name }));
+
+  if (colleagues.length === 0) return [];
+
+  // professional_services e professional_profiles não têm FK direta entre
+  // si (ambas apontam pra profiles separadamente) — busca o avatar à parte
+  // em vez de tentar um embed que o PostgREST não consegue resolver sozinho.
+  const { data: avatars } = await supabase
+    .from("professional_profiles")
+    .select("profile_id, avatar_url")
+    .in(
+      "profile_id",
+      colleagues.map((c) => c.id)
+    );
+  const avatarByProfileId = new Map((avatars ?? []).map((a) => [a.profile_id, a.avatar_url]));
+
+  return colleagues.map((c) => ({ ...c, avatarUrl: avatarByProfileId.get(c.id) ?? null }));
+}
+
+/**
+ * Tutor aceita a indicação de colega (item 27) — cria a conversa prévia
+ * vinculada à request original (nunca muta professional_id na request
+ * antiga, item 28). Só o Tutor pode chamar: requests_insert exige
+ * tutor_id = auth.uid(), então nem faria sentido o Profissional tentar.
+ */
+export async function acceptReferral(requestId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: original } = await supabase
+    .from("requests")
+    .select("id, tutor_id, category, status, referred_professional_id")
+    .eq("id", requestId)
+    .single();
+
+  if (!original || original.tutor_id !== user.id) {
+    return { error: "Você não tem permissão para aceitar essa indicação." };
+  }
+  if (!original.referred_professional_id || !["recusado", "cancelado"].includes(original.status)) {
+    return { error: "Não há indicação disponível para essa solicitação." };
+  }
+
+  const draft = await createLinkedPrechat(
+    supabase,
+    user.id,
+    original.referred_professional_id,
+    original.category,
+    requestId
+  );
+  if (!draft) {
+    return { error: "Não foi possível iniciar a conversa com o profissional indicado." };
+  }
+
+  redirect(`/solicitacoes/${draft.id}`);
+}
+
+/**
+ * Substituição pós-aceite (item 29 — o caso mais delicado, já com proposta
+ * aceita/em andamento). Cancela a request original (transições já
+ * permitidas: confirmado/checkin desde 0012, em_andamento/finalizacao
+ * desde 0048 — nenhuma migration de máquina de estados necessária) e, se
+ * foi o Tutor quem chamou com um substituto escolhido, já cria a conversa
+ * vinculada. Se foi o Profissional, ele só grava a sugestão — o Tutor
+ * decide depois via acceptReferral, mesma regra do item 28.
+ *
+ * ⚠️ Pendência financeira formal (mesmo padrão de confirmPaymentManually,
+ * lib/actions/admin.ts): não mexe em payments/payouts/professional_cancellations
+ * — hoje as três estão vazias (Onda 3 pausada). Reembolso ao Tutor e
+ * eventual débito de comissão do Profissional que cancelou ficam pendentes
+ * até o financeiro real retomar.
+ */
+export async function substituteProfessional(input: unknown): Promise<ActionResult> {
+  const parsed = substituteProfessionalSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: request } = await supabase
+    .from("requests")
+    .select("id, tutor_id, professional_id, category, status")
+    .eq("id", parsed.data.requestId)
+    .single();
+
+  if (!request || (request.tutor_id !== user.id && request.professional_id !== user.id)) {
+    return { error: "Você não faz parte dessa solicitação." };
+  }
+  if (!["confirmado", "checkin", "em_andamento", "finalizacao"].includes(request.status)) {
+    return { error: "Substituição só é possível depois que o atendimento foi confirmado." };
+  }
+
+  const isTutor = request.tutor_id === user.id;
+  let referredProfessionalId: string | null = null;
+
+  if (parsed.data.newProfessionalId) {
+    const excludeId = isTutor ? request.professional_id : user.id;
+    const eligible = await isEligibleColleague(
+      supabase,
+      request.category,
+      parsed.data.newProfessionalId,
+      excludeId
+    );
+    if (!eligible) {
+      return { error: "Profissional escolhido não está disponível para esta categoria." };
+    }
+    referredProfessionalId = parsed.data.newProfessionalId;
+  } else if (isTutor) {
+    return { error: "Escolha um profissional substituto para continuar." };
+  }
+
+  const { error: cancelError } = await supabase
+    .from("requests")
+    .update({ status: "cancelado", referred_professional_id: referredProfessionalId })
+    .eq("id", parsed.data.requestId);
+  if (cancelError) {
+    return { error: "Não foi possível cancelar a solicitação original." };
+  }
+
+  await supabase.from("messages").insert({
+    request_id: parsed.data.requestId,
+    sender_id: user.id,
+    content: `Solicitação cancelada para substituição de profissional. Motivo: ${parsed.data.reason}.`,
+  });
+
+  revalidatePath(`/solicitacoes/${parsed.data.requestId}`);
+
+  if (isTutor && referredProfessionalId) {
+    const draft = await createLinkedPrechat(
+      supabase,
+      user.id,
+      referredProfessionalId,
+      request.category,
+      parsed.data.requestId
+    );
+    if (draft) {
+      redirect(`/solicitacoes/${draft.id}`);
+    }
+  }
+
+  return { error: null };
+}
+
+/**
+ * Mudança de escopo/valor/data DEPOIS que a proposta já foi aceita (itens
+ * 23/24) — nunca mexe em requests.status, diferente de requestAdjustment
+ * (pré-aceite). Bidirecional: tutor ou profissional podem propor.
+ */
+export async function proposeScopeChange(input: unknown): Promise<ActionResult> {
+  const parsed = proposeScopeChangeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: request } = await supabase
+    .from("requests")
+    .select("id, tutor_id, professional_id, status")
+    .eq("id", parsed.data.requestId)
+    .single();
+
+  if (!request || (request.tutor_id !== user.id && request.professional_id !== user.id)) {
+    return { error: "Você não faz parte dessa solicitação." };
+  }
+  if (!["confirmado", "checkin", "em_andamento", "finalizacao"].includes(request.status)) {
+    return { error: "Mudança de escopo só é possível depois que a proposta foi aceita." };
+  }
+
+  let oldValue: string | null = null;
+
+  if (parsed.data.fieldChanged === "data") {
+    const { data: occurrence } = await supabase
+      .from("request_occurrences")
+      .select("scheduled_at, status")
+      .eq("id", parsed.data.occurrenceId!)
+      .eq("request_id", parsed.data.requestId)
+      .single();
+    if (!occurrence || occurrence.status !== "agendado") {
+      return { error: "Essa ocorrência não pode mais ter a data alterada." };
+    }
+    oldValue = occurrence.scheduled_at;
+  } else {
+    const { data: proposal } = await supabase
+      .from("proposals")
+      .select("scope, price")
+      .eq("request_id", parsed.data.requestId)
+      .not("accepted_at", "is", null)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    oldValue =
+      parsed.data.fieldChanged === "escopo" ? proposal?.scope ?? "" : String(proposal?.price ?? "");
+  }
+
+  const { error } = await supabase.from("scope_change_requests").insert({
+    request_id: parsed.data.requestId,
+    occurrence_id: parsed.data.fieldChanged === "data" ? parsed.data.occurrenceId : null,
+    proposed_by: user.id,
+    field_changed: parsed.data.fieldChanged,
+    old_value: oldValue ?? "",
+    new_value: parsed.data.newValue,
+  });
+
+  if (error) {
+    return {
+      error: error.code === "23505"
+        ? "Já existe uma proposta de mudança pendente para este campo."
+        : "Não foi possível propor a mudança.",
+    };
+  }
+
+  await supabase.from("messages").insert({
+    request_id: parsed.data.requestId,
+    sender_id: user.id,
+    content: `Proposta de mudança (${parsed.data.fieldChanged}): de "${oldValue}" para "${parsed.data.newValue}".`,
+  });
+
+  revalidatePath(`/solicitacoes/${parsed.data.requestId}`);
+  return { error: null };
+}
+
+/**
+ * Só a contraparte de quem propôs pode responder (RLS já garante isso —
+ * scope_change_requests_update_counterpart — esta checagem é só pra
+ * devolver uma mensagem de erro melhor que "0 linhas afetadas").
+ */
+export async function respondScopeChange(input: unknown): Promise<ActionResult> {
+  const parsed = respondScopeChangeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { data: change } = await supabase
+    .from("scope_change_requests")
+    .select("id, request_id, proposed_by, field_changed, occurrence_id, new_value, status")
+    .eq("id", parsed.data.scopeChangeId)
+    .single();
+
+  if (!change) {
+    return { error: "Proposta de mudança não encontrada." };
+  }
+  if (change.proposed_by === user.id) {
+    return { error: "Você não pode responder à própria proposta." };
+  }
+  if (change.status !== "pendente") {
+    return { error: "Essa proposta já foi respondida." };
+  }
+
+  const { error } = await supabase
+    .from("scope_change_requests")
+    .update({ status: parsed.data.decision, responded_at: new Date().toISOString(), responded_by: user.id })
+    .eq("id", parsed.data.scopeChangeId);
+
+  if (error) {
+    return { error: "Não foi possível responder à proposta." };
+  }
+
+  if (parsed.data.decision === "aceito" && change.field_changed === "data" && change.occurrence_id) {
+    await supabase
+      .from("request_occurrences")
+      .update({ scheduled_at: change.new_value })
+      .eq("id", change.occurrence_id)
+      .eq("status", "agendado");
+  }
+  // escopo/valor aceitos: sem Onda 3, não há como cobrar diferença nem
+  // reembolsar automaticamente — fica só como registro histórico na
+  // própria scope_change_requests até o financeiro real retomar.
+
+  await supabase.from("messages").insert({
+    request_id: change.request_id,
+    sender_id: user.id,
+    content:
+      parsed.data.decision === "aceito"
+        ? `Mudança de ${change.field_changed} aceita.`
+        : `Mudança de ${change.field_changed} recusada.`,
+  });
+
+  revalidatePath(`/solicitacoes/${change.request_id}`);
   return { error: null };
 }
 /**

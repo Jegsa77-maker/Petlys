@@ -14,6 +14,9 @@ import { EditRecurrenceForm } from "@/components/requests/edit-recurrence-form";
 import { HelpButton } from "@/components/requests/help-button";
 import { ConfirmPaymentButton } from "@/components/requests/confirm-payment-button";
 import { EndConversationButton } from "@/components/requests/end-conversation-button";
+import { ScopeChangePanel } from "@/components/requests/scope-change-panel";
+import { ReferralCard } from "@/components/requests/referral-card";
+import { SubstituteProfessionalButton } from "@/components/requests/substitute-professional-button";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
 import { nextActionCopy } from "@/lib/domain/request-status-copy";
 import { REQUEST_STATUS_LABEL as STATUS_LABEL } from "@/lib/domain/request-status-labels";
@@ -36,7 +39,7 @@ export default async function SolicitacaoDetailPage({
   const { data: request } = await supabase
     .from("requests")
     .select(
-      "id, tutor_id, professional_id, category, status, is_recurring, occurrences_total, is_visita_inicial, is_conversa_previa, address, category_answers, recurrence_interval"
+      "id, tutor_id, professional_id, category, status, is_recurring, occurrences_total, is_visita_inicial, is_conversa_previa, referred_professional_id, address, category_answers, recurrence_interval"
     )
     .eq("id", requestId)
     .single();
@@ -87,6 +90,8 @@ export default async function SolicitacaoDetailPage({
     { data: reviews },
     { data: attachments },
     { data: otherPartyRows },
+    { data: scopeChanges },
+    { data: referredProfile },
   ] = await Promise.all([
     supabase
       .from("messages")
@@ -128,6 +133,18 @@ export default async function SolicitacaoDetailPage({
     // Pra staff, a função sempre devolve vazio (auth.uid() não bate com
     // tutor_id nem professional_id) — mais simples que ramificar aqui.
     supabase.rpc("get_request_other_party_name", { p_request_id: requestId }),
+    supabase
+      .from("scope_change_requests")
+      .select("id, proposed_by, field_changed, old_value, new_value, status, created_at")
+      .eq("request_id", requestId)
+      .order("created_at", { ascending: false }),
+    // Se não há indicação, a query só não acha nada — mais simples que
+    // ramificar o tipo da promise aqui dentro do Promise.all.
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", request?.referred_professional_id ?? "")
+      .maybeSingle(),
   ]);
 
   const otherPartyName = otherPartyRows?.[0]?.full_name ?? null;
@@ -264,7 +281,17 @@ export default async function SolicitacaoDetailPage({
 
         {viewerRole === "profissional" &&
           ["solicitacao_enviada", "em_conversa", "proposta_enviada"].includes(request.status) && (
-            <DeclineRequestButton requestId={request.id} />
+            <DeclineRequestButton
+              requestId={request.id}
+              category={request.category}
+              professionalId={request.professional_id}
+            />
+          )}
+
+        {viewerRole === "tutor" &&
+          request.referred_professional_id &&
+          ["recusado", "cancelado"].includes(request.status) && (
+            <ReferralCard requestId={request.id} referredProfessionalName={referredProfile?.full_name ?? "um colega"} />
           )}
 
         {currentOccurrence && (
@@ -295,6 +322,24 @@ export default async function SolicitacaoDetailPage({
             )}
           </section>
         )}
+
+        {viewerRole !== "staff" &&
+          ["confirmado", "checkin", "em_andamento", "finalizacao"].includes(request.status) && (
+            <section className="flex flex-col gap-2">
+              <ScopeChangePanel
+                requestId={request.id}
+                currentUserId={user.id}
+                scopeChanges={scopeChanges ?? []}
+                occurrences={(occurrences ?? []).filter((o) => o.status === "agendado")}
+              />
+              <SubstituteProfessionalButton
+                requestId={request.id}
+                category={request.category}
+                excludeProfessionalId={viewerRole === "tutor" ? request.professional_id : user.id}
+                viewerRole={viewerRole}
+              />
+            </section>
+          )}
 
         {viewerRole !== "staff" && !isPreChat && (
           <HelpButton

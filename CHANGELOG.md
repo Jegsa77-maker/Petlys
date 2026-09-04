@@ -4,6 +4,33 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-03 — Backlog externo: financeiro pausado, mudança de escopo pós-acordo + indicação/substituição de profissional (itens 23-29)
+
+**Contexto:** usuário trouxe uma lista de 39 itens de backlog de uma conversa com "o funcional" (ChatGPT). Cruzamento feito item a item contra o que já estava no radar — a maior parte do financeiro (itens 1-18) já estava mapeada nas 6 etapas da Onda 3, com pedaços já construídos (onboarding, split codado, bloqueio de saque, conciliação). Decisão do usuário: **financeiro fica pro final**, depois do resto da aplicação estar pronto; itens 21-22 (origem do tutor/circulação entre profissionais, território de CRM) ficam de fora, como já decidido antes; dashboard de KPIs (19-20) aguarda especificação do usuário; infraestrutura (30-39) fica pro fim também. Entra agora: **itens 23-29**.
+
+### Mudança de escopo pós-acordo (23-24)
+
+Hoje só existia "pedir ajuste" ANTES do aceite (`requestAdjustment`). Nova tabela `scope_change_requests` (`supabase/migrations/0058_scope_change_requests.sql`) — bidirecional (tutor ou profissional propõe escopo/valor/data), **nunca mexe em `requests.status`**. RLS: insere quem é parte, só a **contraparte** de quem propôs responde (mesmo padrão de `0022_fix_proposals_accept_rls.sql` — restrição de coluna via `grant`, não editar o conteúdo proposto). Notificações via triggers reaproveitando `notify()` (0012).
+
+- `lib/actions/requests.ts`: `proposeScopeChange`, `respondScopeChange`. Aceitar `data` aplica de verdade em `request_occurrences`; aceitar `escopo`/`valor` fica só como registro histórico — sem Onda 3, não tem como cobrar diferença nem reembolsar automaticamente (mesmo aviso já usado em `confirmPaymentManually`).
+- `components/requests/scope-change-panel.tsx` (novo).
+
+### Indicação e substituição de profissional (25-29)
+
+Achado-chave da exploração: **nenhuma migration de RLS nova precisa** — a trava do item 28 ("nunca automático") já existe de graça: `requests_insert` exige `tutor_id = auth.uid()`, então o Profissional fisicamente não consegue criar a request nova em nome do Tutor. Reaproveita o padrão já usado pra visita inicial: nunca muta `professional_id` numa request existente, sempre cria uma nova vinculada via `origin_request_id`.
+
+- `requests.referred_professional_id` (novo, `0059_referral_and_substitution.sql`) — Profissional só *sugere*, Tutor sempre decide.
+- `lib/actions/requests.ts`: `declineRequest` reescrito (aceita `referredProfessionalId` opcional), `listEligibleColleagues` (mesma categoria, serviço ativo, exclui quem indicou), `acceptReferral` (cria a conversa vinculada — reaproveita `startConversation`/`is_conversa_previa`), `substituteProfessional` (pós-aceite — cancela a request original; transições `confirmado/checkin/em_andamento/finalizacao -> cancelado` já existiam desde 0012/0048, nenhuma migration de máquina de estados nova).
+- **Bug real encontrado e corrigido no caminho:** `createRequest` recalculava `origin_request_id` (auto-lookup de visita inicial) toda vez, inclusive ao formalizar uma request existente (`existingRequestId`) — isso apagaria o vínculo de indicação/substituição no meio do fluxo, porque o lookup nunca acha nada pra um par tutor/novo-profissional que nunca teve visita inicial. Corrigido: quando há `existingRequestId`, o `origin_request_id` já gravado no rascunho é preservado antes de considerar o auto-lookup.
+- `components/requests/{referral-card,substitute-professional-button}.tsx` (novos). `decline-request-button.tsx` ganhou seletor de "indicar colega".
+- `get_pet_co_tutor_names`-style: nenhuma função nova precisou disso — o profissional indicado é sempre alguém com serviço ativo na categoria, então `profiles_select_public_professional` (0013) já libera ler o nome dele.
+
+**Verificação:** `tsc --noEmit`/`eslint .`/`next build` limpos (36 rotas). 85/85 testes passando (74 anteriores + 11 novos: `tests/rls/scope-change-requests.test.ts`, `tests/rls/decline-referral-substitution.test.ts`). Fluxo completo testado ao vivo no navegador com sessões reais (2 contas): profissional recusa indicando um colega → tutor vê o `ReferralCard` com o nome certo → aceita → conversa vinculada abre com `origin_request_id` apontando pra request original (confirmado no banco) → formulário de formalização já carrega com a categoria certa. Dado de teste limpo depois.
+
+**Não incluído nesta entrega:** teste automatizado da lógica de elegibilidade (`isEligibleColleague`) em si — as Server Actions usam `next/headers`, não dá pra chamar direto de um teste Vitest fora do request lifecycle do Next; cobertura ficou na camada de RLS (que é o que realmente protege o dado) mais a verificação manual ao vivo.
+
+---
+
 ## 2026-09-03 — 2 erros de CX achados navegando como Tutor: chat direto pré-solicitação + botão "Enviar" travado
 
 **Contexto:** usuário navegando pessoalmente pela visão Tutor (com as contas de teste liberadas na entrada anterior) achou 2 problemas reais.

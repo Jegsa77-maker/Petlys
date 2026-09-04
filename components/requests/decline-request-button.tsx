@@ -1,18 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { declineRequest } from "@/lib/actions/requests";
+import { useState, useEffect } from "react";
+import { declineRequest, listEligibleColleagues } from "@/lib/actions/requests";
+import type { ServiceCategory } from "@/types/database";
 
-export function DeclineRequestButton({ requestId }: { requestId: string }) {
+type Colleague = { id: string; fullName: string; avatarUrl: string | null };
+
+export function DeclineRequestButton({
+  requestId,
+  category,
+  professionalId,
+}: {
+  requestId: string;
+  category: ServiceCategory;
+  professionalId: string;
+}) {
   const [showReason, setShowReason] = useState(false);
   const [reason, setReason] = useState("");
+  const [colleagues, setColleagues] = useState<Colleague[]>([]);
+  const [referredId, setReferredId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!showReason) return;
+    listEligibleColleagues(category, professionalId).then(setColleagues);
+  }, [showReason, category, professionalId]);
 
   async function handleDecline() {
     setError(null);
     setIsSubmitting(true);
-    const result = await declineRequest(requestId, reason || undefined);
+    const result = await declineRequest({
+      requestId,
+      reason: reason || undefined,
+      referredProfessionalId: referredId || undefined,
+    });
     setIsSubmitting(false);
     if (result?.error) setError(result.error);
   }
@@ -40,6 +62,25 @@ export function DeclineRequestButton({ requestId }: { requestId: string }) {
         placeholder="Motivo (opcional)"
         className="input"
       />
+      {colleagues.length > 0 && (
+        <div>
+          <label className="block text-xs font-medium text-black mb-1">
+            Indicar um colega (opcional)
+          </label>
+          <select
+            value={referredId}
+            onChange={(e) => setReferredId(e.target.value)}
+            className="input"
+          >
+            <option value="">Não indicar ninguém</option>
+            {colleagues.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.fullName}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
       <div className="flex gap-2">
         <button

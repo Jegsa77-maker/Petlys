@@ -1743,6 +1743,7 @@ export type Database = {
           professional_id: string
           prontuario_shared_at: string | null
           recurrence_interval: string | null
+          referred_professional_id: string | null
           status: Database["public"]["Enums"]["request_status"]
           tutor_id: string
           updated_at: string
@@ -1762,6 +1763,7 @@ export type Database = {
           professional_id: string
           prontuario_shared_at?: string | null
           recurrence_interval?: string | null
+          referred_professional_id?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           tutor_id: string
           updated_at?: string
@@ -1781,6 +1783,7 @@ export type Database = {
           professional_id?: string
           prontuario_shared_at?: string | null
           recurrence_interval?: string | null
+          referred_professional_id?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           tutor_id?: string
           updated_at?: string
@@ -1796,6 +1799,13 @@ export type Database = {
           {
             foreignKeyName: "requests_professional_id_fkey"
             columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requests_referred_professional_id_fkey"
+            columns: ["referred_professional_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1887,6 +1897,77 @@ export type Database = {
           {
             foreignKeyName: "reviews_reviewer_id_fkey"
             columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scope_change_requests: {
+        Row: {
+          created_at: string
+          field_changed: Database["public"]["Enums"]["scope_change_field"]
+          id: string
+          new_value: string
+          occurrence_id: string | null
+          old_value: string
+          proposed_by: string
+          request_id: string
+          responded_at: string | null
+          responded_by: string | null
+          status: Database["public"]["Enums"]["scope_change_status"]
+        }
+        Insert: {
+          created_at?: string
+          field_changed: Database["public"]["Enums"]["scope_change_field"]
+          id?: string
+          new_value: string
+          occurrence_id?: string | null
+          old_value: string
+          proposed_by: string
+          request_id: string
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: Database["public"]["Enums"]["scope_change_status"]
+        }
+        Update: {
+          created_at?: string
+          field_changed?: Database["public"]["Enums"]["scope_change_field"]
+          id?: string
+          new_value?: string
+          occurrence_id?: string | null
+          old_value?: string
+          proposed_by?: string
+          request_id?: string
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: Database["public"]["Enums"]["scope_change_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_change_requests_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "request_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_change_requests_proposed_by_fkey"
+            columns: ["proposed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_change_requests_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_change_requests_responded_by_fkey"
+            columns: ["responded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2158,6 +2239,8 @@ export type Database = {
         | "cancelado"
         | "incidente"
         | "em_disputa"
+      scope_change_field: "escopo" | "valor" | "data"
+      scope_change_status: "pendente" | "aceito" | "recusado"
       service_category:
         | "pet_sitter"
         | "passeador"
@@ -2350,6 +2433,8 @@ export const Constants = {
         "incidente",
         "em_disputa",
       ],
+      scope_change_field: ["escopo", "valor", "data"],
+      scope_change_status: ["pendente", "aceito", "recusado"],
       service_category: [
         "pet_sitter",
         "passeador",
@@ -2378,5 +2463,7 @@ export type PetSize = Database["public"]["Enums"]["pet_size"];
 export type ReconciliationCategory = Database["public"]["Enums"]["reconciliation_category"];
 export type RecipientStatus = Database["public"]["Enums"]["recipient_status"];
 export type RequestStatus = Database["public"]["Enums"]["request_status"];
+export type ScopeChangeField = Database["public"]["Enums"]["scope_change_field"];
+export type ScopeChangeStatus = Database["public"]["Enums"]["scope_change_status"];
 export type ServiceCategory = Database["public"]["Enums"]["service_category"];
 export type SuspensionStatus = Database["public"]["Enums"]["suspension_status"];

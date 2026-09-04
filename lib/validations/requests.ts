@@ -110,6 +110,55 @@ export const scheduleChoiceSchema = z
     path: ["proposedPeriod"],
   });
 
+/**
+ * Mudança de escopo/valor/data DEPOIS que a proposta já foi aceita (itens
+ * 23/24 do backlog) — diferente de requestAdjustment (pré-aceite), esta
+ * nunca mexe em requests.status. Bidirecional: tutor ou profissional podem
+ * propor.
+ */
+export const proposeScopeChangeSchema = z
+  .object({
+    requestId: z.uuid(),
+    fieldChanged: z.enum(["escopo", "valor", "data"]),
+    occurrenceId: z.uuid().optional(),
+    newValue: z.string().trim().min(1, "Descreva o novo valor").max(1000),
+  })
+  .refine((d) => d.fieldChanged !== "data" || !!d.occurrenceId, {
+    message: "Selecione a ocorrência que vai mudar de data",
+    path: ["occurrenceId"],
+  });
+export type ProposeScopeChangeValues = z.infer<typeof proposeScopeChangeSchema>;
+
+export const respondScopeChangeSchema = z.object({
+  scopeChangeId: z.uuid(),
+  decision: z.enum(["aceito", "recusado"]),
+});
+export type RespondScopeChangeValues = z.infer<typeof respondScopeChangeSchema>;
+
+// Indicação de colega ao recusar (itens 25-26) — referredProfessionalId é
+// opcional, nunca transfere a solicitação sozinho (item 28: o Tutor sempre
+// decide via acceptReferral).
+export const declineRequestSchema = z.object({
+  requestId: z.uuid(),
+  reason: z.string().trim().max(500).optional(),
+  referredProfessionalId: z.uuid().optional(),
+});
+export type DeclineRequestValues = z.infer<typeof declineRequestSchema>;
+
+/**
+ * Substituição de profissional pós-aceite (item 29 — o caso mais delicado,
+ * já com proposta aceita/em andamento). newProfessionalId é obrigatório
+ * quando quem chama é o Tutor (ele já escolheu quem quer); opcional quando é
+ * o Profissional (ele só sugere — a Action decide a regra pelo papel de
+ * quem chama, nunca pelo cliente).
+ */
+export const substituteProfessionalSchema = z.object({
+  requestId: z.uuid(),
+  reason: z.string().trim().min(1, "Descreva o motivo da substituição").max(1000),
+  newProfessionalId: z.uuid().optional(),
+});
+export type SubstituteProfessionalValues = z.infer<typeof substituteProfessionalSchema>;
+
 export const sendProposalSchema = z
   .object({
     requestId: z.uuid(),
