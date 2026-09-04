@@ -822,6 +822,48 @@ export type Database = {
           },
         ]
       }
+      pet_media: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          media_type: Database["public"]["Enums"]["pet_media_type"]
+          pet_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          media_type: Database["public"]["Enums"]["pet_media_type"]
+          pet_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          media_type?: Database["public"]["Enums"]["pet_media_type"]
+          pet_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pet_media_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pet_media_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pet_tutors: {
         Row: {
           added_at: string
@@ -2368,6 +2410,7 @@ export type Database = {
         | "solicitado"
         | "pago"
         | "bloqueado"
+      pet_media_type: "foto" | "video"
       pet_size: "pequeno" | "medio" | "grande" | "gigante"
       recipient_status: "pendente" | "ativo" | "rejeitado" | "desabilitado"
       reconciliation_category:
@@ -2560,6 +2603,7 @@ export const Constants = {
         "pago",
         "bloqueado",
       ],
+      pet_media_type: ["foto", "video"],
       pet_size: ["pequeno", "medio", "grande", "gigante"],
       recipient_status: ["pendente", "ativo", "rejeitado", "desabilitado"],
       reconciliation_category: [
@@ -2612,6 +2656,7 @@ export type ParameterAction = Database["public"]["Enums"]["parameter_action"];
 export type ParameterLifecycle = Database["public"]["Enums"]["parameter_lifecycle"];
 export type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 export type PayoutStatus = Database["public"]["Enums"]["payout_status"];
+export type PetMediaType = Database["public"]["Enums"]["pet_media_type"];
 export type PetSize = Database["public"]["Enums"]["pet_size"];
 export type ReconciliationCategory = Database["public"]["Enums"]["reconciliation_category"];
 export type RecipientStatus = Database["public"]["Enums"]["recipient_status"];

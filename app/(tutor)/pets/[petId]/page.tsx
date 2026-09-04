@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PawPrint } from "lucide-react";
 import { CoTutorsSection } from "@/components/pets/co-tutors-section";
 import { PetMediaSection } from "@/components/pets/pet-media-section";
+import { PetGallerySection } from "@/components/pets/pet-gallery-section";
 import { PetProfileSection, type FieldDef } from "@/components/pets/pet-profile-section";
 import {
   updatePetHealth,
@@ -92,6 +93,19 @@ export default async function PetDetailPage({
     .eq("pet_id", petId)
     .eq("status", "pendente");
 
+  const { data: mediaRows } = await supabase
+    .from("pet_media")
+    .select("id, media_type, url")
+    .eq("pet_id", petId)
+    .order("created_at", { ascending: true });
+
+  const galleryItems = (mediaRows ?? []).map((row) => ({
+    id: row.id,
+    mediaType: row.media_type,
+    path: row.url,
+    publicUrl: supabase.storage.from("pet-gallery").getPublicUrl(row.url).data.publicUrl,
+  }));
+
   const stalenessLabel = prontuarioStalenessLabel(pet);
 
   return (
@@ -162,6 +176,10 @@ export default async function PetDetailPage({
         </div>
 
         <CoTutorsSection petId={pet.id} tutors={tutors ?? []} pendingInvites={pendingInvites ?? []} />
+
+        <div className="mt-6">
+          <PetGallerySection petId={pet.id} initialItems={galleryItems} />
+        </div>
 
         <p className="text-xs text-gray-500 mt-6">
           As etapas de saúde, comportamento, rotina e emergência são
