@@ -18,6 +18,62 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Galeria de fotos e vídeos no fim do perfil do pet (item 3 da lista de ajustes)
+
+**Contexto:** item 3 de uma lista de 8 ajustes/bugs que o usuário reportou navegando o app já em produção ("permitir colocar mais fotos extras e vídeos pequenos/permitir clicar e ver foto ou vídeo rodando"). Diferente da foto de perfil única (`pets.photo_url`), esse é uma lista aberta — precisava de tabela própria, não uma coluna.
+
+**Implementação:** área aberta (mesmo espírito de `pet-photos`: não é dado sensível como a carteira de vacinação) pra anexar várias fotos e vídeos curtos do pet, com grade de miniaturas, lightbox pra ver em tamanho real e dar play no vídeo, e exclusão (referência + arquivo físico, sem deixar órfão — diferente da carteira de vacinação, que só remove a referência).
+
+- `supabase/migrations/0072_pet_media_gallery.sql`: tabela `pet_media` (nova) + bucket `pet-gallery` (público, MIME e tamanho restritos no próprio Storage como rede de segurança — 50MB, o maior dos dois casos).
+- Limites aplicados no client antes do upload (padrão comum de apps de foto/vídeo curto): foto até 10MB, vídeo até 50MB, teto de 20 itens por pet.
+- RLS: leitura aberta (`using (true)`), escrita só pro(s) tutor(es) do pet.
+- `components/pets/pet-gallery-section.tsx` (novo), `lib/actions/pet-media.ts` (novo), `lib/domain/pet-media-limits.ts` (novo, com testes).
+
+**Verificação:** testado ao vivo com um vídeo real (arquivo de sistema do Windows, não fabricado) — confirmado que o vídeo carrega com duração real, `play()` funciona, e remover apaga tanto a linha do banco quanto o arquivo físico no Storage (verificado direto via `list()` pós-remoção). `tsc`/`eslint`/`next build`/testes limpos.
+
+---
+
+## 2026-09-04 — Busca: deduplica profissional por categoria e ordena por proximidade (itens 7-8)
+
+**Contexto:** itens 7 e 8 da mesma lista de ajustes — "na busca perto de mim, buscar a princípio os mais próximos profissionais conforme configuração do radar" e "na busca o profissional vem múltiplas vezes por categoria... acho que possa mandar o a partir do valor mais baixo cadastrado".
+
+**Correção**, tudo em `app/(tutor)/buscar/page.tsx`, em JS puro no server component (sem RPC novo — `distance_km`/`haversineKm` e a tabela de área de atendimento já existiam):
+- Um card por profissional+categoria (não por serviço) — fica o de menor preço, que é o que a etiqueta "a partir de" já promete.
+- Quando o Tutor compartilha localização, os resultados vêm ordenados do mais próximo pro mais distante (antes a ordem era a que o Postgres decidisse devolver, sem garantia nenhuma).
+
+**Verificação:** testado ao vivo criando um serviço duplicado de propósito (mesma categoria, preços diferentes) — confirmado que só o de menor preço aparece; testado com coordenadas reais de dois profissionais — confirmado que a ordem inverte corretamente conforme a distância. Fixture de teste removida depois.
+
+---
+
+## 2026-09-04 — Correções de UX/bugs encontrados navegando o app (lista do usuário, itens 1-2 e 4-6)
+
+**Contexto:** usuário navegou o ambiente já em produção (Vercel) e reportou 8 itens de uma vez. Esta entrada cobre os itens 1, 2, 4, 5 e 6 (os itens 3, 7 e 8 têm entradas próprias, por serem maiores).
+
+- **Item 1** — botão de mostrar/ocultar senha (login, criar conta, criação de Supervisor): `components/shared/password-input.tsx` (novo).
+- **Item 2** — fichas do pet (saúde/comportamento/rotina/emergência) marcavam "Preenchido" mesmo com o formulário vazio: os schemas (zod) tratam todo campo como opcional, então salvar em branco gravava um objeto cheio de `""`, que a checagem de "seção preenchida" antiga (`Object.keys(...).length > 0`) lia como conteúdo real. Corrigido em duas pontas: `lib/domain/category-requirements.ts` (`isSectionFilled` agora exige string não-vazia ou `true`) e `lib/actions/pets.ts` (`stripEmptyStrings` antes de gravar).
+- **Item 4** — login não pulava a tela de escolha de perfil pra conta de papel único: a correção inicial chamava `setActiveRole` (uma Server Action) direto no render de `app/page.tsx`, o que quebrou em produção com "Cookies can only be modified in a Server Action or Route Handler" — corrigido descobrindo que nem precisava do cookie: `resolveActiveRole` (middleware) já resolve sozinho quando a conta só tem um papel.
+- **Item 5** — Notificações/Sair colados no rodapé da sidebar em telas altas: era o `flex-1` na `<nav>` empurrando o resto pro fundo do viewport, independente de quantos itens de menu existiam.
+- **Item 6** — carteira de vacinação: dava pra anexar mas não pra visualizar nem excluir, e aceitava qualquer tipo de arquivo (o `accept` do `<input type="file">` é só um filtro de picker do navegador, fácil de contornar). `supabase/migrations/0071_pet_documents_mime_restriction.sql` restringe o bucket a PDF/imagem de verdade (aplicado pelo Storage, não pelo client); `removePetDocument` (nova action) + botões de visualizar (URL assinada, bucket privado) e remover em `components/pets/pet-media-section.tsx`.
+
+**Também nesta entrega**, revisados individualmente e trazidos junto — não gerados por mim, mas por um agente de teste E2E rodando em segundo plano na mesma sessão (ver seção própria de metodologia se precisar do porquê disso ser seguro):
+- RLS "ovo e galinha" que impedia **qualquer** tutor de cadastrar pet (bug crítico — bloqueava toda a jornada).
+- Resincronização de estado dos filtros de busca quando a URL muda sem desmontar o componente.
+- Move de `app/(tutor)/solicitacoes` para `app/(shared)/solicitacoes` (conflito de rotas paralelas — a tela é usada tanto por tutor quanto por profissional, e viver sob o layout `(tutor)` fazia o Profissional ver o menu lateral errado).
+
+**Verificação:** cada item testado ao vivo no navegador (incluindo criar/resetar contas de teste dedicadas, single-role e dual-role, pra confirmar que a tela de escolha de perfil não regrediu pra quem tem os dois papéis). `tsc`/`eslint`/`next build` limpos; suíte de testes com only a falha conhecida de rate-limit do Supabase Auth (não relacionada).
+
+---
+
+## 2026-09-04 — Corrige botão travado no login/cadastro/esqueci-senha após falha de rede
+
+**Contexto:** mesmo padrão de bug já corrigido no chat (`chat-panel.tsx`, sessão anterior): `setIsSubmitting(true)` sem `try/finally` em volta do `await` da Server Action — se a chamada falhar ou for abortada (rede instável, navegação interrompida no meio), `setIsSubmitting(false)` nunca roda e o botão fica desabilitado pro resto da sessão do componente, sem nenhuma mensagem de erro visível.
+
+Achado testando o ambiente de produção na Vercel: uma navegação minha interrompeu o POST de login em andamento (`ERR_ABORTED`) e o formulário ficou sem feedback nenhum.
+
+**Correção:** os 3 caminhos do mesmo formulário (entrar, criar conta, esqueci a senha) em `components/auth/email-password-form.tsx` ganharam `try/finally` em volta do `await`.
+
+---
+
 ## 2026-09-04 — Área de atendimento do profissional: raio configurável a partir do CEP
 
 **Contexto:** usuário pediu, no cadastro do Profissional, um jeito de escolher o raio de atendimento (1/5/10/20/50 km ou "sem restrição") a partir do CEP dele. Investigando antes de construir, achei que **`professional_service_areas` era só schema e RLS desde a fundação (migration 0012) — nenhuma tela ou Server Action jamais escreveu nela.** Os 2 registros que já apareciam no mapa de cobertura do Admin vieram de insert direto via SQL, não de um fluxo real. Autorização (insert/update/delete do próprio profissional) já existia, só faltava a peça que usa isso.
