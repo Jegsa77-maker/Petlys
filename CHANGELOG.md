@@ -4,6 +4,20 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Área de atendimento do profissional: raio configurável a partir do CEP
+
+**Contexto:** usuário pediu, no cadastro do Profissional, um jeito de escolher o raio de atendimento (1/5/10/20/50 km ou "sem restrição") a partir do CEP dele. Investigando antes de construir, achei que **`professional_service_areas` era só schema e RLS desde a fundação (migration 0012) — nenhuma tela ou Server Action jamais escreveu nela.** Os 2 registros que já apareciam no mapa de cobertura do Admin vieram de insert direto via SQL, não de um fluxo real. Autorização (insert/update/delete do próprio profissional) já existia, só faltava a peça que usa isso.
+
+- `0069_professional_service_area_radius.sql`: `radius_km` passa a aceitar `null` (= sem restrição de distância, pedido explícito do usuário — antes era `not null default 10`, sem essa opção); nova coluna `center_zip` (guarda o CEP digitado, pra reexibir no formulário); constraint única em `professional_id` (uma área por profissional, upsert em vez de múltiplas linhas — nenhum registro existente tinha mais de uma).
+- `lib/actions/service-area.ts`: `upsertServiceArea` — reaproveita `lib/services/geocoding.ts` (a mesma função `geocodeCep` construída pro endereço do Tutor) pra transformar CEP em lat/lng, depois faz upsert por `professional_id`.
+- `components/professional/service-area-form.tsx`: campo de CEP + chips de raio (1/5/10/20/50 km + "Sem restrição"), plugado em `app/(profissional)/perfil/page.tsx`.
+- `app/(tutor)/buscar/page.tsx`: filtro de distância atualizado — `radius_km === null` agora sempre inclui o profissional na busca, independente da distância do Tutor.
+- **Verificado ao vivo, incluindo um caso de falha real**: salvar com raio de 20km funcionou de primeira (CEP do Rio de Janeiro geocodificado certo). A primeira tentativa de salvar "sem restrição" falhou com timeout de rede no Nominatim (`ETIMEDOUT`, achado real via log do servidor, não bug de código — a chamada com `radiusKm: null` chegou certinha no servidor) — na segunda tentativa funcionou e `radius_km` ficou `null` no banco, confirmado por SQL direto.
+
+**Verificação:** `tsc --noEmit`/`eslint .`/`next build` limpos (37 rotas). `tests/rls/professional-service-area.test.ts` (novo: insert com radius null, constraint única bloqueia segunda área, upsert atualiza em vez de duplicar, outro profissional não edita área alheia) — 4/4 passando isolado. A suíte completa não fechou verde nesta sessão por causa do rate limit de auth do Supabase (achado: havia uma tarefa em background rodando em paralelo, num worktree dentro do próprio repo, também batendo na mesma auth do projeto — corrigido `vitest.config.mts` pra excluir `.claude/worktrees/**` da própria descoberta de testes, que antes rodava a suíte de lá junto com a daqui por engano). Re-conferir quando o rate limit esvaziar.
+
+---
+
 ## 2026-09-04 — Endereço do Tutor (novo "Meu perfil"): fecha o lado que faltava no mapa de cobertura
 
 **Contexto:** usuário reparou, olhando o mapa de cobertura ao vivo, que só apareciam profissionais, nunca tutores. Não era mock nem bug da consulta — é um gap real: `profiles.address_zip/address_lat/address_lng` existem no schema desde a fundação do projeto, mas **nenhum formulário do app jamais escreveu neles** pro Tutor (o endereço só existia como texto livre dentro de cada solicitação, nunca persistido no perfil). Profissional aparecia porque configura área de atendimento com lat/lng de verdade — fluxo que já existia antes, sem relação com este dashboard.

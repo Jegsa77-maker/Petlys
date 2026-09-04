@@ -1331,35 +1331,38 @@ export type Database = {
         Row: {
           center_lat: number
           center_lng: number
+          center_zip: string | null
           created_at: string
           excluded_zips: string[]
           id: string
           professional_id: string
-          radius_km: number
+          radius_km: number | null
         }
         Insert: {
           center_lat: number
           center_lng: number
+          center_zip?: string | null
           created_at?: string
           excluded_zips?: string[]
           id?: string
           professional_id: string
-          radius_km?: number
+          radius_km?: number | null
         }
         Update: {
           center_lat?: number
           center_lng?: number
+          center_zip?: string | null
           created_at?: string
           excluded_zips?: string[]
           id?: string
           professional_id?: string
-          radius_km?: number
+          radius_km?: number | null
         }
         Relationships: [
           {
             foreignKeyName: "professional_service_areas_professional_id_fkey"
             columns: ["professional_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },

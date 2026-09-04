@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProfessionalProfileForm } from "@/components/professional/professional-profile-form";
+import { ServiceAreaForm } from "@/components/professional/service-area-form";
 import { CertificationsSection } from "@/components/professional/certifications-section";
 import {
   computeProfessionalLevel,
@@ -23,6 +24,7 @@ export default async function PerfilProfissionalPage() {
     { data: certifications },
     { count: completedCount },
     { data: reviews },
+    { data: serviceArea },
   ] = await Promise.all([
     supabase.from("professional_profiles").select("*").eq("profile_id", user.id).maybeSingle(),
     supabase
@@ -41,6 +43,11 @@ export default async function PerfilProfissionalPage() {
       .eq("professional_id", user.id)
       .in("status", ["avaliacao", "concluido"]),
     supabase.from("reviews").select("rating").eq("reviewee_id", user.id).is("hidden_at", null),
+    supabase
+      .from("professional_service_areas")
+      .select("center_zip, radius_km")
+      .eq("professional_id", user.id)
+      .maybeSingle(),
   ]);
 
   const avgRating = averageRating(reviews ?? []);
@@ -117,6 +124,11 @@ export default async function PerfilProfissionalPage() {
             visitaInicialModality: profile?.visita_inicial_modality ?? "",
             visitaInicialDeductible: profile?.visita_inicial_deductible ?? false,
           }}
+        />
+
+        <ServiceAreaForm
+          currentZip={serviceArea?.center_zip ?? null}
+          currentRadiusKm={serviceArea?.radius_km ?? null}
         />
 
         <CertificationsSection professionalId={user.id} certifications={certifications ?? []} />

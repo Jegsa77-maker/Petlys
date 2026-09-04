@@ -116,7 +116,9 @@ export default async function BuscarPage({
       const withinRange = new Set<string>();
       (areas ?? []).forEach((area) => {
         const dist = haversineKm(userLat, userLng, area.center_lat, area.center_lng);
-        if (dist <= area.radius_km) {
+        // radius_km null = profissional marcou "sem restrição" — sempre
+        // dentro do raio, independente da distância.
+        if (area.radius_km === null || dist <= area.radius_km) {
           withinRange.add(area.professional_id);
           distanceByProfessional[area.professional_id] = dist;
         }
