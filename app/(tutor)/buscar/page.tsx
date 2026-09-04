@@ -52,7 +52,7 @@ export default async function BuscarPage({
   let query = supabase
     .from("professional_services")
     .select(
-      "id, category, subcategory, base_price, pricing_model, professional_id, species_accepted, profiles(id, full_name)"
+      "id, category, subcategory, base_price, pricing_model, professional_id, species_accepted"
     )
     .eq("active", true);
 
@@ -178,6 +178,20 @@ export default async function BuscarPage({
     filteredServices = filteredServices.filter((s) => favoriteProfessionalIds.has(s.professional_id));
   }
 
+  // Nome de cada profissional via RPC estreito (0073) em vez do embed
+  // `profiles(id, full_name)` que existia aqui antes — o embed dependia da
+  // policy pública de profiles, removida por vazar a linha inteira (ver
+  // migration). Todo professional_id já vem de um serviço ativo, então
+  // bate exatamente com o filtro do RPC.
+  const nameByProfessional = new Map<string, string>();
+  if (filteredServices.length > 0) {
+    const professionalIdsForNames = [...new Set(filteredServices.map((s) => s.professional_id))];
+    const { data: names } = await supabase.rpc("get_public_professional_names", {
+      p_professional_ids: professionalIdsForNames,
+    });
+    (names ?? []).forEach((n) => nameByProfessional.set(n.id, n.full_name));
+  }
+
   // Um card por profissional+categoria, não por serviço — um profissional
   // com vários serviços na mesma categoria (ex.: "banho" e "tosa" dentro de
   // banho_tosa) aparecia repetido na busca. Fica o de menor preço, que é o
@@ -224,7 +238,7 @@ export default async function BuscarPage({
     seenInMap.add(service.professional_id);
     pins.push({
       professionalId: service.professional_id,
-      name: service.profiles?.full_name ?? "Profissional",
+      name: nameByProfessional.get(service.professional_id) ?? "Profissional",
       categoryLabel: `${CATEGORY_LABEL[service.category]}${service.subcategory ? ` · ${service.subcategory}` : ""}`,
       basePrice: service.base_price,
       lat: area.lat,
@@ -287,7 +301,7 @@ export default async function BuscarPage({
                   >
                     <div>
                       <p className="font-semibold text-black">
-                        {service.profiles?.full_name ?? "Profissional"}
+                        {nameByProfessional.get(service.professional_id) ?? "Profissional"}
                       </p>
                       <p className="text-xs text-gray-500">
                         {CATEGORY_LABEL[service.category]}

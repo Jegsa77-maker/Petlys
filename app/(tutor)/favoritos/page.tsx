@@ -69,7 +69,11 @@ export default async function FavoritosPage() {
   }
 
   const [{ data: profiles }, { data: services }, { data: reviews }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name").in("id", professionalIds),
+    // RPC estreito (0073) em vez de ler profiles direto — mesma razão do
+    // /profissional/[id]: profiles_select não libera a linha de quem não é
+    // o próprio dono, só a policy pública antiga liberava (e vazava a linha
+    // inteira, não só o nome).
+    supabase.rpc("get_public_professional_names", { p_professional_ids: professionalIds }),
     supabase
       .from("professional_services")
       .select("professional_id, category, subcategory, base_price")

@@ -2349,6 +2349,13 @@ export type Database = {
           tutor_profile_id: string
         }[]
       }
+      get_public_professional_names: {
+        Args: { p_professional_ids: string[] }
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       get_request_other_party_name: {
         Args: { p_request_id: string }
         Returns: {

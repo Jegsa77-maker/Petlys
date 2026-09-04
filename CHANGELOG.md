@@ -4,6 +4,20 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Corrige vazamento de dado sensível no perfil público do profissional
+
+**Contexto:** achado sentado numa worktree de uma sessão anterior, nunca commitado nem aplicado no banco — reconciliei e concluí nesta sessão. `profiles_select_public_professional` (0013) é uma policy de RLS só de **linha**: quando um profissional tem `professional_services` ativo, ela libera a leitura da linha `profiles` **inteira** via PostgREST, sem filtro de coluna. `/buscar`, `/profissional/[id]` e `/favoritos` só liam `id, full_name` no código, mas a policy nunca restringiu a consulta a essas colunas — qualquer requisição com a chave anon podia pedir `phone, cpf_cnpj, birth_date, address_zip, address_lat, address_lng` do mesmo jeito. Ficou pior depois que `/meu-perfil` passou a gravar endereço residencial real do Tutor: numa conta dupla (tutor + profissional no mesmo perfil), esse endereço ficava exposto a qualquer visitante do perfil público.
+
+**Correção:** mesmo padrão já usado em `get_pet_co_tutor_names` (0037) e `get_request_other_party_name` (0056) — função `SECURITY DEFINER` estreita (`get_public_professional_names`) que só devolve `id, full_name` pra quem tem serviço ativo, nunca a linha inteira. A policy antiga foi removida.
+
+- `supabase/migrations/0073_narrow_public_professional_profile_read.sql`
+- `app/(tutor)/buscar/page.tsx`, `app/(tutor)/favoritos/page.tsx`, `app/(tutor)/profissional/[profissionalId]/page.tsx`, `app/(shared)/solicitacoes/[requestId]/page.tsx`: trocam leitura direta de `profiles` (ou embed `profiles(...)`) pelo RPC.
+- `tests/rls/public-professional-profile.test.ts` (novo, 6 casos): prova que dado sensível não vaza mais (nem pra outra conta, nem pra anon), que o RPC continua funcionando pra descoberta pública, e que o próprio dono do perfil não foi afetado.
+
+**Verificação:** aplicado direto no banco de produção via MCP (não só planejado) — confirmado com uma leitura anônima real pós-fix: `profiles` direto devolve `null`, RPC devolve só `{id, full_name}`. `tsc`/`eslint`/`next build` limpos, teste novo passando (6/6) isoladamente.
+
+---
+
 ## 2026-09-04 — Área de atendimento do profissional: raio configurável a partir do CEP
 
 **Contexto:** usuário pediu, no cadastro do Profissional, um jeito de escolher o raio de atendimento (1/5/10/20/50 km ou "sem restrição") a partir do CEP dele. Investigando antes de construir, achei que **`professional_service_areas` era só schema e RLS desde a fundação (migration 0012) — nenhuma tela ou Server Action jamais escreveu nela.** Os 2 registros que já apareciam no mapa de cobertura do Admin vieram de insert direto via SQL, não de um fluxo real. Autorização (insert/update/delete do próprio profissional) já existia, só faltava a peça que usa isso.

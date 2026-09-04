@@ -31,11 +31,16 @@ export default async function ProfissionalPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .eq("id", profissionalId)
-    .single();
+  // Não lê profiles direto: profiles_select só libera o próprio perfil ou
+  // admin/supervisor (0009) — a linha inteira de um profissional (com
+  // endereço/CPF/telefone) nunca deveria ficar exposta pra qualquer
+  // visitante só porque ele tem serviço ativo (ver 0073). O RPC devolve
+  // só id/full_name, e só quando há professional_services ativo — mesma
+  // regra que valia antes na policy pública, agora sem vazar a linha inteira.
+  const { data: profileRows } = await supabase.rpc("get_public_professional_names", {
+    p_professional_ids: [profissionalId],
+  });
+  const profile = profileRows?.[0] ?? null;
 
   if (!profile) {
     notFound();

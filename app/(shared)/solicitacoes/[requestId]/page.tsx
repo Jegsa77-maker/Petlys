@@ -138,13 +138,17 @@ export default async function SolicitacaoDetailPage({
       .select("id, proposed_by, field_changed, old_value, new_value, status, created_at")
       .eq("request_id", requestId)
       .order("created_at", { ascending: false }),
-    // Se não há indicação, a query só não acha nada — mais simples que
-    // ramificar o tipo da promise aqui dentro do Promise.all.
-    supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", request?.referred_professional_id ?? "")
-      .maybeSingle(),
+    // RPC estreito (0073) em vez de ler profiles direto — o profissional
+    // indicado não é parte dessa request, então não há como usar
+    // get_request_other_party_name aqui; mesma regra de "só quem tem
+    // serviço ativo" que valia na policy pública removida. Se não há
+    // indicação, nem chama — mais simples que ramificar o tipo da promise
+    // aqui dentro do Promise.all.
+    request?.referred_professional_id
+      ? supabase.rpc("get_public_professional_names", {
+          p_professional_ids: [request.referred_professional_id],
+        })
+      : Promise.resolve({ data: null }),
   ]);
 
   const otherPartyName = otherPartyRows?.[0]?.full_name ?? null;
@@ -291,7 +295,7 @@ export default async function SolicitacaoDetailPage({
         {viewerRole === "tutor" &&
           request.referred_professional_id &&
           ["recusado", "cancelado"].includes(request.status) && (
-            <ReferralCard requestId={request.id} referredProfessionalName={referredProfile?.full_name ?? "um colega"} />
+            <ReferralCard requestId={request.id} referredProfessionalName={referredProfile?.[0]?.full_name ?? "um colega"} />
           )}
 
         {currentOccurrence && (
