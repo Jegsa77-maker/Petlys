@@ -84,6 +84,7 @@ export default async function TutorInicioPage() {
         <div className="flex flex-col gap-2">
           <QuickLink href="/pets" label="Meus pets" />
           <QuickLink href="/solicitacoes" label="Minhas solicitações" />
+          <QuickLink href="/meu-perfil" label="Meu perfil" />
         </div>
 
         {!isAlsoProfissional && (

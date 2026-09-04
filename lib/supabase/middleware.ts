@@ -11,7 +11,7 @@ const ANON_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 // Telas exclusivas de cada papel — uma conta com os dois papéis nunca vê
 // as duas misturadas, só a do "papel ativo" escolhido em / (ver
 // lib/actions/auth.ts:setActiveRole e app/page.tsx).
-const TUTOR_ONLY_PREFIXES = ["/inicio", "/pets", "/buscar", "/profissional"];
+const TUTOR_ONLY_PREFIXES = ["/inicio", "/pets", "/buscar", "/profissional", "/meu-perfil"];
 const PROFISSIONAL_ONLY_PREFIXES = ["/dashboard", "/agenda", "/kanban", "/servicos", "/perfil", "/financeiro"];
 // Compartilhadas entre os dois papéis (o conteúdo muda conforme o papel
 // ativo), mas exigem que a conta já tenha escolhido um papel quando tem

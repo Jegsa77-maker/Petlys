@@ -4,6 +4,24 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Endereço do Tutor (novo "Meu perfil"): fecha o lado que faltava no mapa de cobertura
+
+**Contexto:** usuário reparou, olhando o mapa de cobertura ao vivo, que só apareciam profissionais, nunca tutores. Não era mock nem bug da consulta — é um gap real: `profiles.address_zip/address_lat/address_lng` existem no schema desde a fundação do projeto, mas **nenhum formulário do app jamais escreveu neles** pro Tutor (o endereço só existia como texto livre dentro de cada solicitação, nunca persistido no perfil). Profissional aparecia porque configura área de atendimento com lat/lng de verdade — fluxo que já existia antes, sem relação com este dashboard.
+
+Descobri também, no caminho, que **o Tutor não tinha nenhuma tela de "meu perfil"** (só o Profissional tem, em `/perfil`) — essa entrega criou a primeira.
+
+- `app/(tutor)/meu-perfil/page.tsx` (novo, adicionado a `TUTOR_ONLY_PREFIXES` no middleware) — mostra nome/e-mail (leitura) e o formulário de endereço. Link novo em "Início" (`/inicio`).
+- `lib/services/geocoding.ts` (novo): CEP → endereço via ViaCEP (serviço público brasileiro, sem custo/chave) → lat/lng via Nominatim (OpenStreetMap — mesmo provedor dos tiles que o mapa já usa, não introduz um serviço novo no projeto). Sem PostGIS/API paga, mesmo espírito de `distance_km`/`cep_to_uf`.
+- `lib/actions/tutor-profile.ts`: `updateTutorAddress` — só CEP, opcional (decisão do usuário: não bloquear cadastro nem fluxo atual). RLS de `profiles` já permitia o Tutor atualizar sua própria linha (`profiles_update`, 0009) — nenhuma migration nova precisou disso.
+- **Bug real encontrado e corrigido ao testar ao vivo**: o `User-Agent` do fetch pro Nominatim tinha um travessão ("—") no comentário/string, e cabeçalho HTTP precisa ser puro ASCII — `fetch` falhava com `Cannot convert argument to a ByteString`. Trocado por texto sem acentuação.
+- **Verificado de ponta a ponta**: CEP `01310-100` salvo pela conta de teste dupla → `profiles.address_lat/lng` gravados corretos (Avenida Paulista) → reconsultei a lógica do `admin_kpi_geo_coverage` direto no banco e o tutor já aparece agrupado em "São Paulo" junto com o profissional que já estava lá.
+
+**Achado de segurança encontrado no caminho, sinalizado como tarefa separada (não corrigido aqui):** `profiles_select_public_professional` (0013) é uma policy só de linha — quando bate (qualquer perfil com serviço ativo), libera a leitura da linha `profiles` **inteira**, sem filtro de coluna. Numa conta dupla (tutor + profissional, mesma linha), o endereço que acabou de ganhar um jeito de ser preenchido ficaria visível pra qualquer um vendo o perfil público do profissional. É uma característica pré-existente da tabela (não introduzida por esta entrega), mas o campo novo torna o risco concreto — vale uma view (`public_professional_profiles`) só com colunas seguras, em vez de expor `profiles` inteira nesse caminho.
+
+**Verificação:** `tsc --noEmit`/`eslint .`/`next build` limpos (37 rotas agora). 96/96 testes (nenhum novo automatizado aqui — a chamada real a ViaCEP/Nominatim não é o tipo de coisa que vale mockar num teste de RLS; cobertura ficou na verificação manual ao vivo documentada acima).
+
+---
+
 ## 2026-09-04 — Dashboard de KPIs do Admin (itens 19-20): as 6 áreas completas + funil de instrumentação
 
 **Continuação da entrada anterior** (fundação + mapa de cobertura). Fechado agora o resto do dashboard: os ~4 RPCs de KPI que faltavam, a tela de 6 abas de verdade (recharts), e a instrumentação dos eventos de funil que a `analytics_events` estava esperando.
