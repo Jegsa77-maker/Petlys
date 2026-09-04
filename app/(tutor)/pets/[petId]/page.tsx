@@ -4,6 +4,7 @@ import { PawPrint } from "lucide-react";
 import { CoTutorsSection } from "@/components/pets/co-tutors-section";
 import { PetMediaSection } from "@/components/pets/pet-media-section";
 import { PetGallerySection } from "@/components/pets/pet-gallery-section";
+import { getGalleryLimits } from "@/lib/actions/pet-media";
 import { PetProfileSection, type FieldDef } from "@/components/pets/pet-profile-section";
 import {
   updatePetHealth,
@@ -106,6 +107,8 @@ export default async function PetDetailPage({
     publicUrl: supabase.storage.from("pet-gallery").getPublicUrl(row.url).data.publicUrl,
   }));
 
+  const galleryLimits = await getGalleryLimits();
+
   const stalenessLabel = prontuarioStalenessLabel(pet);
 
   return (
@@ -178,7 +181,13 @@ export default async function PetDetailPage({
         <CoTutorsSection petId={pet.id} tutors={tutors ?? []} pendingInvites={pendingInvites ?? []} />
 
         <div className="mt-6">
-          <PetGallerySection petId={pet.id} initialItems={galleryItems} />
+          <PetGallerySection
+            petId={pet.id}
+            initialItems={galleryItems}
+            maxPhotoBytes={galleryLimits.maxPhotoBytes}
+            maxVideoBytes={galleryLimits.maxVideoBytes}
+            maxItems={galleryLimits.maxItems}
+          />
         </div>
 
         <p className="text-xs text-gray-500 mt-6">

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ImagePlus, Loader2, Play, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { addPetMedia, removePetMedia } from "@/lib/actions/pet-media";
-import { MAX_MEDIA_ITEMS_PER_PET, validateMediaFile, isVideoMimeType } from "@/lib/domain/pet-media-limits";
+import { validateMediaFile, isVideoMimeType } from "@/lib/domain/pet-media-limits";
 import type { PetMediaType } from "@/types/database";
 
 type GalleryItem = {
@@ -18,14 +18,23 @@ type GalleryItem = {
  * Galeria de fotos e vídeos extras do pet (seção 6.2, item 3 da lista de
  * ajustes) — diferente da foto de perfil única (PetMediaSection), aqui é
  * uma lista aberta (bucket público, mesmo espírito de pet-photos), com
- * lightbox pra abrir foto em tamanho real ou dar play no vídeo.
+ * lightbox pra abrir foto em tamanho real ou dar play no vídeo. Limites
+ * (tamanho e quantidade) vêm do Admin via `platform_parameters` — ver
+ * `getGalleryLimits` em lib/actions/pet-media.ts — resolvidos no server e
+ * passados prontos aqui, não hardcoded no client.
  */
 export function PetGallerySection({
   petId,
   initialItems,
+  maxPhotoBytes,
+  maxVideoBytes,
+  maxItems,
 }: {
   petId: string;
   initialItems: GalleryItem[];
+  maxPhotoBytes: number;
+  maxVideoBytes: number;
+  maxItems: number;
 }) {
   const [items, setItems] = useState(initialItems);
   const [isUploading, setIsUploading] = useState(false);
@@ -33,7 +42,9 @@ export function PetGallerySection({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const remainingSlots = MAX_MEDIA_ITEMS_PER_PET - items.length;
+  const remainingSlots = maxItems - items.length;
+  const maxPhotoMb = Math.round(maxPhotoBytes / (1024 * 1024));
+  const maxVideoMb = Math.round(maxVideoBytes / (1024 * 1024));
 
   async function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -44,7 +55,7 @@ export function PetGallerySection({
 
     if (files.length > remainingSlots) {
       setError(
-        `Você só pode adicionar mais ${remainingSlots} item(ns) — limite de ${MAX_MEDIA_ITEMS_PER_PET} fotos/vídeos por pet.`
+        `Você só pode adicionar mais ${remainingSlots} item(ns) — limite de ${maxItems} fotos/vídeos por pet.`
       );
       return;
     }
@@ -53,7 +64,7 @@ export function PetGallerySection({
     const supabase = createClient();
 
     for (const file of files) {
-      const validationError = validateMediaFile(file);
+      const validationError = validateMediaFile(file, { maxPhotoBytes, maxVideoBytes });
       if (validationError) {
         setError(validationError);
         continue;
@@ -107,7 +118,7 @@ export function PetGallerySection({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-black">Fotos e vídeos</p>
         <span className="text-xs text-gray-400">
-          {items.length}/{MAX_MEDIA_ITEMS_PER_PET}
+          {items.length}/{maxItems}
         </span>
       </div>
 
@@ -150,7 +161,8 @@ export function PetGallerySection({
       </div>
 
       <p className="text-xs text-gray-500">
-        Foto até 10MB, vídeo até 50MB. Visível pra você, os co-tutores e o profissional contratado.
+        Foto até {maxPhotoMb}MB, vídeo até {maxVideoMb}MB. Visível pra você, os co-tutores e o profissional
+        contratado.
       </p>
 
       {error && <p className="text-xs text-red-600" role="alert">{error}</p>}

@@ -4,6 +4,20 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Limites da galeria do pet viram parâmetro do Admin
+
+**Contexto:** os limites de foto/vídeo/quantidade da galeria (item 3, entrega anterior) estavam fixos no código (10MB/50MB/20 itens). Usuário pediu pra poder ajustar sem depender de deploy, e já de cara reduziu os valores: foto 1MB, vídeo 5MB, 10 itens.
+
+**Implementação**, mesmo padrão já usado pra comissão/taxa de serviço (`platform_parameters`, sem RPC — a policy de select já é aberta pra qualquer client):
+- 3 parâmetros novos, cadastrados pela tela real do Admin (não SQL direto): `galeria_pet_foto_max_mb` (1), `galeria_pet_video_max_mb` (5), `galeria_pet_max_itens` (10).
+- `lib/actions/pet-media.ts`: `getGalleryLimits()` (nova) lê os 3 parâmetros com fallback pros valores default caso ainda não estejam cadastrados; `addPetMedia` passou a reconferir o tamanho do arquivo **depois** do upload (consultando o próprio Storage), porque a checagem no client é só UX — sem isso, dava pra contornar o limite chamando o Storage direto.
+- `lib/domain/pet-media-limits.ts`: `validateMediaFile` deixou de usar constantes fixas, agora recebe os limites como parâmetro (continua isomórfico, sem I/O).
+- Bucket `pet-gallery` mantido em 50MB de teto no Storage (é o máximo que o Supabase Free aceita por arquivo) — funciona como rede de segurança de infra, independente do valor configurado no parâmetro.
+
+**Verificação:** testado ao vivo criando os 3 parâmetros pela tela do Admin e confirmando, via inspeção do DOM renderizado, que a galeria do pet já mostra "Foto até 1MB, vídeo até 5MB" e "0/10" — sem precisar de novo deploy. `tsc`/`eslint`/`next build`/testes limpos (8/8 no arquivo de limites, incluindo um caso novo provando que limites customizados são respeitados).
+
+---
+
 ## 2026-09-04 — Corrige vazamento de dado sensível no perfil público do profissional
 
 **Contexto:** achado sentado numa worktree de uma sessão anterior, nunca commitado nem aplicado no banco — reconciliei e concluí nesta sessão. `profiles_select_public_professional` (0013) é uma policy de RLS só de **linha**: quando um profissional tem `professional_services` ativo, ela libera a leitura da linha `profiles` **inteira** via PostgREST, sem filtro de coluna. `/buscar`, `/profissional/[id]` e `/favoritos` só liam `id, full_name` no código, mas a policy nunca restringiu a consulta a essas colunas — qualquer requisição com a chave anon podia pedir `phone, cpf_cnpj, birth_date, address_zip, address_lat, address_lng` do mesmo jeito. Ficou pior depois que `/meu-perfil` passou a gravar endereço residencial real do Tutor: numa conta dupla (tutor + profissional no mesmo perfil), esse endereço ficava exposto a qualquer visitante do perfil público.
