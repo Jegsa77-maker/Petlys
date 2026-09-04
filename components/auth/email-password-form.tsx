@@ -56,9 +56,12 @@ export function EmailPasswordForm() {
         return;
       }
       setIsSubmitting(true);
-      const result = await signInWithPassword(parsed.data);
-      setIsSubmitting(false);
-      if (result?.error) setError(result.error);
+      try {
+        const result = await signInWithPassword(parsed.data);
+        if (result?.error) setError(result.error);
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -69,14 +72,17 @@ export function EmailPasswordForm() {
         return;
       }
       setIsSubmitting(true);
-      const result = await signUpWithPassword(parsed.data);
-      setIsSubmitting(false);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      if (result?.needsEmailConfirmation) {
-        setNotice("Conta criada! Confira seu e-mail para confirmar antes de entrar.");
+      try {
+        const result = await signUpWithPassword(parsed.data);
+        if (result?.error) {
+          setError(result.error);
+          return;
+        }
+        if (result?.needsEmailConfirmation) {
+          setNotice("Conta criada! Confira seu e-mail para confirmar antes de entrar.");
+        }
+      } finally {
+        setIsSubmitting(false);
       }
       return;
     }
@@ -88,9 +94,12 @@ export function EmailPasswordForm() {
       return;
     }
     setIsSubmitting(true);
-    await requestPasswordReset(parsed.data);
-    setIsSubmitting(false);
-    setNotice("Se esse e-mail estiver cadastrado, você vai receber um link pra redefinir a senha.");
+    try {
+      await requestPasswordReset(parsed.data);
+      setNotice("Se esse e-mail estiver cadastrado, você vai receber um link pra redefinir a senha.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
