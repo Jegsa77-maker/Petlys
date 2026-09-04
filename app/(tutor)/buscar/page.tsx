@@ -178,6 +178,41 @@ export default async function BuscarPage({
     filteredServices = filteredServices.filter((s) => favoriteProfessionalIds.has(s.professional_id));
   }
 
+  // Um card por profissional+categoria, não por serviço — um profissional
+  // com vários serviços na mesma categoria (ex.: "banho" e "tosa" dentro de
+  // banho_tosa) aparecia repetido na busca. Fica o de menor preço, que é o
+  // que a etiqueta "a partir de" do card já promete.
+  const bestServiceByProfessionalCategory = new Map<string, (typeof filteredServices)[number]>();
+  filteredServices.forEach((service) => {
+    const key = `${service.professional_id}:${service.category}`;
+    const current = bestServiceByProfessionalCategory.get(key);
+    if (!current) {
+      bestServiceByProfessionalCategory.set(key, service);
+      return;
+    }
+    if (current.base_price === null && service.base_price !== null) {
+      bestServiceByProfessionalCategory.set(key, service);
+    } else if (
+      current.base_price !== null &&
+      service.base_price !== null &&
+      service.base_price < current.base_price
+    ) {
+      bestServiceByProfessionalCategory.set(key, service);
+    }
+  });
+  filteredServices = [...bestServiceByProfessionalCategory.values()];
+
+  // Mais próximos primeiro quando o Tutor compartilhou localização — sem
+  // isso a ordem era a que o Postgres decidisse devolver, sem garantia
+  // nenhuma de proximidade (item encontrado navegando o app).
+  if (userLat !== null && userLng !== null) {
+    filteredServices = [...filteredServices].sort((a, b) => {
+      const distA = distanceByProfessional[a.professional_id] ?? Infinity;
+      const distB = distanceByProfessional[b.professional_id] ?? Infinity;
+      return distA - distB;
+    });
+  }
+
   // Um pin por profissional (não por serviço) — mesmo critério de
   // deduplicação da tela de favoritos.
   const pins: MapPin[] = [];
