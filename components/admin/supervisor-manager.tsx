@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createSupervisor, revokeSupervisor } from "@/lib/actions/admin";
 import { createSupervisorSchema } from "@/lib/validations/admin";
+import { PasswordInput } from "@/components/shared/password-input";
 
 export function CreateSupervisorForm() {
   const [fullName, setFullName] = useState("");
@@ -24,17 +25,19 @@ export function CreateSupervisorForm() {
     }
 
     setIsSubmitting(true);
-    const result = await createSupervisor(parsed.data);
-    setIsSubmitting(false);
-
-    if (result?.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await createSupervisor(parsed.data);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setSuccess(`Conta criada. Usuário de login: ${username}`);
+      setFullName("");
+      setUsername("");
+      setPassword("");
+    } finally {
+      setIsSubmitting(false);
     }
-    setSuccess(`Conta criada. Usuário de login: ${username}`);
-    setFullName("");
-    setUsername("");
-    setPassword("");
   }
 
   return (
@@ -42,7 +45,7 @@ export function CreateSupervisorForm() {
       <p className="text-sm font-semibold text-black">Nova conta de Supervisor</p>
       <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nome completo" className="input" />
       <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Usuário (mais de 5 caracteres)" className="input" />
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mín. 8 caracteres)" className="input" />
+      <PasswordInput value={password} onChange={setPassword} placeholder="Senha (mín. 8 caracteres)" className="input" />
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
       {success && <p className="text-sm text-black bg-green px-3 py-2 rounded-lg">{success}</p>}
       <button

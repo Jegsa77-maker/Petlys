@@ -20,15 +20,27 @@ describe("isSectionFilled", () => {
     expect(isSectionFilled("texto")).toBe(false);
     expect(isSectionFilled(42)).toBe(false);
   });
+
+  it("objeto só com strings vazias (formulário enviado em branco) NÃO conta como preenchido", () => {
+    // Bug real encontrado navegando o app: updatePetHealth/etc. sempre
+    // gravam todas as chaves do formulário (zod atribui "" a campo opcional
+    // não digitado) — a chave existir não significa que a pessoa digitou
+    // algo.
+    expect(isSectionFilled({ veterinario: "", clinica: "", vacinas: "" })).toBe(false);
+  });
+
+  it("checkbox marcado (true) conta como preenchido mesmo sem texto", () => {
+    expect(isSectionFilled({ aceitaOutrosPets: true, observacoes: "" })).toBe(true);
+  });
 });
 
 describe("missingProntuarioSections", () => {
   const petVazio = { health_info: {}, behavior_info: {}, routine_info: {}, emergency_info: {} };
   const petCompleto = {
-    health_info: { a: 1 },
-    behavior_info: { a: 1 },
-    routine_info: { a: 1 },
-    emergency_info: { a: 1 },
+    health_info: { a: "preenchido" },
+    behavior_info: { a: "preenchido" },
+    routine_info: { a: "preenchido" },
+    emergency_info: { a: "preenchido" },
   };
 
   it("pet sem nada preenchido falta tudo que a categoria exige", () => {

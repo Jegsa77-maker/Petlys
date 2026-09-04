@@ -15,6 +15,26 @@ import { redirect } from "next/navigation";
 type ActionResult = { error: string | null };
 
 /**
+ * Remove strings vazias antes de gravar em `health_info`/`behavior_info`/
+ * `routine_info`/`emergency_info` — os schemas (lib/validations/pets.ts)
+ * marcam todo campo como opcional, então o zod sempre devolve `""` pros
+ * campos que a pessoa não digitou. Sem isso, salvar um formulário
+ * completamente em branco gravava um objeto cheio de chaves vazias, que
+ * `isSectionFilled` (lib/domain/category-requirements.ts) e o próprio
+ * `PetProfileSection` liam como "preenchido" (bug real encontrado
+ * navegando o app). Booleano fica como está — `false` num checkbox é uma
+ * resposta de verdade, não "campo vazio".
+ */
+function stripEmptyStrings<T extends Record<string, unknown>>(data: T): Partial<T> {
+  const result: Partial<T> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === "string" && value.trim() === "") continue;
+    result[key as keyof T] = value as T[keyof T];
+  }
+  return result;
+}
+
+/**
  * Cria um pet com a Etapa 1 (obrigatória) e já vincula o tutor logado
  * em pet_tutors (seção 4.1: todos os campos da Etapa 1 são obrigatórios
  * para o pet ficar apto a receber solicitações).
@@ -50,6 +70,7 @@ export async function createPet(input: unknown): Promise<ActionResult> {
     .single();
 
   if (petError || !pet) {
+    console.error("[createPet] insert failed", petError);
     return { error: "Não foi possível cadastrar o pet. Tente novamente." };
   }
 
@@ -78,7 +99,7 @@ export async function updatePetHealth(petId: string, input: unknown): Promise<Ac
   const supabase = await createClient();
   const { error } = await supabase
     .from("pets")
-    .update({ health_info: parsed.data })
+    .update({ health_info: stripEmptyStrings(parsed.data) })
     .eq("id", petId);
 
   if (error) {
@@ -98,7 +119,7 @@ export async function updatePetBehavior(petId: string, input: unknown): Promise<
   const supabase = await createClient();
   const { error } = await supabase
     .from("pets")
-    .update({ behavior_info: parsed.data })
+    .update({ behavior_info: stripEmptyStrings(parsed.data) })
     .eq("id", petId);
 
   if (error) {
@@ -118,7 +139,7 @@ export async function updatePetRoutine(petId: string, input: unknown): Promise<A
   const supabase = await createClient();
   const { error } = await supabase
     .from("pets")
-    .update({ routine_info: parsed.data })
+    .update({ routine_info: stripEmptyStrings(parsed.data) })
     .eq("id", petId);
 
   if (error) {
@@ -138,7 +159,7 @@ export async function updatePetEmergency(petId: string, input: unknown): Promise
   const supabase = await createClient();
   const { error } = await supabase
     .from("pets")
-    .update({ emergency_info: parsed.data })
+    .update({ emergency_info: stripEmptyStrings(parsed.data) })
     .eq("id", petId);
 
   if (error) {
@@ -177,6 +198,25 @@ export async function updatePetDocument(petId: string, documentPath: string): Pr
 
   if (error) {
     return { error: "Não foi possível salvar o documento do pet." };
+  }
+
+  revalidatePath(`/pets/${petId}`);
+  return { error: null };
+}
+
+/**
+ * Remove a referência ao documento (achado navegando o app: dava pra
+ * anexar mas não pra excluir). Só limpa `document_url` — o objeto em si
+ * fica órfão no Storage, mesmo critério já usado em
+ * withdrawCertification (lib/actions/professional-certifications.ts), que
+ * também só remove a linha/referência, não o arquivo físico.
+ */
+export async function removePetDocument(petId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("pets").update({ document_url: null }).eq("id", petId);
+
+  if (error) {
+    return { error: "Não foi possível remover o documento." };
   }
 
   revalidatePath(`/pets/${petId}`);

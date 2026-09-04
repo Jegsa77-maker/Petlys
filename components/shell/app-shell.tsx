@@ -54,7 +54,7 @@ export function AppShell({
           </span>
         </Link>
 
-        <nav className="flex-1 px-3 flex flex-col gap-1">
+        <nav className="px-3 flex flex-col gap-1">
           {items.map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href);
             return (
@@ -73,7 +73,11 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="px-3 py-4 border-t border-white/10 flex flex-col gap-1">
+        {/* Sem flex-1 no nav acima de propósito: com poucos itens (varia por
+            papel), esse bloco ficava jogado lá embaixo, longe da navegação,
+            num vão vazio enorme em tela alta — segue logo abaixo do nav em
+            vez de grudado no rodapé da sidebar. */}
+        <div className="mt-4 px-3 py-4 border-t border-white/10 flex flex-col gap-1">
           {notificationsDesktop && <div className="px-3 py-1">{notificationsDesktop}</div>}
           <form action={signOut}>
             <button

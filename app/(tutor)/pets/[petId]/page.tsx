@@ -120,7 +120,7 @@ export default async function PetDetailPage({
         </div>
 
         <div className="mb-6">
-          <PetMediaSection petId={pet.id} photoUrl={pet.photo_url} hasDocument={!!pet.document_url} />
+          <PetMediaSection petId={pet.id} photoUrl={pet.photo_url} documentUrl={pet.document_url} />
         </div>
 
         {stalenessLabel && (

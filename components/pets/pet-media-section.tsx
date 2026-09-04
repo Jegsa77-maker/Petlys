@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { FileText, Eye, Trash2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { FileUploadField } from "@/components/shared/file-upload-field";
-import { updatePetPhoto, updatePetDocument } from "@/lib/actions/pets";
+import { updatePetPhoto, updatePetDocument, removePetDocument } from "@/lib/actions/pets";
 
 /**
  * Upload real de foto e carteira de vacinação/documento do pet (seção
@@ -12,14 +14,16 @@ import { updatePetPhoto, updatePetDocument } from "@/lib/actions/pets";
 export function PetMediaSection({
   petId,
   photoUrl,
-  hasDocument,
+  documentUrl,
 }: {
   petId: string;
   photoUrl: string | null;
-  hasDocument: boolean;
+  /** Caminho no bucket privado `pet-documents`, não URL pública. */
+  documentUrl: string | null;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [documentSaved, setDocumentSaved] = useState(hasDocument);
+  const [documentPath, setDocumentPath] = useState(documentUrl);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   async function handlePhotoUploaded(url: string) {
     const result = await updatePetPhoto(petId, url);
@@ -32,7 +36,34 @@ export function PetMediaSection({
       setError(result.error);
       return;
     }
-    setDocumentSaved(true);
+    setDocumentPath(path);
+  }
+
+  async function handleViewDocument() {
+    if (!documentPath) return;
+    const supabase = createClient();
+    const { data, error: signError } = await supabase.storage
+      .from("pet-documents")
+      .createSignedUrl(documentPath, 60);
+    if (signError || !data?.signedUrl) {
+      setError("Não foi possível abrir o documento.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleRemoveDocument() {
+    setIsRemoving(true);
+    try {
+      const result = await removePetDocument(petId);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setDocumentPath(null);
+    } finally {
+      setIsRemoving(false);
+    }
   }
 
   return (
@@ -51,18 +82,41 @@ export function PetMediaSection({
 
       <div>
         <p className="text-sm font-semibold text-black mb-2">Carteira de vacinação / documento</p>
+
+        {documentPath && (
+          <div className="flex items-center gap-3 mb-2">
+            <span className="flex items-center gap-1 text-xs text-gray-600">
+              <FileText size={14} /> Documento enviado
+            </span>
+            <button
+              type="button"
+              onClick={handleViewDocument}
+              className="flex items-center gap-1 text-xs font-semibold text-teal hover:underline"
+            >
+              <Eye size={14} /> Visualizar
+            </button>
+            <button
+              type="button"
+              onClick={handleRemoveDocument}
+              disabled={isRemoving}
+              className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline disabled:opacity-60"
+            >
+              <Trash2 size={14} /> {isRemoving ? "Removendo..." : "Remover"}
+            </button>
+          </div>
+        )}
+
         <FileUploadField
           bucket="pet-documents"
           pathPrefix={petId}
           accept="image/*,.pdf"
           isPrivateBucket
-          currentUrl={documentSaved ? "enviado" : null}
-          currentLabel="Documento enviado"
-          buttonLabel={documentSaved ? "Enviar outro documento" : "Enviar documento"}
+          currentUrl={null}
+          buttonLabel={documentPath ? "Enviar outro documento" : "Enviar documento"}
           onUploaded={handleDocumentUploaded}
         />
         <p className="text-xs text-gray-500 mt-1">
-          Visível só para você, os co-tutores, o profissional contratado e o suporte.
+          Só PDF ou imagem. Visível só para você, os co-tutores, o profissional contratado e o suporte.
         </p>
       </div>
 

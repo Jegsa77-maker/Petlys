@@ -34,6 +34,25 @@ export function SearchFiltersForm({ isTutorLoggedIn }: { isTutorLoggedIn: boolea
   const [especie, setEspecie] = useState(searchParams.get("especie") ?? "");
   const [apenasFavoritos, setApenasFavoritos] = useState(searchParams.get("favoritos") === "1");
 
+  // Os estados acima só usam searchParams como valor inicial (useState roda uma
+  // única vez). Quando a navegação troca a URL sem desmontar este componente
+  // (ex.: clicar num chip de categoria, que é um <Link> para /buscar?...),
+  // os inputs e o badge "Filtros (N)" ficavam com valores obsoletos mesmo
+  // depois que os parâmetros somem da URL de verdade. Resincroniza ajustando o
+  // estado durante a renderização (padrão recomendado pelo React para "adjusting
+  // state when a prop changes"), em vez de um useEffect com setState síncrono.
+  const searchParamsKey = searchParams.toString();
+  const [prevSearchParamsKey, setPrevSearchParamsKey] = useState(searchParamsKey);
+  if (searchParamsKey !== prevSearchParamsKey) {
+    setPrevSearchParamsKey(searchParamsKey);
+    setPrecoMin(searchParams.get("precoMin") ?? "");
+    setPrecoMax(searchParams.get("precoMax") ?? "");
+    setNotaMin(searchParams.get("notaMin") ?? "");
+    setSubcategoria(searchParams.get("subcategoria") ?? "");
+    setEspecie(searchParams.get("especie") ?? "");
+    setApenasFavoritos(searchParams.get("favoritos") === "1");
+  }
+
   const activeCount = [precoMin, precoMax, notaMin, subcategoria, especie, apenasFavoritos ? "1" : ""].filter(
     Boolean
   ).length;

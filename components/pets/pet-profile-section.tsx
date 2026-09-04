@@ -30,9 +30,6 @@ export function PetProfileSection({
   initialValues: Record<string, unknown>;
   onSave: (petId: string, values: Record<string, unknown>) => Promise<ActionResult>;
 }) {
-  const filled = Object.values(initialValues ?? {}).some(
-    (v) => (typeof v === "string" && v.trim() !== "") || v === true
-  );
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const base: Record<string, unknown> = {};
@@ -43,7 +40,15 @@ export function PetProfileSection({
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [saved, setSaved] = useState(false);
+
+  // Deriva do estado atual (`values`), não de um flag "saved" separado —
+  // antes, salvar um formulário em branco marcava "Preenchido" na hora
+  // (setSaved(true) incondicional), sem olhar se algum campo tinha
+  // conteúdo de verdade. Mesmo critério do lib/domain/category-
+  // requirements.ts:isSectionFilled.
+  const isFilled = Object.values(values).some(
+    (v) => (typeof v === "string" && v.trim() !== "") || v === true
+  );
 
   function setField(key: string, value: unknown) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -53,14 +58,16 @@ export function PetProfileSection({
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-    const result = await onSave(petId, values);
-    setIsSubmitting(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await onSave(petId, values);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setEditing(false);
+    } finally {
+      setIsSubmitting(false);
     }
-    setSaved(true);
-    setEditing(false);
   }
 
   return (
@@ -74,10 +81,10 @@ export function PetProfileSection({
         <span className="flex items-center gap-2">
           <span
             className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-              filled || saved ? "text-black bg-green" : "text-gray-400 bg-gray"
+              isFilled ? "text-black bg-green" : "text-gray-400 bg-gray"
             }`}
           >
-            {filled || saved ? "Preenchido" : "Pendente"}
+            {isFilled ? "Preenchido" : "Pendente"}
           </span>
           {editing ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </span>

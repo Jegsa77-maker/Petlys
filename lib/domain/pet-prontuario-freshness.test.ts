@@ -28,7 +28,7 @@ describe("prontuarioStalenessLabel", () => {
 
   it("não alerta prontuário preenchido e recente (dentro do limiar)", () => {
     const petRecente = {
-      health_info: { a: 1 },
+      health_info: { a: "preenchido" },
       behavior_info: {},
       routine_info: {},
       emergency_info: {},
@@ -39,7 +39,7 @@ describe("prontuarioStalenessLabel", () => {
 
   it("alerta prontuário preenchido e velho, em meses", () => {
     const petVelho = {
-      health_info: { a: 1 },
+      health_info: { a: "preenchido" },
       behavior_info: {},
       routine_info: {},
       emergency_info: {},
@@ -52,7 +52,7 @@ describe("prontuarioStalenessLabel", () => {
 
   it("alerta em anos quando passa de 12 meses", () => {
     const petMuitoVelho = {
-      health_info: { a: 1 },
+      health_info: { a: "preenchido" },
       behavior_info: {},
       routine_info: {},
       emergency_info: {},

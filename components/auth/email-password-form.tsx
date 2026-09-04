@@ -12,6 +12,7 @@ import {
   requestPasswordResetSchema,
 } from "@/lib/validations/auth";
 import { trackEvent } from "@/lib/analytics/track";
+import { PasswordInput } from "@/components/shared/password-input";
 
 type Mode = "entrar" | "criar" | "esqueci";
 
@@ -140,13 +141,7 @@ export function EmailPasswordForm() {
         />
 
         {mode !== "esqueci" && (
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Senha"
-            className="input"
-          />
+          <PasswordInput value={password} onChange={setPassword} placeholder="Senha" />
         )}
 
         {error && <p className="text-sm text-red-600" role="alert">{error}</p>}

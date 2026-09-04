@@ -54,7 +54,15 @@ export function FileUploadField({
 
     if (uploadError) {
       setIsUploading(false);
-      setError("Não foi possível enviar o arquivo. Tente novamente.");
+      // Alguns buckets restringem o tipo de arquivo no próprio Storage
+      // (ex.: pet-documents, migration 0071) — essa é a mensagem real que
+      // o Supabase devolve quando o arquivo não bate com o tipo permitido.
+      const isMimeRejection = /mime type .* is not supported/i.test(uploadError.message);
+      setError(
+        isMimeRejection
+          ? "Esse tipo de arquivo não é permitido aqui — envie PDF ou imagem."
+          : "Não foi possível enviar o arquivo. Tente novamente."
+      );
       return;
     }
 

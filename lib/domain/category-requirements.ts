@@ -42,8 +42,19 @@ type PetProntuarioInfo = {
   emergency_info?: unknown;
 };
 
+/**
+ * Uma seção "preenchida" precisa ter pelo menos um valor de verdade — não
+ * basta a chave existir. `updatePetHealth`/etc. (lib/actions/pets.ts) sempre
+ * gravam todas as chaves do formulário, vazias ou não (zod atribui `""` a
+ * todo campo opcional não digitado), então `Object.keys(...).length > 0`
+ * sozinho dava "preenchido" pra um pet sem nada digitado — bug real
+ * encontrado navegando o app.
+ */
 export function isSectionFilled(info: unknown): boolean {
-  return !!info && typeof info === "object" && Object.keys(info as object).length > 0;
+  if (!info || typeof info !== "object") return false;
+  return Object.values(info as Record<string, unknown>).some(
+    (value) => (typeof value === "string" && value.trim() !== "") || value === true
+  );
 }
 
 /**
