@@ -54,7 +54,7 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
 
   const [blockDateValue, setBlockDateValue] = useState("");
-  const [allDay, setAllDay] = useState(true);
+  const [allDay, setAllDay] = useState(false);
   const [blockStartTime, setBlockStartTime] = useState("09:00");
   const [blockEndTime, setBlockEndTime] = useState("18:00");
   const [multiDay, setMultiDay] = useState(false);
@@ -241,16 +241,16 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
           })}
         </ul>
         <form onSubmit={handleBlockDate} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3">
+          <label className="flex items-center gap-2 text-sm text-black">
+            <input type="checkbox" checked={multiDay} onChange={(e) => setMultiDay(e.target.checked)} />
+            Vários dias seguidos (período de férias, por exemplo)
+          </label>
           <input
             type="date"
             value={blockDateValue}
             onChange={(e) => setBlockDateValue(e.target.value)}
             className="input"
           />
-          <label className="flex items-center gap-2 text-sm text-black">
-            <input type="checkbox" checked={multiDay} onChange={(e) => setMultiDay(e.target.checked)} />
-            Vários dias seguidos (período de férias, por exemplo)
-          </label>
           {multiDay && (
             <input
               type="date"

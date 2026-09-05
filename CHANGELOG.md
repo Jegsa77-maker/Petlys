@@ -4,6 +4,17 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-06 — Bloqueios: reordena o formulário e "Dia inteiro" some desmarcado
+
+**Contexto:** ajuste pontual no formulário de criar bloqueio (aba "Configurar horários"): usuário quer o fluxo mais direto — decidir se é vários dias antes de escolher a data, e não começar com "Dia inteiro" pré-marcado escondendo os campos de hora.
+
+- `components/availability/availability-manager.tsx`: checkbox "Vários dias seguidos" subiu pra cima do campo de data (antes vinha depois) — o campo "Até" continua aparecendo assim que marca, só que agora logo abaixo da data em vez de depois.
+- "Dia inteiro" passa a vir **desmarcado** por padrão (era `true`) — os campos de horário já aparecem abertos ao criar um bloqueio novo, sem precisar desmarcar primeiro.
+
+**Verificação:** testado ao vivo — ordem confirmada (Vários dias → data → Até quando marcado → Dia inteiro → horário/descrição), "Dia inteiro" chega desmarcado com os campos de hora visíveis de cara. `tsc`/`eslint`/`next build` limpos.
+
+---
+
 ## 2026-09-06 — Agenda: horário de trabalho com turno partido, bloqueio×compromisso separados de vez
 
 **Contexto:** usuário observou o comportamento da entrega anterior antes de pedir qualquer ajuste (juntou vários pontos numa conversa só, só mandou implementar no final). Resultado: 5 mudanças.
