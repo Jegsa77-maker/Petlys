@@ -37,10 +37,24 @@ export default async function ProfissionalPage({
   // visitante só porque ele tem serviço ativo (ver 0073). O RPC devolve
   // só id/full_name, e só quando há professional_services ativo — mesma
   // regra que valia antes na policy pública, agora sem vazar a linha inteira.
-  const { data: profileRows } = await supabase.rpc("get_public_professional_names", {
-    p_professional_ids: [profissionalId],
-  });
-  const profile = profileRows?.[0] ?? null;
+  //
+  // Exceção: o próprio profissional vendo o botão "Ver como o Tutor vê"
+  // (app/(profissional)/perfil/page.tsx) — antes de publicar o primeiro
+  // serviço, o RPC não devolve nada (não tem professional_services ativo
+  // ainda) e a página dava 404 pra ele mesmo, sem nenhum aviso de por quê.
+  // Nesse caso lê `profiles` direto — profiles_select já libera o próprio
+  // id normalmente, sem precisar do RPC.
+  const isSelfView = user?.id === profissionalId;
+  const profile = isSelfView
+    ? await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("id", profissionalId)
+        .single()
+        .then((r) => r.data)
+    : await supabase
+        .rpc("get_public_professional_names", { p_professional_ids: [profissionalId] })
+        .then((r) => r.data?.[0] ?? null);
 
   if (!profile) {
     notFound();

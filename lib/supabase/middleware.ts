@@ -196,7 +196,16 @@ export async function updateSession(request: NextRequest) {
       // app/(tutor)/solicitacoes/[requestId]/page.tsx).
       const hasSwitchableRole = roleNames.includes("tutor") || roleNames.includes("profissional");
 
-      const isTutorOnly = TUTOR_ONLY_PREFIXES.some((p) => path.startsWith(p));
+      // Exceção: "/profissional/[id]" é a tela pública do perfil (tutor-only,
+      // ver TUTOR_ONLY_PREFIXES), mas também é onde vive o botão "Ver como o
+      // Tutor vê" — dentro da própria tela do Profissional (achado navegando
+      // o app: o botão levava pra essa URL, mas o middleware barrava antes de
+      // chegar lá, redirecionando pra "/" sem explicação nenhuma). Libera só
+      // quando o próprio profissional visita o próprio id.
+      const isSelfProfessionalPreview =
+        path.startsWith("/profissional/") && path === `/profissional/${user.id}`;
+
+      const isTutorOnly = TUTOR_ONLY_PREFIXES.some((p) => path.startsWith(p)) && !isSelfProfessionalPreview;
       const isProfissionalOnly = PROFISSIONAL_ONLY_PREFIXES.some((p) => path.startsWith(p));
       const isRoleAwareShared = ROLE_AWARE_SHARED_PREFIXES.some((p) => path.startsWith(p));
 

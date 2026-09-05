@@ -149,7 +149,7 @@ function OccurrenceCardView({
         </p>
       )}
 
-      {occurrence.status === "agendado" && occurrence.requests?.status === "confirmado" && (
+      {occurrence.status === "agendado" && (
         <button
           onClick={handleCheckin}
           disabled={isSubmitting}
@@ -157,12 +157,6 @@ function OccurrenceCardView({
         >
           Marcar: {stageLabel("checkin")}
         </button>
-      )}
-
-      {occurrence.status === "agendado" && occurrence.requests?.status !== "confirmado" && (
-        <p className="text-xs text-gray-400 text-center">
-          Aguardando confirmação da solicitação
-        </p>
       )}
 
       {occurrence.status === "checkin" && (

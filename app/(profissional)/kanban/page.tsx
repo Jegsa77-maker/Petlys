@@ -7,6 +7,13 @@ export default async function KanbanPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Uma solicitação passa por rascunho/solicitacao_enviada/em_conversa/
+  // proposta_enviada/aguardando_pagamento antes de "confirmado" — a
+  // occurrence já nasce com status "agendado" nesse meio tempo todo
+  // (lib/actions/requests.ts), então sem esse filtro ela aparecia na
+  // coluna "Agendado" do Kanban antes mesmo de existir um compromisso de
+  // verdade (achado navegando o app: card "Aguardando confirmação"
+  // misturado com atendimento real já confirmado).
   const { data: occurrences } = user
     ? await supabase
         .from("request_occurrences")
@@ -15,6 +22,7 @@ export default async function KanbanPage() {
         )
         .eq("requests.professional_id", user.id)
         .in("status", ["agendado", "checkin", "em_andamento", "finalizacao", "concluido"])
+        .not("requests.status", "in", "(rascunho,solicitacao_enviada,em_conversa,proposta_enviada,aguardando_pagamento)")
         .order("scheduled_at", { ascending: true })
     : { data: [] };
 

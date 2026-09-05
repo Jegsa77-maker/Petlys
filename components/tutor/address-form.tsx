@@ -20,13 +20,16 @@ export function AddressForm({ currentZip }: { currentZip: string | null }) {
     setError(null);
     setSuccess(false);
     setIsSubmitting(true);
-    const result = await updateTutorAddress({ cep });
-    setIsSubmitting(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await updateTutorAddress({ cep });
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setSuccess(true);
+    } finally {
+      setIsSubmitting(false);
     }
-    setSuccess(true);
   }
 
   return (

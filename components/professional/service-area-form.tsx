@@ -27,13 +27,16 @@ export function ServiceAreaForm({
     setError(null);
     setSuccess(false);
     setIsSubmitting(true);
-    const result = await upsertServiceArea({ cep, radiusKm });
-    setIsSubmitting(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await upsertServiceArea({ cep, radiusKm });
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setSuccess(true);
+    } finally {
+      setIsSubmitting(false);
     }
-    setSuccess(true);
   }
 
   return (

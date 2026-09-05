@@ -62,24 +62,31 @@ async function fetchViaCep(cep: string): Promise<ViaCepResponse> {
   return response.json();
 }
 
+/**
+ * Uma retentativa depois de uma pausa curta — Nominatim é uma API pública
+ * gratuita e ocasionalmente engasga com timeout num único request (achado
+ * real testando o formulário, registrado no CHANGELOG de hoje). Sem isso,
+ * um engasgo transitório vira erro pro usuário mesmo quando um segundo
+ * request, um instante depois, teria funcionado normalmente.
+ */
 async function fetchNominatim(query: string): Promise<NominatimResult[]> {
-  let response: Response;
-  try {
-    response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
-      // Cabecalho HTTP precisa ser ByteString puro (ASCII) - um em-dash ou
-      // acento aqui quebra o fetch com "Cannot convert argument to a
-      // ByteString" (bug real encontrado testando esse formulario).
-      { headers: { "User-Agent": "PetlysApp/1.0 (contato via app Petlys)" } }
-    );
-  } catch (err) {
-    console.error("[geocoding] nominatim fetch failed", err);
-    throw new GeocodingError("Não foi possível localizar esse endereço no mapa agora. Tente novamente.");
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+  // Cabecalho HTTP precisa ser ByteString puro (ASCII) - um em-dash ou
+  // acento aqui quebra o fetch com "Cannot convert argument to a
+  // ByteString" (bug real encontrado testando esse formulario).
+  const options: RequestInit = { headers: { "User-Agent": "PetlysApp/1.0 (contato via app Petlys)" } };
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) return response.json();
+    } catch (err) {
+      if (attempt === 2) console.error("[geocoding] nominatim fetch failed", err);
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  if (!response.ok) {
-    throw new GeocodingError("Não foi possível localizar esse endereço no mapa agora. Tente novamente.");
-  }
-  return response.json();
+
+  throw new GeocodingError("Não foi possível localizar esse endereço no mapa agora. Tente novamente.");
 }
 
 export async function geocodeCep(rawCep: string): Promise<GeocodedAddress> {

@@ -4,6 +4,20 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Visão Profissional: 3 achados navegando o app
+
+**Contexto:** usuário reportou 5 problemas na visão do Profissional. Esta entrada cobre os 3 que eram bugs pontuais (os outros 2 — calendário mensal da Agenda e drag-and-drop no Kanban — são features novas, entregues à parte).
+
+- **Kanban misturava "aguardando confirmação" com atendimento real na coluna "Agendado"**: a `request_occurrence` já nasce com status `agendado` no momento da criação da solicitação (`lib/actions/requests.ts`), bem antes da solicitação passar por `solicitacao_enviada`/`em_conversa`/`proposta_enviada`/`aguardando_pagamento` até chegar em `confirmado`. A query do Kanban (`app/(profissional)/kanban/page.tsx`) filtrava só pelo status da occurrence, nunca pelo da solicitação — por isso um card sem nada confirmado ainda aparecia junto dos atendimentos de verdade. Corrigido excluindo da query qualquer occurrence cuja solicitação ainda não chegou em `confirmado`.
+- **"Ver como o Tutor vê" não funcionava** — dois bugs empilhados, não um só:
+  1. `/profissional/[id]` está na lista de rotas exclusivas de Tutor (`TUTOR_ONLY_PREFIXES`, `lib/supabase/middleware.ts`) — o próprio Profissional, logado como profissional, era redirecionado pra "/" antes mesmo de a página carregar. Corrigido com uma exceção: quando o id da URL é o do próprio usuário logado, a rota deixa de contar como tutor-only.
+  2. Depois de destravar o middleware, a página ainda dava 404 pra quem não tinha nenhum serviço ativo publicado — o nome do profissional vem de `get_public_professional_names` (RPC de segurança, 0073), que só devolve algo quando há `professional_services` ativo. Corrigido: quando é o próprio profissional se vendo, a página lê `profiles` direto (já permitido por `profiles_select`, 0009) em vez de passar pelo RPC público.
+- **CEP "não funcionava"**: testado ViaCEP e Nominatim direto — ambos respondendo normalmente, e o fluxo salvou e geocodificou certo numa tentativa real durante a verificação. O suspeito mais provável é o engasgo transitório do Nominatim já registrado antes no changelog, combinado com um bug real que encontrei nos dois formulários que usam CEP (`service-area-form.tsx`, `address-form.tsx`): `setIsSubmitting` sem `try/finally` — se `geocodeCep` falhar de forma inesperada, o botão "Salvando..." travava pra sempre, sem mensagem de erro (mesma classe de bug já corrigida em outros formulários nesta sessão). Corrigido os dois formulários, e adicionada uma retentativa automática no Nominatim (`lib/services/geocoding.ts`) depois de uma pausa curta, já que é uma API pública gratuita sem SLA.
+
+**Verificação:** os três testados ao vivo — Kanban confirmado só via inspeção da query (sem occurrence "agendado" fantasma pra reproduzir agora); "Ver como o Tutor vê" testado de ponta a ponta com uma conta profissional sem nenhum serviço publicado (before: redirect pra "/"; depois: perfil carrega normal, mostrando "Nenhum serviço publicado ainda"); CEP testado salvando de verdade e confirmando lat/lng reais no banco. `tsc`/`eslint`/`next build`/testes limpos (só a falha conhecida de rate-limit do Supabase Auth).
+
+---
+
 ## 2026-09-04 — Tela de Usuários: CRUD completo (Admin) + ver/bloquear/chat (Supervisor)
 
 **Contexto:** usuário pediu uma tela no Admin com CRUD de qualquer conta, qualquer papel — inclusive outro Administrador —, com uma regra específica pra exclusão: apagar o relacionamento todo, a não ser que haja pendência financeira. No meio da implementação, pediu também que o Supervisor tivesse uma versão mais enxuta (ver, bloquear/desbloquear, redefinir senha, ver perfil) e que os dois papéis pudessem conversar com o usuário via chat a partir do perfil.
