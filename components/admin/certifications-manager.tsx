@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { reviewCertification } from "@/lib/actions/professional-certifications";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -17,15 +16,17 @@ type Certification = {
   id: string;
   category: string;
   status: string;
+  /** URL pública já resolvida (bucket professional-certifications virou público na migration 0085). */
   document_url: string;
   professional_name: string;
 };
 
 /**
  * Revisão manual de habilitações (seção 6.3/13.3) — Admin/Supervisor
- * aprova ou rejeita o documento enviado pelo profissional.
- * `document_url` guarda o caminho no bucket privado, não uma URL pública
- * — a visualização gera um link assinado sob demanda.
+ * aprova ou rejeita o documento enviado pelo profissional. Não bloqueia
+ * mais publicar serviço nenhum (2026-09-06) — o profissional já publicou
+ * com o documento "em análise"; aprovar aqui só troca o selo que o Tutor
+ * vê pra "verificado".
  */
 export function CertificationsManager({ certifications }: { certifications: Certification[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -33,19 +34,6 @@ export function CertificationsManager({ certifications }: { certifications: Cert
   const [reviewNotes, setReviewNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
-
-  async function handleViewDocument(path: string) {
-    const supabase = createClient();
-    const { data, error: signError } = await supabase.storage
-      .from("professional-certifications")
-      .createSignedUrl(path, 60);
-
-    if (signError || !data?.signedUrl) {
-      setError("Não foi possível gerar o link do documento.");
-      return;
-    }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-  }
 
   async function handleApprove(id: string) {
     setBusyId(id);
@@ -91,13 +79,14 @@ export function CertificationsManager({ certifications }: { certifications: Cert
           <p className="text-sm font-semibold text-black">{cert.professional_name}</p>
           <p className="text-xs text-gray-500 mb-2">{CATEGORY_LABEL[cert.category] ?? cert.category}</p>
 
-          <button
-            type="button"
-            onClick={() => handleViewDocument(cert.document_url)}
-            className="text-xs text-teal font-semibold hover:underline mb-3"
+          <a
+            href={cert.document_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-xs text-teal font-semibold hover:underline mb-3"
           >
             Ver documento
-          </button>
+          </a>
 
           {rejectingId === cert.id ? (
             <div className="flex flex-col gap-2">

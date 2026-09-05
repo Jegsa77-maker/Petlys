@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProfessionalProfileForm } from "@/components/professional/professional-profile-form";
 import { ServiceAreaForm } from "@/components/professional/service-area-form";
-import { CertificationsSection } from "@/components/professional/certifications-section";
 import { ProfessionalGallerySection } from "@/components/professional/professional-gallery-section";
 import { ProfessionalSkillsSection } from "@/components/professional/professional-skills-section";
 import { getGalleryLimits } from "@/lib/actions/pet-media";
@@ -24,7 +23,6 @@ export default async function PerfilProfissionalPage() {
   const [
     { data: profile },
     { count: activeServicesCount },
-    { data: certifications },
     { count: completedCount },
     { data: reviews },
     { data: serviceArea },
@@ -38,11 +36,6 @@ export default async function PerfilProfissionalPage() {
       .select("id", { count: "exact", head: true })
       .eq("professional_id", user.id)
       .eq("active", true),
-    supabase
-      .from("professional_certifications")
-      .select("id, category, status, review_notes")
-      .eq("professional_id", user.id)
-      .order("created_at", { ascending: false }),
     supabase
       .from("requests")
       .select("id", { count: "exact", head: true })
@@ -163,8 +156,6 @@ export default async function PerfilProfissionalPage() {
           currentZip={serviceArea?.center_zip ?? null}
           currentRadiusKm={serviceArea?.radius_km ?? null}
         />
-
-        <CertificationsSection professionalId={user.id} certifications={certifications ?? []} />
       </div>
     </main>
   );

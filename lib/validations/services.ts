@@ -62,6 +62,11 @@ export const createServiceSchema = z
   });
 export type CreateServiceValues = z.infer<typeof createServiceSchema>;
 
+// Editar um serviço já publicado (2026-09-06) — mesmos campos de
+// createServiceSchema, só acrescenta o id de qual linha atualizar.
+export const updateServiceSchema = createServiceSchema.and(z.object({ serviceId: z.uuid() }));
+export type UpdateServiceValues = z.infer<typeof updateServiceSchema>;
+
 // Horário de trabalho (ajuste de 2026-09-06: virou uma LISTA de ranges,
 // não mais um único — profissional com turno partido, ex. 9h-12h e
 // 15h-18h, precisa dos dois). Vale pra semana inteira (não mais por dia

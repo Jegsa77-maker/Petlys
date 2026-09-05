@@ -3,11 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   createServiceSchema,
+  updateServiceSchema,
   workingHoursSchema,
   blockDateSchema,
   updateBlockSchema,
 } from "@/lib/validations/services";
-import { categoryRequiresCertification } from "@/lib/domain/regulated-categories";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { error: string | null };
@@ -31,24 +31,11 @@ export async function createService(input: unknown): Promise<ActionResult> {
     return { error: "Sessão expirada. Faça login novamente." };
   }
 
-  // Categorias regulamentadas exigem habilitação aprovada antes de publicar
-  // (seção 6.3) — ex.: veterinário domiciliar precisa de CRMV verificado.
-  if (categoryRequiresCertification(parsed.data.category)) {
-    const { data: approvedCert } = await supabase
-      .from("professional_certifications")
-      .select("id")
-      .eq("professional_id", user.id)
-      .eq("category", parsed.data.category)
-      .eq("status", "aprovado")
-      .maybeSingle();
-
-    if (!approvedCert) {
-      return {
-        error:
-          "Essa categoria exige habilitação verificada. Envie seu documento em Meu perfil > Habilitações antes de publicar este serviço.",
-      };
-    }
-  }
+  // Categorias regulamentadas (seção 6.3) não bloqueiam mais publicar sem
+  // habilitação aprovada (ajuste de 2026-09-06, pedido do usuário: "não
+  // precisa de aprovador") — o documento enviado fica visível pro Tutor
+  // consultar por conta própria (ver certification-status.ts), e a
+  // aprovação do Admin/Supervisor só acrescenta o selo "verificado".
 
   const { data: service, error } = await supabase
     .from("professional_services")
@@ -84,6 +71,73 @@ export async function createService(input: unknown): Promise<ActionResult> {
     );
     if (addonsError) {
       return { error: "Serviço publicado, mas houve um erro ao salvar os adicionais." };
+    }
+  }
+
+  revalidatePath("/servicos");
+  return { error: null };
+}
+
+/**
+ * Editar um serviço já publicado (2026-09-06, pedido do usuário: "tem que
+ * permitir editar ou apagar o serviço" — sem apagar de verdade, ver
+ * decisão registrada no CHANGELOG; "pausar" já cobre o caso de tirar da
+ * vitrine). Substitui todos os campos de uma vez, mesmo espírito de
+ * createService; adicionais são recriados do zero (mais simples que fazer
+ * diff item a item, mesmo padrão de setWorkingHours).
+ */
+export async function updateService(input: unknown): Promise<ActionResult> {
+  const parsed = updateServiceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados do serviço inválidos" };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("professional_services")
+    .update({
+      category: parsed.data.category,
+      subcategory: parsed.data.subcategory ?? null,
+      pricing_model: parsed.data.pricingModel,
+      base_price: parsed.data.basePrice ?? null,
+      multi_pet_discount_percent: parsed.data.multiPetDiscountPercent ?? null,
+      description: parsed.data.description ?? null,
+      duration_minutes: parsed.data.durationMinutes ?? null,
+      species_accepted: parsed.data.speciesAccepted,
+      min_size: parsed.data.minSize ?? null,
+      max_size: parsed.data.maxSize ?? null,
+      restrictions: parsed.data.restrictions ?? null,
+      category_details: parsed.data.categoryDetails,
+    })
+    // RLS (professional_services_update, 0009) já restringe a linha ao
+    // dono — filtro aqui só evita atualizar por engano um id de outro
+    // profissional caso a RLS algum dia mude.
+    .eq("id", parsed.data.serviceId);
+
+  if (error) {
+    return { error: "Não foi possível salvar as alterações." };
+  }
+
+  const { error: deleteAddonsError } = await supabase
+    .from("professional_service_addons")
+    .delete()
+    .eq("service_id", parsed.data.serviceId);
+
+  if (deleteAddonsError) {
+    return { error: "Serviço atualizado, mas houve um erro ao salvar os adicionais." };
+  }
+
+  if (parsed.data.addons.length > 0) {
+    const { error: addonsError } = await supabase.from("professional_service_addons").insert(
+      parsed.data.addons.map((addon) => ({
+        service_id: parsed.data.serviceId,
+        name: addon.name,
+        price: addon.price,
+      }))
+    );
+    if (addonsError) {
+      return { error: "Serviço atualizado, mas houve um erro ao salvar os adicionais." };
     }
   }
 

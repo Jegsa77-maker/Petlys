@@ -3,11 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Plus, X } from "lucide-react";
-import { createService } from "@/lib/actions/services";
+import { createService, updateService } from "@/lib/actions/services";
 import { createServiceSchema } from "@/lib/validations/services";
 import { SERVICE_SUBCATEGORIES, SPECIES_OPTIONS, PET_SIZES, PET_SIZE_LABEL } from "@/lib/domain/service-catalog";
 import { SERVICE_CATEGORY_LABEL as CATEGORY_LABEL } from "@/lib/domain/service-catalog";
 import { SERVICE_CATEGORY_FIELDS } from "@/lib/domain/service-category-fields";
+import { categoryRequiresCertification } from "@/lib/domain/regulated-categories";
+import { ServiceCategoryCertification } from "@/components/services/service-category-certification";
+import type { EffectiveCertificationStatus } from "@/lib/domain/certification-status";
 import type { ServiceCategory } from "@/types/database";
 
 const PRICING_LABEL: Record<string, string> = {
@@ -22,28 +25,59 @@ const PRICING_LABEL: Record<string, string> = {
 
 type AddonDraft = { name: string; price: string };
 
+export type EditingServiceData = {
+  id: string;
+  category: string;
+  subcategory: string;
+  pricingModel: string;
+  basePrice: string;
+  multiPetDiscountPercent: string;
+  description: string;
+  durationMinutes: string;
+  speciesAccepted: string[];
+  minSize: string;
+  maxSize: string;
+  restrictions: string;
+  addons: AddonDraft[];
+  categoryDetails: Record<string, string | boolean>;
+};
+
 export function ServiceForm({
+  professionalId,
   skillCategories,
-  onCreated,
+  certificationsByCategory,
+  editing,
+  onCancelEdit,
+  onSaved,
 }: {
+  professionalId: string;
   /** Categorias que o profissional já declarou como "Habilidade" (2026-09-06)
    * — só essas podem virar Serviço; libera os campos específicos de cada uma. */
   skillCategories: ServiceCategory[];
-  onCreated?: () => void;
+  /** Status efetivo de habilitação por categoria regulamentada (2026-09-06) — ver lib/domain/certification-status.ts. */
+  certificationsByCategory: Record<string, { status: EffectiveCertificationStatus; documentUrl: string | null }>;
+  /** Presente = editando um serviço já publicado, em vez de criar um novo. */
+  editing?: EditingServiceData | null;
+  onCancelEdit?: () => void;
+  onSaved?: () => void;
 }) {
-  const [category, setCategory] = useState("");
-  const [categoryDetails, setCategoryDetails] = useState<Record<string, string | boolean>>({});
-  const [subcategory, setSubcategory] = useState("");
-  const [pricingModel, setPricingModel] = useState("");
-  const [basePrice, setBasePrice] = useState("");
-  const [multiPetDiscountPercent, setMultiPetDiscountPercent] = useState("");
-  const [description, setDescription] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState("");
-  const [speciesAccepted, setSpeciesAccepted] = useState<string[]>([]);
-  const [minSize, setMinSize] = useState("");
-  const [maxSize, setMaxSize] = useState("");
-  const [restrictions, setRestrictions] = useState("");
-  const [addons, setAddons] = useState<AddonDraft[]>([]);
+  const [category, setCategory] = useState(editing?.category ?? "");
+  const [categoryDetails, setCategoryDetails] = useState<Record<string, string | boolean>>(
+    editing?.categoryDetails ?? {}
+  );
+  const [subcategory, setSubcategory] = useState(editing?.subcategory ?? "");
+  const [pricingModel, setPricingModel] = useState(editing?.pricingModel ?? "");
+  const [basePrice, setBasePrice] = useState(editing?.basePrice ?? "");
+  const [multiPetDiscountPercent, setMultiPetDiscountPercent] = useState(
+    editing?.multiPetDiscountPercent ?? ""
+  );
+  const [description, setDescription] = useState(editing?.description ?? "");
+  const [durationMinutes, setDurationMinutes] = useState(editing?.durationMinutes ?? "");
+  const [speciesAccepted, setSpeciesAccepted] = useState<string[]>(editing?.speciesAccepted ?? []);
+  const [minSize, setMinSize] = useState(editing?.minSize ?? "");
+  const [maxSize, setMaxSize] = useState(editing?.maxSize ?? "");
+  const [restrictions, setRestrictions] = useState(editing?.restrictions ?? "");
+  const [addons, setAddons] = useState<AddonDraft[]>(editing?.addons ?? []);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -93,27 +127,32 @@ export function ServiceForm({
     }
 
     setIsSubmitting(true);
-    const result = await createService(parsed.data);
+    const result = editing
+      ? await updateService({ ...parsed.data, serviceId: editing.id })
+      : await createService(parsed.data);
     setIsSubmitting(false);
 
     if (result?.error) {
       setError(result.error);
       return;
     }
-    setCategory("");
-    setSubcategory("");
-    setPricingModel("");
-    setBasePrice("");
-    setMultiPetDiscountPercent("");
-    setDescription("");
-    setDurationMinutes("");
-    setSpeciesAccepted([]);
-    setMinSize("");
-    setMaxSize("");
-    setRestrictions("");
-    setAddons([]);
-    setCategoryDetails({});
-    onCreated?.();
+
+    if (!editing) {
+      setCategory("");
+      setSubcategory("");
+      setPricingModel("");
+      setBasePrice("");
+      setMultiPetDiscountPercent("");
+      setDescription("");
+      setDurationMinutes("");
+      setSpeciesAccepted([]);
+      setMinSize("");
+      setMaxSize("");
+      setRestrictions("");
+      setAddons([]);
+      setCategoryDetails({});
+    }
+    onSaved?.();
   }
 
   function setCategoryDetail(key: string, value: string | boolean) {
@@ -122,8 +161,10 @@ export function ServiceForm({
 
   const subcategoryOptions = category ? SERVICE_SUBCATEGORIES[category] ?? [] : [];
   const categoryFields = category ? SERVICE_CATEGORY_FIELDS[category as ServiceCategory] ?? [] : [];
+  const requiresCertification = category ? categoryRequiresCertification(category as ServiceCategory) : false;
+  const certInfo = certificationsByCategory[category] ?? { status: "nenhum" as const, documentUrl: null };
 
-  if (skillCategories.length === 0) {
+  if (!editing && skillCategories.length === 0) {
     return (
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
         <p className="font-semibold mb-1">Adicione uma habilidade antes de publicar um serviço</p>
@@ -138,7 +179,7 @@ export function ServiceForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
-      <p className="text-sm font-semibold text-black">Novo serviço</p>
+      <p className="text-sm font-semibold text-black">{editing ? "Editar serviço" : "Novo serviço"}</p>
 
       <select
         value={category}
@@ -223,6 +264,15 @@ export function ServiceForm({
             );
           })}
         </div>
+      )}
+
+      {requiresCertification && (
+        <ServiceCategoryCertification
+          professionalId={professionalId}
+          category={category as ServiceCategory}
+          status={certInfo.status}
+          documentUrl={certInfo.documentUrl}
+        />
       )}
 
       <select value={pricingModel} onChange={(e) => setPricingModel(e.target.value)} className="input">
@@ -355,13 +405,24 @@ export function ServiceForm({
 
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-      >
-        {isSubmitting ? "Publicando..." : "Publicar serviço"}
-      </button>
+      <div className="flex gap-2">
+        {editing && (
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="flex-1 rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+        >
+          {isSubmitting ? "Salvando..." : editing ? "Salvar alterações" : "Publicar serviço"}
+        </button>
+      </div>
     </form>
   );
 }

@@ -9,6 +9,9 @@ import {
 } from "@/lib/domain/professional-reputation";
 import { FavoriteButton } from "@/components/search/favorite-button";
 import { trackEventServer } from "@/lib/analytics/track-server";
+import { buildCertificationStatusMap } from "@/lib/domain/certification-status";
+import { categoryRequiresCertification } from "@/lib/domain/regulated-categories";
+import type { ServiceCategory } from "@/types/database";
 
 const CATEGORY_LABEL: Record<string, string> = {
   pet_sitter: "Pet sitter / cuidador",
@@ -91,7 +94,7 @@ export default async function ProfissionalPage({
     .eq("profile_id", profissionalId)
     .maybeSingle();
 
-  const [{ count: completedCount }, { count: approvedCertCount }, { data: favoriteRow }] = await Promise.all([
+  const [{ count: completedCount }, { data: certRows }, { data: favoriteRow }] = await Promise.all([
     supabase
       .from("requests")
       .select("id", { count: "exact", head: true })
@@ -99,9 +102,8 @@ export default async function ProfissionalPage({
       .in("status", ["avaliacao", "concluido"]),
     supabase
       .from("professional_certifications")
-      .select("id", { count: "exact", head: true })
-      .eq("professional_id", profissionalId)
-      .eq("status", "aprovado"),
+      .select("category, status, document_url, created_at")
+      .eq("professional_id", profissionalId),
     user
       ? supabase
           .from("tutor_favorites")
@@ -111,6 +113,24 @@ export default async function ProfissionalPage({
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+
+  // Habilitação por categoria (2026-09-06: sem gate de aprovação pra
+  // publicar — o documento fica visível pro Tutor conferir por conta
+  // própria, ver lib/domain/certification-status.ts) — documentUrl já
+  // resolvido pra URL pública (bucket virou público na migration 0085).
+  const statusByCategory = buildCertificationStatusMap(certRows ?? []);
+  const certificationsByCategory = Object.fromEntries(
+    Object.entries(statusByCategory).map(([category, info]) => [
+      category,
+      {
+        status: info.status,
+        documentUrl: info.documentPath
+          ? supabase.storage.from("professional-certifications").getPublicUrl(info.documentPath).data.publicUrl
+          : null,
+      },
+    ])
+  );
+  const hasApprovedCertification = Object.values(certificationsByCategory).some((c) => c.status === "aprovado");
 
   const avgRating = averageRating(reviews ?? []);
   const level = computeProfessionalLevel(completedCount ?? 0, avgRating);
@@ -142,7 +162,7 @@ export default async function ProfissionalPage({
               <span className="flex items-center gap-1 bg-teal/10 rounded-full px-2 py-0.5">
                 <Award size={12} /> {PROFESSIONAL_LEVEL_LABEL[level]}
               </span>
-              {(approvedCertCount ?? 0) > 0 && (
+              {hasApprovedCertification && (
                 <span className="flex items-center gap-1 bg-teal/10 rounded-full px-2 py-0.5">
                   <BadgeCheck size={12} /> Documentação verificada
                 </span>
@@ -282,6 +302,11 @@ export default async function ProfissionalPage({
                   {service.multi_pet_discount_percent}% de desconto para múltiplos pets
                 </p>
               ) : null}
+              {categoryRequiresCertification(service.category as ServiceCategory) && (
+                <ServiceCertificationNote
+                  info={certificationsByCategory[service.category] ?? { status: "nenhum", documentUrl: null }}
+                />
+              )}
             </li>
           ))}
           {(!services || services.length === 0) && (
@@ -312,5 +337,40 @@ export default async function ProfissionalPage({
         )}
       </div>
     </main>
+  );
+}
+
+const CERT_STATUS_LABEL: Record<string, string> = {
+  aprovado: "✅ Documentação verificada",
+  pendente: "Documento enviado — em análise",
+  rejeitado: "Documentação não verificada",
+  nenhum: "Nenhum documento de habilitação enviado",
+};
+
+/**
+ * Selo de habilitação por serviço (2026-09-06) — categoria regulamentada
+ * (hoje só veterinário domiciliar) sempre mostra o status, mesmo "nenhum",
+ * pra transparência total: sem aprovador bloqueando publicar, o Tutor
+ * decide por conta própria com a informação completa na mão.
+ */
+function ServiceCertificationNote({
+  info,
+}: {
+  info: { status: string; documentUrl: string | null };
+}) {
+  return (
+    <p className="text-xs mt-1">
+      <span className={info.status === "aprovado" ? "text-teal font-semibold" : "text-gray-500"}>
+        {CERT_STATUS_LABEL[info.status] ?? info.status}
+      </span>
+      {info.documentUrl && (
+        <>
+          {" · "}
+          <a href={info.documentUrl} target="_blank" rel="noopener noreferrer" className="text-teal font-semibold hover:underline">
+            Ver documento
+          </a>
+        </>
+      )}
+    </p>
   );
 }

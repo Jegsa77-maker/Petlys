@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { markNotificationRead, markAllNotificationsRead } from "@/lib/actions/notifications";
-import { Bell, MessageCircle, FileText, Star, AlertTriangle } from "lucide-react";
+import { Bell, MessageCircle, FileText, Star, AlertTriangle, BadgeCheck } from "lucide-react";
 
 type Notification = {
   id: string;
@@ -19,6 +19,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   avaliacao_recebida: <Star size={16} />,
   status_atendimento: <AlertTriangle size={16} />,
   incidente_aberto: <AlertTriangle size={16} className="text-red-700" />,
+  certificacao_enviada: <BadgeCheck size={16} />,
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -27,6 +28,7 @@ const TYPE_LABEL: Record<string, string> = {
   avaliacao_recebida: "Avaliação recebida",
   status_atendimento: "Status atualizado",
   incidente_aberto: "Incidente aberto — Preciso de ajuda",
+  certificacao_enviada: "Nova habilitação enviada pra revisão",
 };
 
 export function NotificationList({ notifications }: { notifications: Notification[] }) {
@@ -66,6 +68,9 @@ export function NotificationList({ notifications }: { notifications: Notificatio
             const requestId = (n.payload as Record<string, unknown> | null)?.request_id as
               | string
               | undefined;
+            const certificationId = (n.payload as Record<string, unknown> | null)?.certification_id as
+              | string
+              | undefined;
             return (
               <li
                 key={n.id}
@@ -86,6 +91,15 @@ export function NotificationList({ notifications }: { notifications: Notificatio
                       className="text-xs text-teal font-semibold hover:underline"
                     >
                       Ver atendimento
+                    </Link>
+                  )}
+                  {certificationId && (
+                    <Link
+                      href="/admin/habilitacoes"
+                      onClick={() => !n.read_at && handleMarkRead(n.id)}
+                      className="text-xs text-teal font-semibold hover:underline"
+                    >
+                      Revisar habilitação
                     </Link>
                   )}
                 </div>

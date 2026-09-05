@@ -11,8 +11,10 @@ type ActionResult = { error: string | null };
 
 /**
  * Profissional envia documento de habilitação pra uma categoria
- * regulamentada (seção 6.3). Fica `pendente` até revisão manual de
- * Admin/Supervisor — ver reviewCertification.
+ * regulamentada (seção 6.3), a partir do formulário de Serviço (movido de
+ * "Meu perfil" em 2026-09-06). Fica `pendente` até revisão manual de
+ * Admin/Supervisor — ver reviewCertification. Não bloqueia publicar
+ * nenhum serviço (ver createService) — só define o selo que o Tutor vê.
  */
 export async function submitCertification(input: unknown): Promise<ActionResult> {
   const parsed = submitCertificationSchema.safeParse(input);
@@ -39,7 +41,7 @@ export async function submitCertification(input: unknown): Promise<ActionResult>
     return { error: "Não foi possível enviar o documento. Tente novamente." };
   }
 
-  revalidatePath("/perfil");
+  revalidatePath("/servicos");
   return { error: null };
 }
 
@@ -54,7 +56,7 @@ export async function withdrawCertification(certificationId: string): Promise<Ac
     return { error: "Só é possível remover documentos ainda pendentes de revisão." };
   }
 
-  revalidatePath("/perfil");
+  revalidatePath("/servicos");
   return { error: null };
 }
 

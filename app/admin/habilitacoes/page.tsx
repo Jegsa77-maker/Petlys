@@ -16,7 +16,10 @@ export default async function HabilitacoesPage() {
     id: c.id,
     category: c.category,
     status: c.status,
-    document_url: c.document_url,
+    // Bucket virou público na migration 0085 — resolve pra URL pública
+    // aqui em vez de gerar link assinado no client.
+    document_url: supabase.storage.from("professional-certifications").getPublicUrl(c.document_url).data
+      .publicUrl,
     professional_name: c.profiles?.full_name ?? "Profissional",
   }));
 

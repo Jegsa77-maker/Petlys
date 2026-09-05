@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Pencil } from "lucide-react";
 import { toggleServiceActive } from "@/lib/actions/services";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -25,17 +26,24 @@ type Service = {
   professional_service_addons: { id: string; name: string; price: number }[];
 };
 
-export function ServiceList({ services }: { services: Service[] }) {
+export function ServiceList({
+  services,
+  onEdit,
+}: {
+  services: Service[];
+  /** Ausente = tela sem edição habilitada (mantém a lista só-leitura de antes). */
+  onEdit?: (serviceId: string) => void;
+}) {
   return (
     <ul className="flex flex-col gap-2">
       {services.map((service) => (
-        <ServiceRow key={service.id} service={service} />
+        <ServiceRow key={service.id} service={service} onEdit={onEdit} />
       ))}
     </ul>
   );
 }
 
-function ServiceRow({ service }: { service: Service }) {
+function ServiceRow({ service, onEdit }: { service: Service; onEdit?: (serviceId: string) => void }) {
   const [active, setActive] = useState(service.active);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,16 +77,28 @@ function ServiceRow({ service }: { service: Service }) {
           </p>
         )}
       </div>
-      <button
-        type="button"
-        onClick={handleToggle}
-        disabled={isSubmitting}
-        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
-          active ? "bg-teal text-white" : "bg-gray text-gray-500"
-        }`}
-      >
-        {active ? "Ativo" : "Pausado"}
-      </button>
+      <div className="flex items-center gap-2 shrink-0">
+        {onEdit && (
+          <button
+            type="button"
+            onClick={() => onEdit(service.id)}
+            aria-label="Editar serviço"
+            className="p-1.5 rounded-full text-gray-400 hover:text-teal hover:bg-teal/5"
+          >
+            <Pencil size={14} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={isSubmitting}
+          className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+            active ? "bg-teal text-white" : "bg-gray text-gray-500"
+          }`}
+        >
+          {active ? "Ativo" : "Pausado"}
+        </button>
+      </div>
     </li>
   );
 }
