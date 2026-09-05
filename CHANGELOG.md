@@ -4,6 +4,37 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-06 — Perfis contra o doc "Petlys | Perfis - Pilar 1": Tutor, Profissional (Habilidades + dados), Serviço, Solicitação
+
+**Contexto:** usuário trouxe `Petlys_Perfis_Plataforma_Pilar1.pdf` (documento funcional) pra validar contra o que a plataforma já tem. Depois de várias rodadas de perguntas (`me pergunte suas duvidas. e ainda nao faca nada`), fechamos um escopo de 5 partes.
+
+### 1. Tutor
+- **Castrado** (`pets.neutered boolean`): toggle Sim/Não na página do pet (`components/pets/pet-neutered-toggle.tsx`), salva na hora, mesmo espírito de `toggleServiceActive`.
+- **Foto de perfil** (`profiles.avatar_url text`): novo `AvatarForm` em "Meu perfil", reaproveitando `FileUploadField` no bucket `avatars` já existente — a RLS desse bucket é por prefixo de dono (`(storage.foldername(name))[1] = auth.uid()`), não por papel, então não precisou de nenhuma migration de Storage.
+
+### 2. Profissional — Dados
+- **Galeria de fotos/vídeos** (`professional_media` + bucket `professional-gallery`, migration `0080`): clone exato do padrão de `pet_media`/`pet-gallery` — mesma RLS por prefixo de dono, mesmo componente (lightbox, contador de vagas), e **reaproveita os mesmos limites de tamanho/quantidade configurados pelo Admin** (`getGalleryLimits()`) em vez de duplicar parâmetro.
+- **Formação, Instagram/site, nome profissional** (`professional_profiles.formation/social_url/professional_name`, migration `0079`): 3 campos novos no formulário de perfil.
+- **Correção de um mapeamento anterior**: o relatório de gaps de uma sessão passada dizia que o avatar do Profissional era "só campo de URL, sem upload" — falso; `professional-profile-form.tsx` já usa `FileUploadField` de verdade. Só faltava mesmo a galeria.
+
+### 3. Profissional — Habilidades (novo conceito)
+- **`professional_skills`** (migration `0081`, unique `(professional_id, category)`): o profissional declara em quais categorias atua — vira badge público no perfil, e **é pré-requisito pra publicar um Serviço** naquela categoria (`ServiceForm` filtra o `<select>` de categoria pelas habilidades já declaradas e mostra um aviso com link pra "Meu perfil" quando não há nenhuma).
+- **Habilidade ≠ Serviço, de propósito**: habilidade é só a declaração da categoria (uma vez); os campos operacionais/preço ficam no Serviço, que pode ter várias linhas na mesma categoria (ex.: dois serviços de "Pet sitter" com preços/pacotes diferentes) — decisão fechada com o usuário depois de um exemplo concreto ("pode por 2x o petsitter com dois valores").
+
+### 4. Serviço — campos específicos por categoria
+- **`professional_services.category_details jsonb`** (migration `0082`, mesmo padrão de `pets.health_info`/`requests.category_answers` — blob solto em vez de colunas esparsas): `lib/domain/service-category-fields.ts` define os campos por categoria (pet_sitter: atende onde/qtd máxima de pets; passeador: tamanho do grupo/aceita vacina incompleta; adestrador: atende onde; veterinário: especialidade/leva equipamento; hospedagem: capacidade, aceita não castrado/não sociável, entrada/saída, regra de atraso, diária extra — **só informativo por enquanto**, sem enforcement contra reservas reais, que depende da revisão maior do modelo de hospedagem, ainda não priorizada; banho e tosa: nenhum campo novo). `ServiceForm` renderiza esses campos dinamicamente conforme a categoria escolhida.
+
+### 5. Solicitação — acesso ao imóvel
+- **`has_key`, `key_delivery_method`, `other_person_present`, `has_cameras`** (migration `0083`): nova seção "Acesso ao imóvel (opcional)" no formulário de nova solicitação, mesmo espírito de `address`/`notes` — nada obrigatório.
+- **Anexos já existiam**: o que parecia um gap (upload de arquivo na solicitação) já estava implementado desde a migration `0023` (`request_attachments`, `lib/actions/request-attachments.ts`) — nenhum código novo precisou ser escrito aqui.
+
+### Bug achado e corrigido durante a verificação (pré-existente, não introduzido nesta entrega)
+`components/professional/professional-profile-form.tsx`: `handleSubmit` passava `values` cru pro `professionalProfileSchema.safeParse` e pro `upsertProfessionalProfile`, sem converter string vazia pra `undefined`. Como `visitaInicialDurationMinutes` usa `z.coerce.number().int().positive().optional()`, uma string vazia virava `0` (não `undefined`) e falhava em `.positive()` — **isso bloqueava salvar o perfil sempre que "Ofereço visita inicial" estivesse desligado**, que é o caso comum. Corrigido convertendo os campos numéricos opcionais (`experienceYears`, `visitaInicialPrice`, `visitaInicialDurationMinutes`, `visitaInicialModality`) pra `undefined` quando vazios antes do parse — mesmo padrão que `ServiceForm.handleSubmit` já usa.
+
+**Verificação:** testado ao vivo de ponta a ponta na conta dupla de teste — Castrado (toggle "Sim" confirmado em `pets.neutered`), avatar do Tutor (upload renderiza), perfil do Profissional (nome/formação/Instagram/anos salvos e confirmados no banco, só depois da correção do bug acima), Habilidades (categoria "Pet sitter" adicionada, badge aparece, libera a categoria no formulário de Serviço), Serviço (categoria limitada às habilidades declaradas, campos "Atende"/"Quantidade máxima de pets" renderizados e persistidos em `category_details`), Solicitação (chave/entrega/outra pessoa/câmeras preenchidos e confirmados em `requests`). `tsc`/`eslint`/`next build` limpos; suíte com a mesma falha conhecida de rate-limit do Supabase Auth (106 passaram, 10 skip).
+
+---
+
 ## 2026-09-06 — Bloqueios: lista vai pra baixo do formulário
 
 `components/availability/availability-manager.tsx`: a lista de bloqueios já criados (aba "Configurar horários") passa a vir **depois** do formulário de criar um novo, não antes — pedido do usuário, só reordenação de JSX, sem mudança de lógica.

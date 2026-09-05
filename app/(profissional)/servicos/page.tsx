@@ -8,15 +8,20 @@ export default async function ServicosPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: services } = user
-    ? await supabase
-        .from("professional_services")
-        .select(
-          "id, category, subcategory, base_price, active, multi_pet_discount_percent, duration_minutes, species_accepted, restrictions, professional_service_addons(id, name, price)"
-        )
-        .eq("professional_id", user.id)
-        .order("category")
-    : { data: [] };
+  const [{ data: services }, { data: skillRows }] = user
+    ? await Promise.all([
+        supabase
+          .from("professional_services")
+          .select(
+            "id, category, subcategory, base_price, active, multi_pet_discount_percent, duration_minutes, species_accepted, restrictions, professional_service_addons(id, name, price)"
+          )
+          .eq("professional_id", user.id)
+          .order("category"),
+        supabase.from("professional_skills").select("category").eq("professional_id", user.id),
+      ])
+    : [{ data: [] }, { data: [] }];
+
+  const skillCategories = (skillRows ?? []).map((s) => s.category);
 
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
@@ -25,7 +30,7 @@ export default async function ServicosPage() {
 
         {services && services.length > 0 && <ServiceList services={services} />}
 
-        <ServiceForm />
+        <ServiceForm skillCategories={skillCategories} />
       </div>
     </main>
   );

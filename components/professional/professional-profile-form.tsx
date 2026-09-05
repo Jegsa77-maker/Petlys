@@ -17,6 +17,9 @@ export function ProfessionalProfileForm({
     languages: string;
     policies: string;
     avatarUrl: string;
+    formation: string;
+    socialUrl: string;
+    professionalName: string;
     visitaInicialEnabled: boolean;
     visitaInicialPrice: string;
     visitaInicialDurationMinutes: string;
@@ -38,14 +41,25 @@ export function ProfessionalProfileForm({
     e.preventDefault();
     setError(null);
 
-    const parsed = professionalProfileSchema.safeParse(values);
+    // Campos numéricos opcionais: string vazia precisa virar `undefined`
+    // antes do parse — z.coerce.number() transforma "" em 0, que quebra
+    // .positive() mesmo o campo sendo opcional (mesmo ajuste já usado em
+    // ServiceForm.handleSubmit).
+    const sanitized = {
+      ...values,
+      experienceYears: values.experienceYears || undefined,
+      visitaInicialPrice: values.visitaInicialPrice || undefined,
+      visitaInicialDurationMinutes: values.visitaInicialDurationMinutes || undefined,
+      visitaInicialModality: values.visitaInicialModality || undefined,
+    };
+    const parsed = professionalProfileSchema.safeParse(sanitized);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Verifique os dados informados");
       return;
     }
 
     setIsSubmitting(true);
-    const result = await upsertProfessionalProfile(values);
+    const result = await upsertProfessionalProfile(sanitized);
     setIsSubmitting(false);
 
     if (result?.error) {
@@ -70,6 +84,16 @@ export function ProfessionalProfileForm({
         <p className="text-xs text-gray-500 mt-1">
           Clique em &quot;Salvar perfil&quot; depois de enviar pra confirmar.
         </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-black mb-1">Nome profissional</label>
+        <input
+          value={values.professionalName}
+          onChange={(e) => setField("professionalName", e.target.value)}
+          placeholder="Ex: Dra. Ana — se diferente do nome da sua conta"
+          className="input"
+        />
       </div>
 
       <div>
@@ -123,6 +147,27 @@ export function ProfessionalProfileForm({
           onChange={(e) => setField("policies", e.target.value)}
           placeholder="Regras próprias que o Tutor deve saber antes de contratar (cancelamento, atraso, etc.)"
           rows={3}
+          className="input"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-black mb-1">Formação</label>
+        <textarea
+          value={values.formation}
+          onChange={(e) => setField("formation", e.target.value)}
+          placeholder="Cursos, formação e especialidades — ex: Técnica veterinária; curso de primeiros socorros pet"
+          rows={2}
+          className="input"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-black mb-1">Instagram / site</label>
+        <input
+          value={values.socialUrl}
+          onChange={(e) => setField("socialUrl", e.target.value)}
+          placeholder="https://instagram.com/seuperfil"
           className="input"
         />
       </div>

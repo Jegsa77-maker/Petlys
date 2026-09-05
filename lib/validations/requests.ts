@@ -37,6 +37,13 @@ export const createRequestSchema = z.object({
   // Profissional a decidir, não uma barreira de envio.
   address: z.string().trim().max(300).optional(),
   categoryAnswers: z.record(z.string(), z.string().trim().max(1000)).default({}),
+  // Acesso ao imóvel (doc "Petlys | Perfis - Pilar 1", seção 6: pertence à
+  // solicitação, não ao perfil — cada contratação pode ter uma combinação
+  // diferente). Tudo opcional, mesmo espírito de address/notes.
+  hasKey: z.boolean().optional(),
+  keyDeliveryMethod: z.string().trim().max(300).optional(),
+  otherPersonPresent: z.string().trim().max(300).optional(),
+  hasCameras: z.boolean().optional(),
   // Preenchido quando o formulário completo nasce de uma conversa prévia
   // (ver startConversationSchema abaixo) — createRequest atualiza essa
   // request já existente em vez de criar uma nova, preservando o chat.

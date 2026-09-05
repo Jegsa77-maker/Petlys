@@ -171,6 +171,26 @@ export async function updatePetEmergency(petId: string, input: unknown): Promise
 }
 
 /**
+ * Castrado — campo de identificação (2026-09-06, revisão contra o doc
+ * "Petlys | Perfis - Pilar 1") que faltava. Coluna própria (`pets.
+ * neutered`), não jsonb: diferente de saúde/comportamento/rotina, isso
+ * é um fato estruturado que outras partes do sistema podem precisar
+ * checar (ex.: um serviço de hospedagem que só aceita pet castrado).
+ * `null` = não informado ainda, diferente de `false` = informou que não é.
+ */
+export async function updatePetNeutered(petId: string, neutered: boolean | null): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("pets").update({ neutered }).eq("id", petId);
+
+  if (error) {
+    return { error: "Não foi possível salvar." };
+  }
+
+  revalidatePath(`/pets/${petId}`);
+  return { error: null };
+}
+
+/**
  * Foto do pet (upload real, seção 6.2) — bucket público `pet-photos`,
  * caminho `{petId}/...` (ver 0018_terms_consent_documents_certifications.sql).
  */

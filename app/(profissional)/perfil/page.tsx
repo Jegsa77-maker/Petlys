@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { ProfessionalProfileForm } from "@/components/professional/professional-profile-form";
 import { ServiceAreaForm } from "@/components/professional/service-area-form";
 import { CertificationsSection } from "@/components/professional/certifications-section";
+import { ProfessionalGallerySection } from "@/components/professional/professional-gallery-section";
+import { ProfessionalSkillsSection } from "@/components/professional/professional-skills-section";
+import { getGalleryLimits } from "@/lib/actions/pet-media";
 import {
   computeProfessionalLevel,
   averageRating,
@@ -25,6 +28,9 @@ export default async function PerfilProfissionalPage() {
     { count: completedCount },
     { data: reviews },
     { data: serviceArea },
+    { data: mediaRows },
+    { data: skillRows },
+    galleryLimits,
   ] = await Promise.all([
     supabase.from("professional_profiles").select("*").eq("profile_id", user.id).maybeSingle(),
     supabase
@@ -48,7 +54,21 @@ export default async function PerfilProfissionalPage() {
       .select("center_zip, radius_km")
       .eq("professional_id", user.id)
       .maybeSingle(),
+    supabase
+      .from("professional_media")
+      .select("id, media_type, url")
+      .eq("professional_id", user.id)
+      .order("created_at", { ascending: true }),
+    supabase.from("professional_skills").select("id, category").eq("professional_id", user.id),
+    getGalleryLimits(),
   ]);
+
+  const galleryItems = (mediaRows ?? []).map((row) => ({
+    id: row.id,
+    mediaType: row.media_type as "foto" | "video",
+    path: row.url,
+    publicUrl: supabase.storage.from("professional-gallery").getPublicUrl(row.url).data.publicUrl,
+  }));
 
   const avgRating = averageRating(reviews ?? []);
   const level = computeProfessionalLevel(completedCount ?? 0, avgRating);
@@ -114,6 +134,9 @@ export default async function PerfilProfissionalPage() {
             languages: languages.join(", "),
             policies: profile?.policies ?? "",
             avatarUrl: profile?.avatar_url ?? "",
+            formation: profile?.formation ?? "",
+            socialUrl: profile?.social_url ?? "",
+            professionalName: profile?.professional_name ?? "",
             visitaInicialEnabled: profile?.visita_inicial_enabled ?? false,
             visitaInicialPrice:
               profile?.visita_inicial_price != null ? String(profile.visita_inicial_price) : "",
@@ -125,6 +148,16 @@ export default async function PerfilProfissionalPage() {
             visitaInicialDeductible: profile?.visita_inicial_deductible ?? false,
           }}
         />
+
+        <ProfessionalGallerySection
+          professionalId={user.id}
+          initialItems={galleryItems}
+          maxPhotoBytes={galleryLimits.maxPhotoBytes}
+          maxVideoBytes={galleryLimits.maxVideoBytes}
+          maxItems={galleryLimits.maxItems}
+        />
+
+        <ProfessionalSkillsSection initialSkills={skillRows ?? []} />
 
         <ServiceAreaForm
           currentZip={serviceArea?.center_zip ?? null}

@@ -49,6 +49,12 @@ export const createServiceSchema = z
     maxSize: z.enum(PET_SIZES).optional(),
     restrictions: z.string().trim().max(500).optional(),
     addons: z.array(serviceAddonSchema).max(10).default([]),
+    // Campos específicos por categoria (2026-09-06, ver
+    // lib/domain/service-category-fields.ts) — cada categoria define suas
+    // próprias chaves, então fica livre aqui; a validação de "esse campo
+    // faz sentido pra essa categoria" é responsabilidade da UI, não do
+    // schema (mesmo espírito de categoryAnswers em requests).
+    categoryDetails: z.record(z.string(), z.union([z.string(), z.boolean()])).default({}),
   })
   .refine((data) => !data.minSize || !data.maxSize || PET_SIZE_RANK[data.minSize] <= PET_SIZE_RANK[data.maxSize], {
     message: "O porte mínimo não pode ser maior que o porte máximo",

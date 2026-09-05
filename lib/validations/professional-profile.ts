@@ -22,6 +22,14 @@ export const professionalProfileSchema = z.object({
     .pipe(z.array(z.string()).max(10)),
   policies: z.string().trim().max(2000, "Máximo de 2000 caracteres").optional(),
   avatarUrl: z.string().trim().url("Informe uma URL válida").optional().or(z.literal("")),
+  // Campos que faltavam contra o doc "Petlys | Perfis - Pilar 1"
+  // (2026-09-06): formação (texto livre — diferente de "certificações",
+  // que já tem upload+aprovação própria pra categoria regulamentada),
+  // rede social/site, e nome profissional (ex. "Dra. Ana", diferente do
+  // nome completo da conta).
+  formation: z.string().trim().max(1000, "Máximo de 1000 caracteres").optional(),
+  socialUrl: z.string().trim().url("Informe uma URL válida").optional().or(z.literal("")),
+  professionalName: z.string().trim().max(80).optional(),
   // Visita inicial como jornada própria (seção 7.4/12.1, item 6 da Onda 2)
   // — tudo opcional, igual ao resto do perfil: ativar não é obrigatório
   // pra publicar serviço nenhum.
@@ -40,6 +48,9 @@ export type ProfessionalProfileFormInput = {
   languages: string;
   policies: string;
   avatarUrl: string;
+  formation: string;
+  socialUrl: string;
+  professionalName: string;
   visitaInicialEnabled: boolean;
   visitaInicialPrice: string;
   visitaInicialDurationMinutes: string;

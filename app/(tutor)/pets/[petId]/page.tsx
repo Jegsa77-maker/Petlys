@@ -4,6 +4,7 @@ import { PawPrint } from "lucide-react";
 import { CoTutorsSection } from "@/components/pets/co-tutors-section";
 import { PetMediaSection } from "@/components/pets/pet-media-section";
 import { PetGallerySection } from "@/components/pets/pet-gallery-section";
+import { PetNeuteredToggle } from "@/components/pets/pet-neutered-toggle";
 import { getGalleryLimits } from "@/lib/actions/pet-media";
 import { PetProfileSection, type FieldDef } from "@/components/pets/pet-profile-section";
 import {
@@ -131,9 +132,13 @@ export default async function PetDetailPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <InfoCard label="Porte" value={pet.size ?? "—"} />
           <InfoCard label="Peso" value={pet.weight ? `${pet.weight} kg` : "—"} />
+        </div>
+
+        <div className="mb-6">
+          <PetNeuteredToggle petId={pet.id} initialValue={pet.neutered} />
         </div>
 
         <div className="mb-6">

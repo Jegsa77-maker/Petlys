@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { AddressForm } from "@/components/tutor/address-form";
+import { AvatarForm } from "@/components/tutor/avatar-form";
 
 /**
  * Primeira tela de "meu perfil" pro Tutor — não existia nenhuma até agora
@@ -17,7 +18,7 @@ export default async function MeuPerfilPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email, address_zip")
+    .select("full_name, email, address_zip, avatar_url")
     .eq("id", user.id)
     .single();
 
@@ -25,6 +26,8 @@ export default async function MeuPerfilPage() {
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto flex flex-col gap-6">
         <h1 className="text-2xl font-bold text-teal">Meu perfil</h1>
+
+        <AvatarForm profileId={user.id} currentUrl={profile?.avatar_url ?? null} />
 
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs text-gray-500">Nome</p>

@@ -1,19 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Plus, X } from "lucide-react";
 import { createService } from "@/lib/actions/services";
 import { createServiceSchema } from "@/lib/validations/services";
 import { SERVICE_SUBCATEGORIES, SPECIES_OPTIONS, PET_SIZES, PET_SIZE_LABEL } from "@/lib/domain/service-catalog";
-
-const CATEGORY_LABEL: Record<string, string> = {
-  pet_sitter: "Pet sitter / cuidador",
-  passeador: "Passeador de cães",
-  hospedagem_creche: "Hospedagem / creche",
-  adestrador: "Adestrador / comportamentalista",
-  banho_tosa: "Banho e tosa",
-  veterinario_domiciliar: "Veterinário domiciliar",
-};
+import { SERVICE_CATEGORY_LABEL as CATEGORY_LABEL } from "@/lib/domain/service-catalog";
+import { SERVICE_CATEGORY_FIELDS } from "@/lib/domain/service-category-fields";
+import type { ServiceCategory } from "@/types/database";
 
 const PRICING_LABEL: Record<string, string> = {
   fixo: "Preço fixo",
@@ -27,8 +22,17 @@ const PRICING_LABEL: Record<string, string> = {
 
 type AddonDraft = { name: string; price: string };
 
-export function ServiceForm({ onCreated }: { onCreated?: () => void }) {
+export function ServiceForm({
+  skillCategories,
+  onCreated,
+}: {
+  /** Categorias que o profissional já declarou como "Habilidade" (2026-09-06)
+   * — só essas podem virar Serviço; libera os campos específicos de cada uma. */
+  skillCategories: ServiceCategory[];
+  onCreated?: () => void;
+}) {
   const [category, setCategory] = useState("");
+  const [categoryDetails, setCategoryDetails] = useState<Record<string, string | boolean>>({});
   const [subcategory, setSubcategory] = useState("");
   const [pricingModel, setPricingModel] = useState("");
   const [basePrice, setBasePrice] = useState("");
@@ -80,6 +84,7 @@ export function ServiceForm({ onCreated }: { onCreated?: () => void }) {
       addons: addons
         .filter((a) => a.name.trim() || a.price.trim())
         .map((a) => ({ name: a.name, price: a.price || 0 })),
+      categoryDetails,
     });
 
     if (!parsed.success) {
@@ -107,10 +112,29 @@ export function ServiceForm({ onCreated }: { onCreated?: () => void }) {
     setMaxSize("");
     setRestrictions("");
     setAddons([]);
+    setCategoryDetails({});
     onCreated?.();
   }
 
+  function setCategoryDetail(key: string, value: string | boolean) {
+    setCategoryDetails((prev) => ({ ...prev, [key]: value }));
+  }
+
   const subcategoryOptions = category ? SERVICE_SUBCATEGORIES[category] ?? [] : [];
+  const categoryFields = category ? SERVICE_CATEGORY_FIELDS[category as ServiceCategory] ?? [] : [];
+
+  if (skillCategories.length === 0) {
+    return (
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold mb-1">Adicione uma habilidade antes de publicar um serviço</p>
+        <p>
+          Em <Link href="/perfil" className="underline font-medium">Meu perfil</Link>, na seção
+          &quot;Habilidades&quot;, escolha a categoria que você atua — isso libera os campos certos pra
+          publicar o serviço aqui.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
@@ -121,12 +145,13 @@ export function ServiceForm({ onCreated }: { onCreated?: () => void }) {
         onChange={(e) => {
           setCategory(e.target.value);
           setSubcategory("");
+          setCategoryDetails({});
         }}
         className="input"
       >
         <option value="">Categoria</option>
-        {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
+        {skillCategories.map((value) => (
+          <option key={value} value={value}>{CATEGORY_LABEL[value]}</option>
         ))}
       </select>
 
@@ -137,6 +162,67 @@ export function ServiceForm({ onCreated }: { onCreated?: () => void }) {
             <option key={label} value={label}>{label}</option>
           ))}
         </select>
+      )}
+
+      {categoryFields.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
+          <p className="text-xs font-semibold text-gray-600">Específico de {CATEGORY_LABEL[category]}</p>
+          {categoryFields.map((field) => {
+            const value = categoryDetails[field.key];
+            if (field.type === "checkbox") {
+              return (
+                <label key={field.key} className="flex items-center gap-2 text-sm text-black">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(value)}
+                    onChange={(e) => setCategoryDetail(field.key, e.target.checked)}
+                    className="h-4 w-4 accent-teal"
+                  />
+                  {field.label}
+                </label>
+              );
+            }
+            if (field.type === "select") {
+              return (
+                <div key={field.key}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
+                  <select
+                    value={String(value ?? "")}
+                    onChange={(e) => setCategoryDetail(field.key, e.target.value)}
+                    className="input text-sm"
+                  >
+                    <option value="">Selecione</option>
+                    {field.options?.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
+            return (
+              <div key={field.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
+                {field.type === "textarea" ? (
+                  <textarea
+                    value={String(value ?? "")}
+                    onChange={(e) => setCategoryDetail(field.key, e.target.value)}
+                    rows={2}
+                    placeholder={field.placeholder}
+                    className="input text-sm"
+                  />
+                ) : (
+                  <input
+                    type={field.type === "number" ? "number" : field.type === "time" ? "time" : "text"}
+                    value={String(value ?? "")}
+                    onChange={(e) => setCategoryDetail(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    className="input text-sm"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <select value={pricingModel} onChange={(e) => setPricingModel(e.target.value)} className="input">

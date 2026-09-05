@@ -65,6 +65,7 @@ export async function createService(input: unknown): Promise<ActionResult> {
       min_size: parsed.data.minSize ?? null,
       max_size: parsed.data.maxSize ?? null,
       restrictions: parsed.data.restrictions ?? null,
+      category_details: parsed.data.categoryDetails,
     })
     .select("id")
     .single();

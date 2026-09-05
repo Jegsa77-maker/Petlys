@@ -140,6 +140,10 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
     origin_request_id: originRequestId,
     address: parsed.data.address || null,
     category_answers: parsed.data.categoryAnswers,
+    has_key: parsed.data.hasKey ?? null,
+    key_delivery_method: parsed.data.keyDeliveryMethod || null,
+    other_person_present: parsed.data.otherPersonPresent || null,
+    has_cameras: parsed.data.hasCameras ?? null,
     // Consentimento é validado pelo schema (prontuarioConsent === true) —
     // aqui só registramos o carimbo de quando foi dado (seção 6.4).
     prontuario_shared_at: new Date().toISOString(),

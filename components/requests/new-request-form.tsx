@@ -81,6 +81,10 @@ export function NewRequestForm({
   const [firstOccurrenceAt, setFirstOccurrenceAt] = useState("");
   const [notes, setNotes] = useState("");
   const [address, setAddress] = useState(initialAddress);
+  const [hasKey, setHasKey] = useState<boolean | undefined>(undefined);
+  const [keyDeliveryMethod, setKeyDeliveryMethod] = useState("");
+  const [otherPersonPresent, setOtherPersonPresent] = useState("");
+  const [hasCameras, setHasCameras] = useState<boolean | undefined>(undefined);
   const [categoryAnswers, setCategoryAnswers] = useState<Record<string, string>>(initialCategoryAnswers);
   const [prontuarioConsent, setProntuarioConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +143,10 @@ export function NewRequestForm({
       isVisitaInicial,
       prontuarioConsent,
       address: address || undefined,
+      hasKey,
+      keyDeliveryMethod: keyDeliveryMethod || undefined,
+      otherPersonPresent: otherPersonPresent || undefined,
+      hasCameras,
       categoryAnswers,
       existingRequestId: continuarRequestId,
     });
@@ -297,6 +305,45 @@ export function NewRequestForm({
           className="input"
           placeholder="Rua, número, bairro — se o atendimento for na sua casa"
         />
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3">
+        <p className="text-sm font-medium text-black">Acesso ao imóvel (opcional)</p>
+
+        <label className="flex items-center gap-2 text-sm text-black">
+          <input
+            type="checkbox"
+            checked={hasKey ?? false}
+            onChange={(e) => setHasKey(e.target.checked)}
+            className="h-4 w-4 accent-teal"
+          />
+          Existe chave pro profissional usar
+        </label>
+        {hasKey && (
+          <input
+            value={keyDeliveryMethod}
+            onChange={(e) => setKeyDeliveryMethod(e.target.value)}
+            placeholder="Como a chave vai ser entregue"
+            className="input"
+          />
+        )}
+
+        <input
+          value={otherPersonPresent}
+          onChange={(e) => setOtherPersonPresent(e.target.value)}
+          placeholder="Alguém mais vai estar no imóvel durante o período? Quem/quando (opcional)"
+          className="input"
+        />
+
+        <label className="flex items-center gap-2 text-sm text-black">
+          <input
+            type="checkbox"
+            checked={hasCameras ?? false}
+            onChange={(e) => setHasCameras(e.target.checked)}
+            className="h-4 w-4 accent-teal"
+          />
+          Tem câmeras no imóvel
+        </label>
       </div>
 
       {category && (CATEGORY_QUESTIONS[category] ?? []).length > 0 && (

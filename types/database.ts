@@ -909,6 +909,7 @@ export type Database = {
           health_info: Json
           id: string
           name: string
+          neutered: boolean | null
           photo_url: string | null
           routine_info: Json
           sex: string | null
@@ -928,6 +929,7 @@ export type Database = {
           health_info?: Json
           id?: string
           name: string
+          neutered?: boolean | null
           photo_url?: string | null
           routine_info?: Json
           sex?: string | null
@@ -947,6 +949,7 @@ export type Database = {
           health_info?: Json
           id?: string
           name?: string
+          neutered?: boolean | null
           photo_url?: string | null
           routine_info?: Json
           sex?: string | null
@@ -1228,14 +1231,59 @@ export type Database = {
           },
         ]
       }
+      professional_media: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          media_type: string
+          professional_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          media_type: string
+          professional_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          media_type?: string
+          professional_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_media_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professional_media_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_profiles: {
         Row: {
           avatar_url: string | null
           bio: string | null
           experience_years: number | null
+          formation: string | null
           languages: string[]
           policies: string | null
+          professional_name: string | null
           profile_id: string
+          social_url: string | null
           specializations: string[]
           updated_at: string
           visita_inicial_deductible: boolean
@@ -1248,9 +1296,12 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           experience_years?: number | null
+          formation?: string | null
           languages?: string[]
           policies?: string | null
+          professional_name?: string | null
           profile_id: string
+          social_url?: string | null
           specializations?: string[]
           updated_at?: string
           visita_inicial_deductible?: boolean
@@ -1263,9 +1314,12 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           experience_years?: number | null
+          formation?: string | null
           languages?: string[]
           policies?: string | null
+          professional_name?: string | null
           profile_id?: string
+          social_url?: string | null
           specializations?: string[]
           updated_at?: string
           visita_inicial_deductible?: boolean
@@ -1418,6 +1472,7 @@ export type Database = {
           active: boolean
           base_price: number | null
           category: Database["public"]["Enums"]["service_category"]
+          category_details: Json
           created_at: string
           description: string | null
           duration_minutes: number | null
@@ -1436,6 +1491,7 @@ export type Database = {
           active?: boolean
           base_price?: number | null
           category: Database["public"]["Enums"]["service_category"]
+          category_details?: Json
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
@@ -1454,6 +1510,7 @@ export type Database = {
           active?: boolean
           base_price?: number | null
           category?: Database["public"]["Enums"]["service_category"]
+          category_details?: Json
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
@@ -1478,11 +1535,41 @@ export type Database = {
           },
         ]
       }
+      professional_skills: {
+        Row: {
+          category: Database["public"]["Enums"]["service_category"]
+          created_at: string
+          id: string
+          professional_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["service_category"]
+          created_at?: string
+          id?: string
+          professional_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["service_category"]
+          created_at?: string
+          id?: string
+          professional_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_skills_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address_lat: number | null
           address_lng: number | null
           address_zip: string | null
+          avatar_url: string | null
           birth_date: string | null
           cpf_cnpj: string | null
           created_at: string
@@ -1499,6 +1586,7 @@ export type Database = {
           address_lat?: number | null
           address_lng?: number | null
           address_zip?: string | null
+          avatar_url?: string | null
           birth_date?: string | null
           cpf_cnpj?: string | null
           created_at?: string
@@ -1515,6 +1603,7 @@ export type Database = {
           address_lat?: number | null
           address_lng?: number | null
           address_zip?: string | null
+          avatar_url?: string | null
           birth_date?: string | null
           cpf_cnpj?: string | null
           created_at?: string
@@ -1876,12 +1965,16 @@ export type Database = {
           category_answers: Json
           commission_percent_snapshot: number | null
           created_at: string
+          has_cameras: boolean | null
+          has_key: boolean | null
           id: string
           is_conversa_previa: boolean
           is_recurring: boolean
           is_visita_inicial: boolean
+          key_delivery_method: string | null
           occurrences_total: number
           origin_request_id: string | null
+          other_person_present: string | null
           professional_id: string
           prontuario_shared_at: string | null
           recurrence_interval: string | null
@@ -1896,12 +1989,16 @@ export type Database = {
           category_answers?: Json
           commission_percent_snapshot?: number | null
           created_at?: string
+          has_cameras?: boolean | null
+          has_key?: boolean | null
           id?: string
           is_conversa_previa?: boolean
           is_recurring?: boolean
           is_visita_inicial?: boolean
+          key_delivery_method?: string | null
           occurrences_total?: number
           origin_request_id?: string | null
+          other_person_present?: string | null
           professional_id: string
           prontuario_shared_at?: string | null
           recurrence_interval?: string | null
@@ -1916,12 +2013,16 @@ export type Database = {
           category_answers?: Json
           commission_percent_snapshot?: number | null
           created_at?: string
+          has_cameras?: boolean | null
+          has_key?: boolean | null
           id?: string
           is_conversa_previa?: boolean
           is_recurring?: boolean
           is_visita_inicial?: boolean
+          key_delivery_method?: string | null
           occurrences_total?: number
           origin_request_id?: string | null
+          other_person_present?: string | null
           professional_id?: string
           prontuario_shared_at?: string | null
           recurrence_interval?: string | null

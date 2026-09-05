@@ -48,3 +48,30 @@ export async function updateTutorAddress(input: unknown): Promise<ActionResult> 
   revalidatePath("/meu-perfil");
   return { error: null };
 }
+
+/**
+ * Foto de perfil do Tutor (doc "Petlys | Perfis - Pilar 1": "Foto —
+ * Opcional. Ajuda na identificação e humanização da relação") — até
+ * 2026-09-06 só o Profissional tinha avatar. Mesmo bucket `avatars`
+ * (0017), a policy de storage já é por dono do caminho, não por papel —
+ * não precisou de migration nova de storage, só a coluna em `profiles`.
+ */
+export async function updateTutorAvatar(avatarUrl: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", user.id);
+
+  if (error) {
+    return { error: "Não foi possível salvar a foto." };
+  }
+
+  revalidatePath("/meu-perfil");
+  return { error: null };
+}
