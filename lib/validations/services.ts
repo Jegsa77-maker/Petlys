@@ -56,15 +56,30 @@ export const createServiceSchema = z
   });
 export type CreateServiceValues = z.infer<typeof createServiceSchema>;
 
-export const availabilitySlotSchema = z.object({
-  weekday: z.coerce.number().int().min(0).max(6),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido"),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido"),
-});
-export type AvailabilitySlotValues = z.infer<typeof availabilitySlotSchema>;
+// Ajuste de 2026-09-05: "horário de trabalho" deixou de ser uma lista de
+// janelas por dia da semana — virou um único range que vale pra semana
+// inteira (o profissional trabalha das 9 às 18, ponto — quem tira um dia
+// de folga registra isso como bloqueio/folga na data específica, não
+// editando o horário recorrente). `setWorkingHours` (lib/actions/services.ts)
+// grava esse range nas 7 linhas de weekday de uma vez.
+export const workingHoursSchema = z
+  .object({
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido"),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido"),
+  })
+  .refine((data) => data.startTime < data.endTime, {
+    message: "O horário de início precisa ser antes do fim",
+    path: ["endTime"],
+  });
+export type WorkingHoursValues = z.infer<typeof workingHoursSchema>;
 
 export const BLOCK_TYPES = ["bloqueio", "folga", "compromisso"] as const;
 export type BlockType = (typeof BLOCK_TYPES)[number];
+
+// "Configurar horários" só oferece bloqueio/folga (pedido de 2026-09-05:
+// compromisso passa a existir só pelo atalho "+" da Agenda, não faz
+// sentido cadastrar um compromisso avulso na tela de configuração).
+export const CONFIG_BLOCK_TYPES = ["bloqueio", "folga"] as const satisfies readonly BlockType[];
 
 // Horário é opcional (ajuste pedido depois do calendário mensal — antes só
 // dava pra bloquear o dia inteiro): os dois campos vêm juntos (dia inteiro)
@@ -101,3 +116,24 @@ export const blockDateSchema = z
     { message: "O período não pode passar de 1 ano", path: ["untilDate"] }
   );
 export type BlockDateValues = z.infer<typeof blockDateSchema>;
+
+// Editar um bloqueio/folga/compromisso já existente (clicar num item da
+// lista da Agenda, ou arrastar pra outro horário) — não muda a data, só
+// tipo/horário/motivo.
+export const updateBlockSchema = z
+  .object({
+    id: z.uuid(),
+    blockType: z.enum(BLOCK_TYPES),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido").optional(),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido").optional(),
+    reason: z.string().trim().max(200).optional(),
+  })
+  .refine((data) => (data.startTime == null) === (data.endTime == null), {
+    message: "Informe início e fim, ou deixe os dois em branco pro dia inteiro",
+    path: ["endTime"],
+  })
+  .refine((data) => !data.startTime || !data.endTime || data.startTime < data.endTime, {
+    message: "O horário de início precisa ser antes do fim",
+    path: ["endTime"],
+  });
+export type UpdateBlockValues = z.infer<typeof updateBlockSchema>;

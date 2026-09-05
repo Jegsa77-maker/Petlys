@@ -4,6 +4,20 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-05 — Agenda: redesenho depois do primeiro teste do usuário
+
+**Contexto:** usuário testou a Agenda ao vivo e achou "estranha" — pediu pra simplificar o horário de trabalho pra um único range (em vez de configurar dia por dia), tirar "compromisso" da tela de configuração (só existe pelo atalho "+"), corrigir o drag de compromisso (não funcionava), e fazer clicar num item da lista abrir edição (bloqueio/folga/compromisso) ou levar pro card do atendimento (serviço).
+
+- **Horário de trabalho virou um range só** (`setWorkingHours`/`clearWorkingHours`, `lib/actions/services.ts`): "o profissional trabalha das 9 às 18", ponto — sem mais configurar cada dia da semana separado. Substitui as 7 linhas de weekday de uma vez (mesma tabela, sem migration). Folga num dia específico continua sendo bloqueio, não uma exceção no horário recorrente.
+- **"Configurar horários" perdeu a opção "Compromisso"** (`CONFIG_BLOCK_TYPES` em `lib/validations/services.ts`) — só bloqueio/folga. Compromisso (almoço, médico) só existe pelo atalho "+" da Agenda, que continua oferecendo os 3 tipos.
+- **Removido o esmaecido de hora fora do expediente** na lista do dia — a Agenda do profissional mostra as 24h sempre "abertas"; o horário de trabalho só afeta o que o Tutor consegue pedir (já implementado antes), não a cor da própria Agenda. Ganhou uma linha de referência simples: "Horário de trabalho: 09:00–18:00".
+- **Drag-and-drop de bloqueio/folga/compromisso** (não só de atendimento): faltava o `onDragStart`/`onDrop` nesses cards — adicionado, preservando a duração ao mover (`updateBlock`, nova ação em `lib/actions/services.ts`).
+- **Clicar num item da lista do dia**: bloqueio/folga/compromisso abre um formulário de edição inline (tipo/horário/motivo + remover) no lugar do card; atendimento de serviço navega pra `/kanban?occurrence=<id>`, que agora aceita esse parâmetro pra rolar até o card certo e destacar com um anel teal (`components/kanban/kanban-board.tsx`).
+
+**Verificação:** testado ao vivo de ponta a ponta com fixtures (removidas depois, exceto o horário de trabalho de teste que foi restaurado pro padrão de fábrica) — "Salvar horário" gravou 09:00–18:00 nas 7 linhas; seletor de bloqueio na aba de configuração mostrou só Bloqueio/Folga; arrastar um compromisso de 13h pra 16h moveu preservando a 1h de duração; clicar no compromisso abriu o formulário pré-preenchido, editar o motivo salvou certo; clicar no atendimento "Rex" navegou pra `/kanban?occurrence=...` e o card apareceu com o anel de destaque. `tsc`/`eslint`/`next build` limpos; suíte de testes com a mesma falha conhecida de rate-limit do Supabase Auth (106 passaram).
+
+---
+
 ## 2026-09-05 — Tutor só consegue pedir dentro da disponibilidade real do profissional
 
 **Contexto:** última peça da sequência de ajustes da Agenda — "o tutor deve ver a disponibilidade somente na solicitação". Até aqui, a tela de nova solicitação era um campo de data/hora livre, sem nenhuma ideia de quando o profissional realmente atende. Só virou seguro fazer isso depois da entrega anterior (disponibilidade padrão pra todo profissional) — sem isso, a maioria (que nunca configurou nada) ficaria sem nenhum horário reservável.

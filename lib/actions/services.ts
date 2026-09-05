@@ -3,8 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   createServiceSchema,
-  availabilitySlotSchema,
+  workingHoursSchema,
   blockDateSchema,
+  updateBlockSchema,
 } from "@/lib/validations/services";
 import { categoryRequiresCertification } from "@/lib/domain/regulated-categories";
 import { revalidatePath } from "next/cache";
@@ -105,12 +106,16 @@ export async function toggleServiceActive(serviceId: string, active: boolean): P
 }
 
 /**
- * Agenda semanal recorrente (seção 5.4). A decisão final de horário
- * permanece com o profissional — a plataforma só alerta conflitos,
- * nunca bloqueia.
+ * Horário de trabalho (ajuste de 2026-09-05: virou UM range só pra semana
+ * inteira, não mais uma janela por dia — "o profissional vai por que
+ * trabalha das 9 às 18", ponto; folga num dia específico é bloqueio, não
+ * uma exceção no horário recorrente). Substitui as 7 linhas de weekday de
+ * uma vez só. A decisão final de horário permanece com o profissional —
+ * isso só alimenta o aviso/restrição na tela de solicitação do Tutor
+ * (`lib/domain/availability-check.ts`), nunca trava nada aqui.
  */
-export async function addAvailabilitySlot(input: unknown): Promise<ActionResult> {
-  const parsed = availabilitySlotSchema.safeParse(input);
+export async function setWorkingHours(input: unknown): Promise<ActionResult> {
+  const parsed = workingHoursSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Horário inválido" };
   }
@@ -124,16 +129,57 @@ export async function addAvailabilitySlot(input: unknown): Promise<ActionResult>
     return { error: "Sessão expirada. Faça login novamente." };
   }
 
-  const { error } = await supabase.from("professional_availability").insert({
-    professional_id: user.id,
-    weekday: parsed.data.weekday,
-    start_time: parsed.data.startTime,
-    end_time: parsed.data.endTime,
-    blocked: false,
-  });
+  const { error: deleteError } = await supabase
+    .from("professional_availability")
+    .delete()
+    .eq("professional_id", user.id)
+    .not("weekday", "is", null);
+
+  if (deleteError) {
+    return { error: "Não foi possível salvar o horário." };
+  }
+
+  const { error } = await supabase.from("professional_availability").insert(
+    Array.from({ length: 7 }, (_, weekday) => ({
+      professional_id: user.id,
+      weekday,
+      start_time: parsed.data.startTime,
+      end_time: parsed.data.endTime,
+      blocked: false,
+    }))
+  );
 
   if (error) {
     return { error: "Não foi possível salvar o horário." };
+  }
+
+  revalidatePath("/agenda");
+  return { error: null };
+}
+
+/**
+ * Deixa o horário de trabalho totalmente aberto de novo (sem nenhuma
+ * linha de weekday, cai no fallback de "sem janela declarada = sem
+ * restrição" já usado em `checkAvailability`/Agenda).
+ */
+export async function clearWorkingHours(): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { error } = await supabase
+    .from("professional_availability")
+    .delete()
+    .eq("professional_id", user.id)
+    .not("weekday", "is", null);
+
+  if (error) {
+    return { error: "Não foi possível remover o horário." };
   }
 
   revalidatePath("/agenda");
@@ -188,6 +234,48 @@ export async function blockDate(input: unknown): Promise<ActionResult> {
 
   if (error) {
     return { error: "Não foi possível bloquear a data." };
+  }
+
+  revalidatePath("/agenda");
+  return { error: null };
+}
+
+/**
+ * Editar um bloqueio/folga/compromisso já existente — clicar num item da
+ * lista da Agenda pra ajustar tipo/horário/motivo, ou arrastar pra outro
+ * horário do mesmo dia (2026-09-05: o drag-and-drop de compromisso não
+ * funcionava, só o de atendimento; esta ação é o que o drop chama agora).
+ * Não muda a data — só o profissional escolhe outra data apagando e
+ * recriando pela tela de configuração.
+ */
+export async function updateBlock(input: unknown): Promise<ActionResult> {
+  const parsed = updateBlockSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const { error } = await supabase
+    .from("professional_availability")
+    .update({
+      block_type: parsed.data.blockType,
+      start_time: parsed.data.startTime ?? null,
+      end_time: parsed.data.endTime ?? null,
+      reason: parsed.data.reason ?? null,
+    })
+    .eq("id", parsed.data.id)
+    .eq("professional_id", user.id);
+
+  if (error) {
+    return { error: "Não foi possível atualizar." };
   }
 
   revalidatePath("/agenda");

@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 
-export default async function KanbanPage() {
+export default async function KanbanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ occurrence?: string }>;
+}) {
+  const { occurrence: highlightOccurrenceId } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -33,7 +38,7 @@ export default async function KanbanPage() {
         <p className="text-sm text-gray-600 mb-6">
           Mover um cartão atualiza o status para tutor e profissional automaticamente.
         </p>
-        <KanbanBoard occurrences={occurrences ?? []} />
+        <KanbanBoard occurrences={occurrences ?? []} highlightOccurrenceId={highlightOccurrenceId} />
       </div>
     </main>
   );

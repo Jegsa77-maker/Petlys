@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { registerCheckin, advanceOccurrence, submitOccurrenceReport } from "@/lib/actions/occurrences";
 import { createClient } from "@/lib/supabase/client";
 import { Paperclip, Loader2 } from "lucide-react";
@@ -60,7 +60,16 @@ async function getGeolocation(): Promise<{ lat?: number; lng?: number }> {
  * na hora; mover pra "Finalização" só abre o formulário de relatório (não
  * move sozinho), porque relatório com notas é obrigatório.
  */
-export function KanbanBoard({ occurrences }: { occurrences: OccurrenceCard[] }) {
+export function KanbanBoard({
+  occurrences,
+  highlightOccurrenceId,
+}: {
+  occurrences: OccurrenceCard[];
+  /** Vindo de /kanban?occurrence=<id> — link "ver atendimento" clicado na
+   * Agenda (pedido de 2026-09-05: clicar num serviço na Agenda tem que ir
+   * pro card do atendimento). */
+  highlightOccurrenceId?: string;
+}) {
   const [items, setItems] = useState(occurrences);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -138,6 +147,7 @@ export function KanbanBoard({ occurrences }: { occurrences: OccurrenceCard[] }) 
                   isSubmittingExternally={submittingIds.has(occ.id)}
                   forceOpenReport={forceOpenReportId === occ.id}
                   onReportOpenConsumed={() => setForceOpenReportId((c) => (c === occ.id ? null : c))}
+                  isHighlighted={occ.id === highlightOccurrenceId}
                 />
               ))}
           </div>
@@ -155,6 +165,7 @@ function OccurrenceCardView({
   isSubmittingExternally,
   forceOpenReport,
   onReportOpenConsumed,
+  isHighlighted,
 }: {
   occurrence: OccurrenceCard;
   onUpdated: (id: string, status: string) => void;
@@ -163,7 +174,17 @@ function OccurrenceCardView({
   isSubmittingExternally: boolean;
   forceOpenReport: boolean;
   onReportOpenConsumed: () => void;
+  isHighlighted?: boolean;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isHighlighted) {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notes, setNotes] = useState("");
   const [showReportForm, setShowReportForm] = useState(false);
@@ -231,11 +252,12 @@ function OccurrenceCardView({
 
   return (
     <div
+      ref={cardRef}
       draggable
       onDragStart={onDragStart}
       className={`rounded-lg border border-gray-200 bg-white p-3 cursor-grab active:cursor-grabbing transition-opacity ${
         isDragging ? "opacity-40" : ""
-      }`}
+      } ${isHighlighted ? "ring-2 ring-teal" : ""}`}
     >
       <p className="text-sm font-semibold text-black">{petNames || "Atendimento"}</p>
       <p className="text-xs text-gray-500 mb-1">
