@@ -4,6 +4,19 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-05 — Tutor só consegue pedir dentro da disponibilidade real do profissional
+
+**Contexto:** última peça da sequência de ajustes da Agenda — "o tutor deve ver a disponibilidade somente na solicitação". Até aqui, a tela de nova solicitação era um campo de data/hora livre, sem nenhuma ideia de quando o profissional realmente atende. Só virou seguro fazer isso depois da entrega anterior (disponibilidade padrão pra todo profissional) — sem isso, a maioria (que nunca configurou nada) ficaria sem nenhum horário reservável.
+
+- **`lib/domain/availability-check.ts`** (novo): função pura `checkAvailability(dataHora, janelasRecorrentes, bloqueios)` — checa minuto a minuto se o horário cai dentro da janela de trabalho do dia da semana e fora de qualquer bloqueio/folga/compromisso naquela data. Usada dos dois lados, sem duplicar a lógica: no formulário (feedback na hora) e em `createRequest` (a validação que decide de verdade).
+- **`components/requests/new-request-form.tsx`**: continua o mesmo campo `datetime-local` de sempre (não virou um seletor novo) — mas agora, ao escolher data/hora, mostra um aviso vermelho e desabilita "Enviar solicitação" se cair fora do horário do profissional ou dentro de um bloqueio dele.
+- **`lib/actions/requests.ts` (`createRequest`)**: mesma checagem, agora no servidor — nunca confia só no que o cliente calculou. Roda antes de qualquer escrita no banco, junto dos outros requisitos de bloqueio (prontuário).
+- **Só valida o primeiro atendimento**: um contrato recorrente repete o mesmo dia da semana/horário — cobre o caso comum sem tentar prever bloqueio que ainda nem existe pras ocorrências futuras.
+
+**Verificação:** testado ao vivo — criado um bloqueio de teste (20h–21h) pro profissional-alvo, formulário mostrou "O profissional tem um bloqueio nesse horário. Escolha outro horário." e desabilitou o envio ao escolher 20h30; trocando pra 11h (fora do bloqueio, dentro da disponibilidade padrão) o aviso sumiu e o botão reabilitou. `tsc`/`eslint`/`next build` limpos; suíte de testes com a mesma falha conhecida de rate-limit do Supabase Auth (107 passaram).
+
+---
+
 ## 2026-09-05 — Agenda: disponibilidade padrão, período de bloqueio, atalho "+" e navegação por mês/ano
 
 **Contexto:** sequência de pedidos depois de renomear "Horários recorrentes" — usuário definiu como resolver o risco de restringir reserva sem quebrar profissional nenhum, pediu bloqueio de período inteiro (férias), um atalho "+" pra criar compromisso/bloqueio rápido na Agenda, e navegação direta por mês/ano (hoje só dava pra ir mês a mês).

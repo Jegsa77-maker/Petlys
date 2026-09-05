@@ -39,6 +39,22 @@ export default async function NovaSolicitacaoPage({
   // 2026-09-01 (ver components/admin/prontuario-requirements-manager.tsx).
   const requiredSections = await getCategoryRequiredSections(supabase);
 
+  // Disponibilidade real do profissional (2026-09-05: "o tutor deve ver a
+  // disponibilidade somente na solicitação") — leitura pública, mesma
+  // tabela que a Agenda dele já usa.
+  const { data: availabilitySlots } = await supabase
+    .from("professional_availability")
+    .select("weekday, start_time, end_time, date_override, blocked")
+    .eq("professional_id", profissional);
+
+  const recurringWindows = (availabilitySlots ?? [])
+    .filter((s) => s.weekday !== null)
+    .map((s) => ({ weekday: s.weekday!, startTime: s.start_time!, endTime: s.end_time! }));
+
+  const availabilityBlocks = (availabilitySlots ?? [])
+    .filter((s) => s.date_override !== null)
+    .map((s) => ({ date: s.date_override!, startTime: s.start_time, endTime: s.end_time }));
+
   // "Contratar novamente" (seção 12.3, item 6 da Onda 4) — reaproveita
   // categoria, pets, endereço e respostas de um atendimento concluído
   // anterior. Só reaproveita de uma solicitação que é mesmo do Tutor
@@ -101,6 +117,8 @@ export default async function NovaSolicitacaoPage({
           professionalId={profissional}
           pets={pets}
           requiredSections={requiredSections}
+          recurringWindows={recurringWindows}
+          availabilityBlocks={availabilityBlocks}
           initialIsVisitaInicial={visitaInicial === "1"}
           initialCategory={initialCategory}
           initialPetIds={initialPetIds}

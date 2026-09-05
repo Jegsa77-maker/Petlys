@@ -20,6 +20,7 @@ import {
   PRONTUARIO_SECTION_LABEL,
 } from "@/lib/domain/category-requirements";
 import { getCategoryRequiredSections } from "@/lib/domain/category-requirements-store";
+import { checkAvailability } from "@/lib/domain/availability-check";
 import { trackEventServer } from "@/lib/analytics/track-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -48,6 +49,30 @@ export async function createRequest(input: unknown): Promise<ActionResult> {
 
   if (!user) {
     return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  // Disponibilidade real do profissional (2026-09-05: "o tutor deve ver a
+  // disponibilidade somente na solicitação") — o formulário já avisa isso
+  // na hora, mas quem decide de verdade é o servidor, nunca o cliente.
+  const { data: availabilitySlots } = await supabase
+    .from("professional_availability")
+    .select("weekday, start_time, end_time, date_override, blocked")
+    .eq("professional_id", parsed.data.professionalId);
+
+  const recurringWindows = (availabilitySlots ?? [])
+    .filter((s) => s.weekday !== null)
+    .map((s) => ({ weekday: s.weekday!, startTime: s.start_time!, endTime: s.end_time! }));
+  const availabilityBlocks = (availabilitySlots ?? [])
+    .filter((s) => s.date_override !== null)
+    .map((s) => ({ date: s.date_override!, startTime: s.start_time, endTime: s.end_time }));
+
+  const availability = checkAvailability(
+    new Date(parsed.data.firstOccurrenceAt),
+    recurringWindows,
+    availabilityBlocks
+  );
+  if (!availability.available) {
+    return { error: `${availability.reason} Escolha outro horário.` };
   }
 
   // Requisitos dinâmicos por categoria (seção 6.4): bloqueia o envio se

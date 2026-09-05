@@ -12,6 +12,7 @@ import {
   type ProntuarioSection,
 } from "@/lib/domain/category-requirements";
 import { CATEGORY_QUESTIONS } from "@/lib/domain/category-questions";
+import { checkAvailability, type RecurringWindow, type AvailabilityBlock } from "@/lib/domain/availability-check";
 import type { ServiceCategory } from "@/types/database";
 
 const RECURRENCE_LABEL: Record<string, string> = {
@@ -43,6 +44,8 @@ export function NewRequestForm({
   professionalId,
   pets,
   requiredSections = CATEGORY_REQUIRED_SECTIONS,
+  recurringWindows = [],
+  availabilityBlocks = [],
   initialIsVisitaInicial = false,
   initialCategory = "",
   initialPetIds = [],
@@ -54,6 +57,11 @@ export function NewRequestForm({
   pets: PetOption[];
   /** Configurável pelo Admin (`/admin/parametros`) — default de fábrica quando não informado. */
   requiredSections?: Record<ServiceCategory, ProntuarioSection[]>;
+  /** Disponibilidade real do profissional (2026-09-05) — usada só pra
+   * avisar/bloquear horário fora da janela dele, não pra desenhar um
+   * seletor novo (continua o mesmo datetime-local de sempre). */
+  recurringWindows?: RecurringWindow[];
+  availabilityBlocks?: AvailabilityBlock[];
   initialIsVisitaInicial?: boolean;
   /** "Contratar novamente" (seção 12.3, item 6 da Onda 4) — reaproveita categoria, pets, endereço e respostas de um atendimento anterior. Data e consentimento nunca vêm pré-preenchidos: são específicos de cada pedido. */
   initialCategory?: string;
@@ -106,6 +114,14 @@ export function NewRequestForm({
   }, [category, petIds, pets, requiredSections]);
 
   const hasBlockingRequirements = missingByPet.length > 0;
+
+  // Disponibilidade real do profissional (2026-09-05) — só checa o
+  // primeiro atendimento (um contrato recorrente repete o mesmo dia da
+  // semana/horário, então cobre o caso comum).
+  const availability = useMemo(() => {
+    if (!firstOccurrenceAt) return { available: true, reason: null };
+    return checkAvailability(new Date(firstOccurrenceAt), recurringWindows, availabilityBlocks);
+  }, [firstOccurrenceAt, recurringWindows, availabilityBlocks]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -263,6 +279,11 @@ export function NewRequestForm({
           onChange={(e) => setFirstOccurrenceAt(e.target.value)}
           className="input"
         />
+        {!availability.available && (
+          <p className="text-sm text-red-600 mt-1" role="alert">
+            {availability.reason} Escolha outro horário.
+          </p>
+        )}
       </div>
 
       <div>
@@ -324,7 +345,7 @@ export function NewRequestForm({
 
       <button
         type="submit"
-        disabled={isSubmitting || pets.length === 0 || hasBlockingRequirements}
+        disabled={isSubmitting || pets.length === 0 || hasBlockingRequirements || !availability.available}
         className="w-full rounded-lg bg-teal px-4 py-3 text-sm font-semibold text-white
                    hover:opacity-90 disabled:opacity-60 transition-opacity"
       >
