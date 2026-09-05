@@ -4,6 +4,18 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-05 — Agenda: calendário mensal estilo Google Agenda
+
+**Contexto:** o último dos 5 problemas reportados na Visão Profissional (ver entrada de 2026-09-04 abaixo) — "Agenda Profissional, apresentar o calendário do mês atual, podendo avançar pra frente ou trás, com a lista de horas da 00:01 a 00:00 com o agendamento do serviço ou compromisso ou bloqueio [...] estilo agenda Google". `/agenda` só tinha o editor de disponibilidade semanal (`AvailabilityManager`) — nenhuma visão de calendário, nenhum lugar pra ver o que já está agendado.
+
+- **`lib/domain/agenda-calendar.ts`** (novo): matemática de calendário pura — monta a grade de semanas domingo–sábado do mês (incluindo os dias de borda do mês anterior/seguinte, igual ao Google Agenda), navegação de mês (`addMonths`) e parsing do parâmetro de URL. Sem lib de datas nova — projeto não tinha nenhuma, e a conta não justifica uma dependência (mesma decisão já tomada pro drag-and-drop do Kanban).
+- **`app/(profissional)/agenda/page.tsx`** (reescrito): lê `?mes=YYYY-MM` da URL, busca as `request_occurrences` do profissional no intervalo da grade (mesmo filtro do Kanban — solicitação ainda não confirmada não conta como compromisso) e os bloqueios de `professional_availability`. Navegar de mês é só um `<Link href="/agenda?mes=...">` — o Server Component refaz a busca sozinho, sem precisar de fetch client-side.
+- **`components/agenda/agenda-view.tsx`** (novo): duas abas — "Calendário" (novo) e "Configurar horários" (o `AvailabilityManager` que já existia, sem nenhuma mudança). O calendário mostra um ponto embaixo de qualquer dia com atendimento ou bloqueio; clicar num dia abre um painel com a lista de horas 00:00–23:00 (rolável), cada uma mostrando o pet/categoria/status de quem está agendado naquele horário, e um banner vermelho no topo se o dia estiver bloqueado. Seleção de dia é só estado local — todas as ocorrências do mês visível já chegam prontas via props, sem round-trip novo ao clicar num dia.
+
+**Verificação:** testado ao vivo com ocorrências fixture em dias diferentes do mês (fixture removida depois) — pontos aparecem certo nos dias com atendimento/bloqueio, clicar no dia mostra os horários certos com nome do pet e categoria, banner de bloqueio aparece com o motivo, navegação pra mês anterior/seguinte funciona e limpa a seleção do dia (não seleciona "hoje" fora do mês atual), aba "Configurar horários" continua funcionando sem nenhuma regressão. Testado também em viewport mobile (375px) sem quebra de layout. `tsc`/`eslint`/`next build` limpos; suíte de testes com a mesma falha conhecida de rate-limit do Supabase Auth (arquivos diferentes a cada rodada, não relacionado a esta mudança).
+
+---
+
 ## 2026-09-05 — Kanban: arrastar cartão entre status (drag-and-drop)
 
 **Contexto:** dos 5 problemas reportados na Visão Profissional (ver entrada de 2026-09-04 abaixo), este é o segundo dos dois que eram feature nova, não bug — "gostaria que o profissional consiga arrastar/mover o kanban de um status pra outro preenchendo o que é necessário".
