@@ -1,3 +1,5 @@
+import type { BlockType } from "@/lib/validations/services";
+
 /**
  * Cálculo de grade de calendário mensal (item 1 da lista de achados na
  * Visão Profissional, 2026-09-04: "Agenda Profissional, apresentar o
@@ -5,6 +7,20 @@
  * nenhuma, e a conta é simples o bastante pra não justificar uma
  * dependência (mesma decisão já tomada pro drag-and-drop do Kanban).
  */
+
+/** Rótulo e cor de cada tipo de bloqueio (ajuste pedido em 2026-09-05:
+ * diferenciar bloqueio/folga/compromisso na lista da Agenda). */
+export const BLOCK_TYPE_LABEL: Record<BlockType, string> = {
+  bloqueio: "Bloqueio",
+  folga: "Folga",
+  compromisso: "Compromisso",
+};
+
+export const BLOCK_TYPE_COLOR: Record<BlockType, { bg: string; text: string; dot: string }> = {
+  bloqueio: { bg: "bg-gray-200", text: "text-gray-700", dot: "bg-gray-500" },
+  folga: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
+  compromisso: { bg: "bg-blue-100", text: "text-blue-700", dot: "bg-blue-500" },
+};
 
 export const WEEKDAY_SHORT_LABEL = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 

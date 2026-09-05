@@ -4,6 +4,19 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-05 — Agenda: reagendar arrastando, bloqueios com horário e cores por tipo
+
+**Contexto:** usuário testou o calendário mensal (entrada anterior) e pediu 4 ajustes: (1) arrastar um atendimento pra outro horário do mesmo dia pra reagendar; (2) "Bloqueios e folgas" só deixava marcar o dia inteiro, precisava de horário específico — "nesse caso é agendamento de folgas, compromissos e bloqueios"; (3) não entendeu pra que serve "Horários recorrentes"; (4) cores diferentes na lista pra bloqueio/compromisso/folga.
+
+- **Reagendar arrastando (1)**: reaproveitada a `rescheduleOccurrence` que já existia (usada hoje pelo botão "Reagendar" na tela da solicitação, `components/requests/reschedule-occurrence-button.tsx`) — "nunca bloqueia: qualquer parte pode mover uma ocorrência ainda não iniciada, sem aprovação prévia" já era a regra de negócio. Card de atendimento agendado vira `draggable`, cada linha de hora vira alvo de drop; soltar numa hora diferente chama a mesma ação, mantendo o dia e trocando só a hora (minuto zerado). Cartões de checkin/em andamento/concluído não são arrastáveis (reagendar o que já começou não faz sentido, mesma regra que a tela da solicitação já aplicava).
+- **Bloqueio com horário específico (2)**: `start_time`/`end_time` já existiam na tabela `professional_availability` (só usados até então pelas janelas recorrentes) e não tinham nenhuma restrição que impedisse de usá-los numa linha de `date_override` — só o código sempre gravava `null` ali. Migration `0076` acrescenta `block_type` (`bloqueio`/`folga`/`compromisso`, obrigatório quando é bloqueio de data) pra dar nome e cor a cada um. Formulário ganhou seletor de tipo + checkbox "Dia inteiro" que, desmarcado, revela início/fim.
+- **Cores por tipo (4)**: serviço continua teal; bloqueio cinza, folga âmbar, compromisso azul — tanto na lista de "Bloqueios, folgas e compromissos" quanto na lista de horas do calendário (bloqueio com horário aparece repetido em cada hora que cobre; dia inteiro vira um banner colorido no topo do painel do dia).
+- **"Horários recorrentes" (3) — achado ao investigar antes de mexer**: essa seção nunca fez nada além de guardar dado. Não há, em lugar nenhum do código, uma verificação que compare o horário de uma nova solicitação contra essas janelas — o texto antigo da página ("a plataforma só avisa sobre conflitos, nunca bloqueia sozinha") descrevia um aviso que não existe. Troquei o texto da página por algo que não promete isso, e adicionei uma legenda embaixo do título explicando que é só referência pessoal do profissional hoje. Perguntei ao usuário se quer manter assim ou construir o aviso de conflito de verdade — não decidi sozinho porque é escopo de feature nova, não um ajuste do que já existe.
+
+**Verificação:** testado ao vivo de ponta a ponta com fixtures (removidas depois) — arrastar um atendimento de "agendado" pra outro horário confirmou `scheduled_at` novo no banco e o card reaparecendo na hora certa; bloqueio com horário específico salvou `block_type`/`start_time`/`end_time` corretos e apareceu na cor certa, repetido nas duas horas que cobre; folga de dia inteiro apareceu como banner. `tsc`/`eslint`/`next build` limpos; suíte de testes com a mesma falha conhecida de rate-limit do Supabase Auth (arquivos diferentes a cada rodada, não relacionado a esta mudança).
+
+---
+
 ## 2026-09-05 — Agenda: calendário mensal estilo Google Agenda
 
 **Contexto:** o último dos 5 problemas reportados na Visão Profissional (ver entrada de 2026-09-04 abaixo) — "Agenda Profissional, apresentar o calendário do mês atual, podendo avançar pra frente ou trás, com a lista de horas da 00:01 a 00:00 com o agendamento do serviço ou compromisso ou bloqueio [...] estilo agenda Google". `/agenda` só tinha o editor de disponibilidade semanal (`AvailabilityManager`) — nenhuma visão de calendário, nenhum lugar pra ver o que já está agendado.

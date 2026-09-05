@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Ban } from "lucide-react";
 import { AvailabilityManager } from "@/components/availability/availability-manager";
+import { rescheduleOccurrence } from "@/lib/actions/requests";
 import {
   WEEKDAY_SHORT_LABEL,
   MONTH_LABEL,
@@ -11,9 +12,12 @@ import {
   monthParam,
   addMonths,
   getMonthMatrix,
+  BLOCK_TYPE_LABEL,
+  BLOCK_TYPE_COLOR,
 } from "@/lib/domain/agenda-calendar";
 import { occurrenceStageLabel } from "@/lib/domain/occurrence-pipeline";
 import { SERVICE_CATEGORY_LABEL } from "@/lib/domain/service-catalog";
+import type { BlockType } from "@/lib/validations/services";
 import type { OccurrenceStatus, ServiceCategory } from "@/types/database";
 
 type OccurrenceItem = {
@@ -27,6 +31,9 @@ type OccurrenceItem = {
 type BlockedDate = {
   id: string;
   date: string;
+  startTime: string | null;
+  endTime: string | null;
+  blockType: BlockType;
   reason: string | null;
 };
 
@@ -37,12 +44,25 @@ type Slot = {
   end_time: string | null;
   date_override: string | null;
   blocked: boolean;
+  block_type: string | null;
   reason: string | null;
 };
 
 function statusLabel(occ: OccurrenceItem): string {
   if (occ.status === "agendado") return "Agendado";
   return occ.category ? occurrenceStageLabel(occ.category, occ.status) : occ.status;
+}
+
+/** Horas (inclusive) que um bloco de horário específico cobre — usado pra
+ * repetir o card em cada linha da lista que ele atravessa. */
+function hoursCovered(startTime: string, endTime: string): number[] {
+  const startHour = Number(startTime.slice(0, 2));
+  const endHour = Number(endTime.slice(0, 2));
+  const endMinute = Number(endTime.slice(3, 5));
+  const lastHour = endMinute > 0 ? endHour : endHour - 1;
+  const hours: number[] = [];
+  for (let h = startHour; h <= Math.max(startHour, lastHour); h++) hours.push(h);
+  return hours;
 }
 
 /**
@@ -52,11 +72,19 @@ function statusLabel(occ: OccurrenceItem): string {
  * busca com o novo intervalo, sem precisar de client-side fetch nenhum;
  * a seleção do dia é só estado local, já que todas as ocorrências do mês
  * visível já chegaram prontas por props.
+ *
+ * Ajustes de 2026-09-05 (usuário testou e pediu): arrastar um atendimento
+ * agendado pra outro horário do mesmo dia reagenda de verdade (reusa a
+ * ação `rescheduleOccurrence` que já existia pro chat da solicitação —
+ * "nunca bloqueia", qualquer parte pode mover uma ocorrência ainda não
+ * iniciada, sem depender de aprovação prévia); bloqueios/folgas/
+ * compromissos ganharam horário específico (antes só dia inteiro) e cor
+ * própria na lista.
  */
 export function AgendaView({
   year,
   month,
-  occurrences,
+  occurrences: initialOccurrences,
   blockedDates,
   slots,
 }: {
@@ -67,11 +95,15 @@ export function AgendaView({
   slots: Slot[];
 }) {
   const [tab, setTab] = useState<"calendario" | "horarios">("calendario");
+  const [occurrences, setOccurrences] = useState(initialOccurrences);
+  const [dragError, setDragError] = useState<string | null>(null);
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
   const [selectedDate, setSelectedDate] = useState<string | null>(
     isCurrentMonth ? toDateKey(today) : null
   );
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverHour, setDragOverHour] = useState<number | null>(null);
 
   const weeks = getMonthMatrix(year, month);
   const prev = addMonths(year, month, -1);
@@ -85,14 +117,18 @@ export function AgendaView({
     occurrencesByDay.set(key, list);
   }
 
-  const blocksByDay = new Map<string, BlockedDate>();
+  const blocksByDay = new Map<string, BlockedDate[]>();
   for (const block of blockedDates) {
-    blocksByDay.set(block.date, block);
+    const list = blocksByDay.get(block.date) ?? [];
+    list.push(block);
+    blocksByDay.set(block.date, list);
   }
 
   const todayKey = toDateKey(today);
   const selectedDayOccurrences = selectedDate ? occurrencesByDay.get(selectedDate) ?? [] : [];
-  const selectedDayBlock = selectedDate ? blocksByDay.get(selectedDate) : undefined;
+  const selectedDayBlocks = selectedDate ? blocksByDay.get(selectedDate) ?? [] : [];
+  const wholeDayBlocks = selectedDayBlocks.filter((b) => !b.startTime);
+  const timedBlocks = selectedDayBlocks.filter((b) => b.startTime && b.endTime);
 
   const hours = Array.from({ length: 24 }, (_, h) => h);
   const occurrencesByHour = new Map<number, OccurrenceItem[]>();
@@ -101,6 +137,42 @@ export function AgendaView({
     const list = occurrencesByHour.get(h) ?? [];
     list.push(occ);
     occurrencesByHour.set(h, list);
+  }
+
+  const blocksByHour = new Map<number, BlockedDate[]>();
+  for (const block of timedBlocks) {
+    for (const h of hoursCovered(block.startTime!, block.endTime!)) {
+      const list = blocksByHour.get(h) ?? [];
+      list.push(block);
+      blocksByHour.set(h, list);
+    }
+  }
+
+  async function handleDropOnHour(hour: number) {
+    const id = draggedId;
+    setDraggedId(null);
+    setDragOverHour(null);
+    if (!id || !selectedDate) return;
+
+    const occ = occurrences.find((o) => o.id === id);
+    if (!occ || occ.status !== "agendado") return;
+
+    const original = new Date(occ.scheduledAt);
+    if (original.getHours() === hour) return;
+
+    const newDate = new Date(selectedDate + "T00:00:00");
+    newDate.setHours(hour, 0, 0, 0);
+
+    const previous = occ.scheduledAt;
+    setOccurrences((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, scheduledAt: newDate.toISOString() } : o))
+    );
+
+    const result = await rescheduleOccurrence({ occurrenceId: id, newScheduledAt: newDate.toISOString() });
+    if (result?.error) {
+      setDragError(result.error);
+      setOccurrences((prev) => prev.map((o) => (o.id === id ? { ...o, scheduledAt: previous } : o)));
+    }
   }
 
   return (
@@ -203,24 +275,75 @@ export function AgendaView({
                 })}
               </p>
 
-              {selectedDayBlock && (
-                <div className="flex items-center gap-2 rounded-lg bg-red-50 text-red-700 px-3 py-2 mb-3 text-sm">
-                  <Ban size={16} />
-                  Dia bloqueado{selectedDayBlock.reason ? ` — ${selectedDayBlock.reason}` : ""}
-                </div>
+              {wholeDayBlocks.map((block) => {
+                const color = BLOCK_TYPE_COLOR[block.blockType];
+                return (
+                  <div
+                    key={block.id}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2 mb-2 text-sm ${color.bg} ${color.text}`}
+                  >
+                    <Ban size={16} />
+                    {BLOCK_TYPE_LABEL[block.blockType]} — dia inteiro
+                    {block.reason ? ` — ${block.reason}` : ""}
+                  </div>
+                );
+              })}
+
+              {dragError && (
+                <p className="text-xs text-red-600 mb-2" role="alert">
+                  {dragError}
+                </p>
               )}
+
+              <p className="text-xs text-gray-400 mb-1">
+                Arraste um atendimento agendado pra outro horário pra reagendar.
+              </p>
 
               <div className="flex flex-col divide-y divide-gray-100 max-h-96 overflow-y-auto">
                 {hours.map((h) => {
                   const items = occurrencesByHour.get(h) ?? [];
+                  const blocks = blocksByHour.get(h) ?? [];
                   return (
-                    <div key={h} className="flex gap-3 py-1.5">
+                    <div
+                      key={h}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverHour(h);
+                      }}
+                      onDragLeave={() => setDragOverHour((c) => (c === h ? null : c))}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDropOnHour(h);
+                      }}
+                      className={`flex gap-3 py-1.5 ${dragOverHour === h ? "bg-teal/5" : ""}`}
+                    >
                       <p className="w-12 shrink-0 text-xs text-gray-400 pt-0.5">
                         {String(h).padStart(2, "0")}:00
                       </p>
                       <div className="flex flex-col gap-1 flex-1">
+                        {blocks.map((block) => {
+                          const color = BLOCK_TYPE_COLOR[block.blockType];
+                          return (
+                            <div key={block.id} className={`rounded-lg px-2 py-1 ${color.bg}`}>
+                              <p className={`text-xs font-semibold ${color.text}`}>
+                                {BLOCK_TYPE_LABEL[block.blockType]}
+                                {block.reason ? ` — ${block.reason}` : ""}
+                              </p>
+                              <p className={`text-xs ${color.text}`}>
+                                {block.startTime?.slice(0, 5)}–{block.endTime?.slice(0, 5)}
+                              </p>
+                            </div>
+                          );
+                        })}
                         {items.map((occ) => (
-                          <div key={occ.id} className="rounded-lg bg-teal/10 px-2 py-1">
+                          <div
+                            key={occ.id}
+                            draggable={occ.status === "agendado"}
+                            onDragStart={() => setDraggedId(occ.id)}
+                            className={`rounded-lg bg-teal/10 px-2 py-1 ${
+                              occ.status === "agendado" ? "cursor-grab active:cursor-grabbing" : ""
+                            } ${draggedId === occ.id ? "opacity-40" : ""}`}
+                          >
                             <p className="text-xs font-semibold text-black">
                               {occ.petNames || "Atendimento"}
                               {occ.category ? ` — ${SERVICE_CATEGORY_LABEL[occ.category] ?? occ.category}` : ""}

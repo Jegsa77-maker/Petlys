@@ -63,8 +63,26 @@ export const availabilitySlotSchema = z.object({
 });
 export type AvailabilitySlotValues = z.infer<typeof availabilitySlotSchema>;
 
-export const blockDateSchema = z.object({
-  dateOverride: z.string().min(1, "Informe a data"),
-  reason: z.string().trim().max(200).optional(),
-});
+export const BLOCK_TYPES = ["bloqueio", "folga", "compromisso"] as const;
+export type BlockType = (typeof BLOCK_TYPES)[number];
+
+// Horário é opcional (ajuste pedido depois do calendário mensal — antes só
+// dava pra bloquear o dia inteiro): os dois campos vêm juntos (dia inteiro)
+// ou nenhum dos dois (horário específico).
+export const blockDateSchema = z
+  .object({
+    dateOverride: z.string().min(1, "Informe a data"),
+    blockType: z.enum(BLOCK_TYPES).default("bloqueio"),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido").optional(),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido").optional(),
+    reason: z.string().trim().max(200).optional(),
+  })
+  .refine((data) => (data.startTime == null) === (data.endTime == null), {
+    message: "Informe início e fim, ou deixe os dois em branco pro dia inteiro",
+    path: ["endTime"],
+  })
+  .refine((data) => !data.startTime || !data.endTime || data.startTime < data.endTime, {
+    message: "O horário de início precisa ser antes do fim",
+    path: ["endTime"],
+  });
 export type BlockDateValues = z.infer<typeof blockDateSchema>;

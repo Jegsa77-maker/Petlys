@@ -158,6 +158,9 @@ export async function blockDate(input: unknown): Promise<ActionResult> {
   const { error } = await supabase.from("professional_availability").insert({
     professional_id: user.id,
     date_override: parsed.data.dateOverride,
+    start_time: parsed.data.startTime ?? null,
+    end_time: parsed.data.endTime ?? null,
+    block_type: parsed.data.blockType,
     reason: parsed.data.reason ?? null,
     blocked: true,
   });

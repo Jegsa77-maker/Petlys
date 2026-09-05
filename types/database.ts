@@ -1074,6 +1074,7 @@ export type Database = {
       }
       professional_availability: {
         Row: {
+          block_type: string | null
           blocked: boolean
           created_at: string
           date_override: string | null
@@ -1085,6 +1086,7 @@ export type Database = {
           weekday: number | null
         }
         Insert: {
+          block_type?: string | null
           blocked?: boolean
           created_at?: string
           date_override?: string | null
@@ -1096,6 +1098,7 @@ export type Database = {
           weekday?: number | null
         }
         Update: {
+          block_type?: string | null
           blocked?: boolean
           created_at?: string
           date_override?: string | null

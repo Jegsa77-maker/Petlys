@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { AgendaView } from "@/components/agenda/agenda-view";
 import { getMonthMatrix, parseMonthParam } from "@/lib/domain/agenda-calendar";
+import type { BlockType } from "@/lib/validations/services";
 
 export default async function AgendaPage({
   searchParams,
@@ -49,7 +50,7 @@ export default async function AgendaPage({
           .order("scheduled_at", { ascending: true }),
         supabase
           .from("professional_availability")
-          .select("id, weekday, start_time, end_time, date_override, blocked, reason")
+          .select("id, weekday, start_time, end_time, date_override, blocked, block_type, reason")
           .eq("professional_id", user.id)
           .order("weekday"),
       ])
@@ -68,14 +69,21 @@ export default async function AgendaPage({
 
   const blockedDates = (slots ?? [])
     .filter((s) => s.date_override !== null)
-    .map((s) => ({ id: s.id, date: s.date_override!, reason: s.reason }));
+    .map((s) => ({
+      id: s.id,
+      date: s.date_override!,
+      startTime: s.start_time,
+      endTime: s.end_time,
+      blockType: (s.block_type ?? "bloqueio") as BlockType,
+      reason: s.reason,
+    }));
 
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
         <h1 className="text-2xl font-bold text-teal mb-1">Agenda</h1>
         <p className="text-sm text-gray-600 mb-6">
-          Você define os horários — a plataforma só avisa sobre conflitos, nunca bloqueia sozinha.
+          Seus atendimentos, folgas e compromissos num só lugar.
         </p>
         <AgendaView
           year={year}
