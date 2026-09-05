@@ -27,17 +27,101 @@ const COLUMNS: { status: string; label: string }[] = [
   { status: "concluido", label: "Concluído" },
 ];
 
+// Só permite arrastar pra coluna imediatamente seguinte — mesma regra que
+// já valia com os botões (não dava pra pular etapa clicando, e o
+// check-in/relatório carregam dado (geolocalização, notas) que se perde
+// se pular uma etapa).
+const NEXT_STATUS: Record<string, string> = {
+  agendado: "checkin",
+  checkin: "em_andamento",
+  em_andamento: "finalizacao",
+  finalizacao: "concluido",
+};
+
+async function getGeolocation(): Promise<{ lat?: number; lng?: number }> {
+  if (typeof window === "undefined" || !navigator.geolocation) return {};
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
+    );
+    return { lat: position.coords.latitude, lng: position.coords.longitude };
+  } catch {
+    // Geolocalização negada ou indisponível — check-in segue sem coordenadas.
+    return {};
+  }
+}
+
+/**
+ * Kanban de atendimentos do Profissional — pedido do usuário: além dos
+ * botões "Marcar: X" que já existiam, dá pra arrastar o cartão pra coluna
+ * seguinte. Continua só sequencial (não dá pra pular etapa arrastando
+ * também) e continua exigindo o que já era necessário em cada etapa: mover
+ * pra "checkin"/"em_andamento"/"concluido" dispara a mesma ação do botão
+ * na hora; mover pra "Finalização" só abre o formulário de relatório (não
+ * move sozinho), porque relatório com notas é obrigatório.
+ */
 export function KanbanBoard({ occurrences }: { occurrences: OccurrenceCard[] }) {
   const [items, setItems] = useState(occurrences);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [submittingIds, setSubmittingIds] = useState<Set<string>>(new Set());
+  const [forceOpenReportId, setForceOpenReportId] = useState<string | null>(null);
 
   function updateLocal(id: string, status: string) {
     setItems((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
   }
 
+  function setSubmitting(id: string, value: boolean) {
+    setSubmittingIds((prev) => {
+      const next = new Set(prev);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  async function handleDrop(columnStatus: string) {
+    setDragOverColumn(null);
+    const id = draggedId;
+    setDraggedId(null);
+    if (!id) return;
+    const dragged = items.find((o) => o.id === id);
+    if (!dragged || NEXT_STATUS[dragged.status] !== columnStatus) return;
+
+    if (columnStatus === "finalizacao") {
+      setForceOpenReportId(id);
+      return;
+    }
+
+    setSubmitting(id, true);
+    if (columnStatus === "checkin") {
+      const coords = await getGeolocation();
+      await registerCheckin({ occurrenceId: id, ...coords });
+    } else {
+      await advanceOccurrence(id, columnStatus as "em_andamento" | "concluido");
+    }
+    setSubmitting(id, false);
+    updateLocal(id, columnStatus);
+  }
+
   return (
     <div className="flex gap-3 overflow-x-auto pb-4">
       {COLUMNS.map((column) => (
-        <div key={column.status} className="flex-shrink-0 w-64">
+        <div
+          key={column.status}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOverColumn(column.status);
+          }}
+          onDragLeave={() => setDragOverColumn((c) => (c === column.status ? null : c))}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleDrop(column.status);
+          }}
+          className={`flex-shrink-0 w-64 rounded-lg transition-colors ${
+            dragOverColumn === column.status ? "bg-teal/5 ring-2 ring-teal/30" : ""
+          }`}
+        >
           <p className="text-xs font-semibold text-gray-500 uppercase mb-2 px-1">
             {column.label} ({items.filter((o) => o.status === column.status).length})
           </p>
@@ -45,7 +129,16 @@ export function KanbanBoard({ occurrences }: { occurrences: OccurrenceCard[] }) 
             {items
               .filter((o) => o.status === column.status)
               .map((occ) => (
-                <OccurrenceCardView key={occ.id} occurrence={occ} onUpdated={updateLocal} />
+                <OccurrenceCardView
+                  key={occ.id}
+                  occurrence={occ}
+                  onUpdated={updateLocal}
+                  onDragStart={() => setDraggedId(occ.id)}
+                  isDragging={draggedId === occ.id}
+                  isSubmittingExternally={submittingIds.has(occ.id)}
+                  forceOpenReport={forceOpenReportId === occ.id}
+                  onReportOpenConsumed={() => setForceOpenReportId((c) => (c === occ.id ? null : c))}
+                />
               ))}
           </div>
         </div>
@@ -57,9 +150,19 @@ export function KanbanBoard({ occurrences }: { occurrences: OccurrenceCard[] }) 
 function OccurrenceCardView({
   occurrence,
   onUpdated,
+  onDragStart,
+  isDragging,
+  isSubmittingExternally,
+  forceOpenReport,
+  onReportOpenConsumed,
 }: {
   occurrence: OccurrenceCard;
   onUpdated: (id: string, status: string) => void;
+  onDragStart: () => void;
+  isDragging: boolean;
+  isSubmittingExternally: boolean;
+  forceOpenReport: boolean;
+  onReportOpenConsumed: () => void;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notes, setNotes] = useState("");
@@ -78,19 +181,12 @@ function OccurrenceCardView({
   const stageLabel = (status: OccurrenceStatus) =>
     category ? occurrenceStageLabel(category, status) : status;
 
+  const reportFormOpen = showReportForm || forceOpenReport;
+  const busy = isSubmitting || isSubmittingExternally;
+
   async function handleCheckin() {
     setIsSubmitting(true);
-    let coords: { lat?: number; lng?: number } = {};
-    if (typeof window !== "undefined" && navigator.geolocation) {
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
-        );
-        coords = { lat: position.coords.latitude, lng: position.coords.longitude };
-      } catch {
-        // Geolocalização negada ou indisponível — check-in segue sem coordenadas.
-      }
-    }
+    const coords = await getGeolocation();
     await registerCheckin({ occurrenceId: occurrence.id, ...coords });
     setIsSubmitting(false);
     onUpdated(occurrence.id, "checkin");
@@ -130,10 +226,17 @@ function OccurrenceCardView({
     setIsSubmitting(false);
     onUpdated(occurrence.id, "finalizacao");
     setShowReportForm(false);
+    onReportOpenConsumed();
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3">
+    <div
+      draggable
+      onDragStart={onDragStart}
+      className={`rounded-lg border border-gray-200 bg-white p-3 cursor-grab active:cursor-grabbing transition-opacity ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
       <p className="text-sm font-semibold text-black">{petNames || "Atendimento"}</p>
       <p className="text-xs text-gray-500 mb-1">
         {new Date(occurrence.scheduled_at).toLocaleString("pt-BR", {
@@ -152,7 +255,7 @@ function OccurrenceCardView({
       {occurrence.status === "agendado" && (
         <button
           onClick={handleCheckin}
-          disabled={isSubmitting}
+          disabled={busy}
           className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
         >
           Marcar: {stageLabel("checkin")}
@@ -162,24 +265,24 @@ function OccurrenceCardView({
       {occurrence.status === "checkin" && (
         <button
           onClick={() => handleAdvance("em_andamento")}
-          disabled={isSubmitting}
+          disabled={busy}
           className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
         >
           Marcar: {stageLabel("em_andamento")}
         </button>
       )}
 
-      {occurrence.status === "em_andamento" && !showReportForm && (
+      {occurrence.status === "em_andamento" && !reportFormOpen && (
         <button
           onClick={() => setShowReportForm(true)}
-          disabled={isSubmitting}
+          disabled={busy}
           className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
         >
           Enviar relatório
         </button>
       )}
 
-      {occurrence.status === "em_andamento" && showReportForm && (
+      {occurrence.status === "em_andamento" && reportFormOpen && (
         <form onSubmit={handleReport} className="flex flex-col gap-2">
           <textarea
             value={notes}
@@ -198,7 +301,7 @@ function OccurrenceCardView({
           )}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={busy}
             className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
           >
             Salvar relatório
@@ -209,7 +312,7 @@ function OccurrenceCardView({
       {occurrence.status === "finalizacao" && (
         <button
           onClick={() => handleAdvance("concluido")}
-          disabled={isSubmitting}
+          disabled={busy}
           className="w-full text-xs font-semibold rounded-lg bg-teal text-white px-3 py-2 hover:opacity-90 disabled:opacity-60"
         >
           Marcar: {stageLabel("concluido")}

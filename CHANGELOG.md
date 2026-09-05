@@ -4,6 +4,19 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-05 — Kanban: arrastar cartão entre status (drag-and-drop)
+
+**Contexto:** dos 5 problemas reportados na Visão Profissional (ver entrada de 2026-09-04 abaixo), este é o segundo dos dois que eram feature nova, não bug — "gostaria que o profissional consiga arrastar/mover o kanban de um status pra outro preenchendo o que é necessário".
+
+- **`components/kanban/kanban-board.tsx`**: cartões viram `draggable`, cada coluna vira alvo de drop (HTML5 drag-and-drop nativo — sem lib nova, projeto não tinha nenhuma). Continua **só sequencial**: só é permitido soltar na coluna imediatamente seguinte à atual (mesma regra que os botões "Marcar: X" já impunham) — soltar numa coluna não-adjacente ou anterior não faz nada.
+- Soltar em "Check-in"/"Em andamento"/"Concluído" dispara a mesma ação que o botão correspondente já disparava (`registerCheckin` com geolocalização opcional, `advanceOccurrence`), sem duplicar lógica.
+- Soltar em "Finalização" **não** move o cartão sozinho — abre o formulário de relatório (o mesmo que já existia atrás do botão "Enviar relatório"), porque `submitOccurrenceReport` exige notas preenchidas; só depois de salvar o relatório é que o cartão migra de verdade.
+- Refeito uma vez no meio do trabalho: a primeira versão sinalizava o drop via um `useEffect` observando uma prop que mudava — o linter (`react-hooks/set-state-in-effect`) corretamente acusou chamar setState de forma síncrona dentro de efeito. Trocado por disparar a ação direto no componente pai (`KanbanBoard.handleDrop`), sem efeito nenhum.
+
+**Verificação:** testado ao vivo de ponta a ponta (fixture criada e removida depois) — automação de mouse não dispara drag-and-drop nativo (limitação conhecida de ferramentas de automação, não do app), então o teste disparou os eventos `dragstart`/`dragover`/`drop` reais via JS. Confirmado no banco a cada etapa: `agendado→checkin` (gravou `checkin_at`), `checkin→em_andamento`, `em_andamento→finalização` (soltar abriu o formulário, preenchido e salvo, gravou `report.notas`), `finalização→concluído` (sincronizou `requests.status` pra `avaliacao`, como os botões já faziam). `tsc`/`eslint`/`next build` limpos; suíte de testes com as mesmas 3 falhas conhecidas de rate-limit do Supabase Auth (não relacionadas a esta mudança).
+
+---
+
 ## 2026-09-04 — Visão Profissional: 3 achados navegando o app
 
 **Contexto:** usuário reportou 5 problemas na visão do Profissional. Esta entrada cobre os 3 que eram bugs pontuais (os outros 2 — calendário mensal da Agenda e drag-and-drop no Kanban — são features novas, entregues à parte).
