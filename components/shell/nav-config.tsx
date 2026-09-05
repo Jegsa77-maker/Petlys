@@ -13,6 +13,7 @@ import {
   Flag,
   SlidersHorizontal,
   Users,
+  UserCog,
   Wallet,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -53,10 +54,12 @@ export const NAV_BY_ROLE: Record<ShellRole, NavItem[]> = {
     { href: "/admin/habilitacoes", label: "Habilitações", icon: BadgeCheck },
     { href: "/admin/parametros", label: "Parâmetros", icon: SlidersHorizontal },
     { href: "/admin/supervisores", label: "Supervisores", icon: Users },
+    { href: "/admin/usuarios", label: "Usuários", icon: UserCog },
   ],
   supervisor: [
     { href: "/supervisor/incidentes", label: "Incidentes", icon: ShieldAlert },
     { href: "/supervisor/moderacao", label: "Moderação", icon: Flag },
+    { href: "/supervisor/usuarios", label: "Usuários", icon: UserCog },
   ],
 };
 
@@ -70,7 +73,7 @@ export const ROLE_LABEL: Record<ShellRole, string> = {
 
 /**
  * No celular, a barra inferior (Matriz_Responsiva) cabe no máximo uns 5
- * itens sem espremer — Admin tem 6 no total, então a barra de baixo
+ * itens sem espremer — Admin tem mais que isso, então a barra de baixo
  * mostra só os 4 primeiros (mais usados) e o resto fica só na sidebar
  * quando a tela crescer.
  */

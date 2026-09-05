@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { recommendSuspensionSchema } from "@/lib/validations/admin";
+import { recommendSuspensionSchema, adminSuspendAccountSchema } from "@/lib/validations/admin";
 import { revalidatePath } from "next/cache";
+import { suspendAccount, unsuspendAccount, lastActiveAdminGuard } from "@/lib/actions/suspension-helpers";
 
 type ActionResult = { error: string | null };
 type ResetPasswordResult = { error: string | null; temporaryPassword?: string };
@@ -151,4 +152,71 @@ export async function resetInternalPassword(targetProfileId: string): Promise<Re
   // Server Action é responsável por exibi-la uma vez e orientar a pessoa
   // a trocá-la no primeiro acesso. Nunca fica salva em texto plano.
   return { error: null, temporaryPassword };
+}
+
+/**
+ * Bloqueia uma conta diretamente — pedido explícito do usuário pra
+ * Supervisor também poder bloquear/desbloquear sem depender do fluxo de
+ * recomendação (recommendSuspension acima continua existindo como via
+ * alternativa). Compartilhado entre Admin e Supervisor: mesma ação usada
+ * nas duas telas de Usuários (app/admin/usuarios e app/supervisor/usuarios).
+ */
+export async function blockAccount(input: unknown): Promise<ActionResult> {
+  const parsed = adminSuspendAccountSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const { user, allowed } = await requireSupervisorOrAdmin();
+  if (!user || !allowed) {
+    return { error: "Apenas Supervisor ou Administrador podem bloquear contas." };
+  }
+
+  if (parsed.data.targetProfileId === user.id) {
+    return { error: "Você não pode bloquear sua própria conta." };
+  }
+
+  const serviceClient = createServiceRoleClient();
+  const guardError = await lastActiveAdminGuard(serviceClient, parsed.data.targetProfileId);
+  if (guardError) return guardError;
+
+  const error = await suspendAccount(serviceClient, {
+    targetProfileId: parsed.data.targetProfileId,
+    actorId: user.id,
+    reason: parsed.data.reason,
+  });
+  if (error) return { error };
+
+  await serviceClient.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: "bloquear_conta",
+    target_profile_id: parsed.data.targetProfileId,
+    details: { reason: parsed.data.reason },
+  });
+
+  revalidatePath(`/admin/usuarios/${parsed.data.targetProfileId}`);
+  revalidatePath(`/supervisor/usuarios/${parsed.data.targetProfileId}`);
+  return { error: null };
+}
+
+/** Desbloqueia uma conta (ver unsuspendAccount, 0074) — espelho de blockAccount. */
+export async function unblockAccount(targetProfileId: string): Promise<ActionResult> {
+  const { user, allowed } = await requireSupervisorOrAdmin();
+  if (!user || !allowed) {
+    return { error: "Apenas Supervisor ou Administrador podem desbloquear contas." };
+  }
+
+  const serviceClient = createServiceRoleClient();
+  const error = await unsuspendAccount(serviceClient, { targetProfileId, actorId: user.id });
+  if (error) return { error };
+
+  await serviceClient.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: "desbloquear_conta",
+    target_profile_id: targetProfileId,
+  });
+
+  revalidatePath(`/admin/usuarios/${targetProfileId}`);
+  revalidatePath(`/supervisor/usuarios/${targetProfileId}`);
+  return { error: null };
 }

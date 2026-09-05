@@ -2113,6 +2113,45 @@ export type Database = {
           },
         ]
       }
+      staff_conversation_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          sender_id: string
+          target_profile_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          target_profile_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          target_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_conversation_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_conversation_messages_target_profile_id_fkey"
+            columns: ["target_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supervisor_grants: {
         Row: {
           created_at: string
@@ -2451,7 +2490,7 @@ export type Database = {
         | "adestrador"
         | "banho_tosa"
         | "veterinario_domiciliar"
-      suspension_status: "pendente" | "aprovada" | "rejeitada"
+      suspension_status: "pendente" | "aprovada" | "rejeitada" | "revogada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2647,7 +2686,7 @@ export const Constants = {
         "banho_tosa",
         "veterinario_domiciliar",
       ],
-      suspension_status: ["pendente", "aprovada", "rejeitada"],
+      suspension_status: ["pendente", "aprovada", "rejeitada", "revogada"],
     },
   },
 } as const

@@ -4,6 +4,23 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-04 — Tela de Usuários: CRUD completo (Admin) + ver/bloquear/chat (Supervisor)
+
+**Contexto:** usuário pediu uma tela no Admin com CRUD de qualquer conta, qualquer papel — inclusive outro Administrador —, com uma regra específica pra exclusão: apagar o relacionamento todo, a não ser que haja pendência financeira. No meio da implementação, pediu também que o Supervisor tivesse uma versão mais enxuta (ver, bloquear/desbloquear, redefinir senha, ver perfil) e que os dois papéis pudessem conversar com o usuário via chat a partir do perfil.
+
+**Decisão de design mais importante — "excluir" nunca é `DELETE` físico.** `profiles.id` é referenciado por 40+ tabelas, muitas compartilhadas com OUTRA pessoa (uma avaliação que um Tutor escreveu sobre o Profissional, o histórico de mensagens de uma conversa). Perguntado diretamente, o usuário escolheu **anonimizar o lado da conta excluída, mantendo o resto**: nome/e-mail/telefone/CPF somem (vira "Usuário removido"), acesso é bloqueado pra sempre, mas solicitações/mensagens/avaliações continuam existindo normalmente — só sem os dados pessoais de quem saiu. Reaproveita o mecanismo de suspensão já existente (0011) como o bloqueio permanente, em vez de inventar um novo.
+
+- **Excluir bloqueado por pendência financeira**: qualquer pagamento não resolvido (`pendente`/`processando`/`contestado`) numa solicitação onde a conta é tutor ou profissional, ou qualquer repasse ainda não `pago` — dinheiro em trânsito não vira órfão.
+- **Criar conta de qualquer papel** (`createUserByAdmin`): generaliza o mecanismo que já existia só pra Supervisor (usuário+senha interno, sem e-mail real, sem OTP) pra também aceitar Tutor/Profissional/Administrador.
+- **Papéis**: ativar/desativar/conceder qualquer papel pra qualquer conta — com trava contra desativar/excluir o **último Administrador ativo do sistema** e contra mexer na própria conta (autoexclusão/autobloqueio).
+- **Bloquear/desbloquear conta** (`blockAccount`/`unblockAccount`, `lib/actions/supervisor.ts`, compartilhado entre Admin e Supervisor): direto, sem depender do fluxo de recomendação em duas etapas que já existia (que continua existindo como via alternativa). `unblockAccount` precisou de um valor novo no enum `suspension_status` (`revogada`, migration 0074) — o mecanismo de suspensão nunca teve um jeito de desfazer.
+- **Chat com o usuário a partir do perfil** (migration 0075, `staff_conversation_messages`): o chat que já existia (`messages`) sempre pertence a uma solicitação (`request_id not null`) — não dava pra reaproveitar pra "falar com qualquer usuário", que não tem solicitação nenhuma por trás. Tabela nova, uma conversa por usuário-alvo, visível a todo o staff (não é DM privado). Desenhada bidirecional (o próprio usuário-alvo pode responder), mas a UI desta entrega é só do lado do staff.
+- **Supervisor**: mesma tela de detalhe (`UserDetailPanel`, com prop `variant`), só que sem edição de perfil, sem gestão de papéis e sem exclusão — só visualização, bloqueio direto, redefinir senha e chat.
+
+**Verificação:** testado ao vivo de ponta a ponta — criei uma conta Administrador de teste, ativei/desativei papéis, gerei senha nova, bloqueei e desbloqueei (confirmado no banco: papéis desativados/reativados, status da suspensão `aprovada`→`revogada`), excluí a conta (confirmado: PII zerada, papéis desativados, log de auditoria completo), e testei o bloqueio por pendência financeira criando um pagamento `pendente` de propósito (bloqueou corretamente, mensagem exata na tela) — fixture removida depois. Chat testado enviando mensagem como Admin e confirmando que o Supervisor enxerga a mesma conversa. `tsc`/`eslint`/`next build`/testes limpos (só a falha conhecida de rate-limit do Supabase Auth em 3 arquivos de RLS, esperada depois de tanto login/logout manual).
+
+---
+
 ## 2026-09-04 — Limites da galeria do pet viram parâmetro do Admin
 
 **Contexto:** os limites de foto/vídeo/quantidade da galeria (item 3, entrega anterior) estavam fixos no código (10MB/50MB/20 itens). Usuário pediu pra poder ajustar sem depender de deploy, e já de cara reduziu os valores: foto 1MB, vídeo 5MB, 10 itens.

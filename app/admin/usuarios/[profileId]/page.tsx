@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { UserDetailPanel } from "@/components/admin/user-detail-panel";
 
-export default async function SupervisorUsuarioPage({
+export default async function AdminUsuarioDetailPage({
   params,
 }: {
   params: Promise<{ profileId: string }>;
@@ -38,6 +38,7 @@ export default async function SupervisorUsuarioPage({
     .order("created_at", { ascending: false })
     .limit(5);
 
+  // Chat de suporte (0075) — visível a qualquer staff, não é DM privado.
   const { data: chatRows } = await supabase
     .from("staff_conversation_messages")
     .select("id, sender_id, content, created_at, profiles!sender_id(full_name)")
@@ -56,7 +57,7 @@ export default async function SupervisorUsuarioPage({
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto flex flex-col gap-6">
-        <Link href="/supervisor/usuarios" className="flex items-center gap-1 text-sm text-gray-500 hover:text-black">
+        <Link href="/admin/usuarios" className="flex items-center gap-1 text-sm text-gray-500 hover:text-black">
           <ArrowLeft size={16} /> Usuários
         </Link>
 
@@ -65,7 +66,7 @@ export default async function SupervisorUsuarioPage({
           roles={roles ?? []}
           suspensions={suspensions ?? []}
           isSelf={profile.id === currentUser?.id}
-          variant="supervisor"
+          variant="admin"
           currentUserId={currentUser?.id ?? ""}
           chatMessages={chatMessages}
         />

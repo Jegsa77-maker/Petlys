@@ -4,8 +4,13 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import {
   upsertParameterSchema,
   createSupervisorSchema,
+  createUserByAdminSchema,
+  updateUserProfileSchema,
 } from "@/lib/validations/admin";
 import { revalidatePath } from "next/cache";
+import type { AppRole, Database } from "@/types/database";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { suspendAccount, lastActiveAdminGuard } from "@/lib/actions/suspension-helpers";
 
 type ActionResult = { error: string | null };
 
@@ -354,4 +359,301 @@ export async function confirmPaymentManually(requestId: string): Promise<ActionR
 
   revalidatePath(`/solicitacoes/${requestId}`);
   return { error: null };
+}
+
+// ============================================================================
+// Tela de Usuários (CRUD pra qualquer papel, inclusive outro Administrador)
+// ============================================================================
+
+/**
+ * Cria uma conta de qualquer papel (Tutor, Profissional, Supervisor ou
+ * Administrador) direto pelo Admin — mesmo mecanismo de conta interna já
+ * usado só pra Supervisor (createSupervisor, acima): usuário+senha via
+ * Admin API do Supabase, sem e-mail/telefone real, sem passar por
+ * OTP/verificação. Generalizado aqui porque o Admin pediu poder criar
+ * qualquer papel, não só Supervisor.
+ */
+export async function createUserByAdmin(input: unknown): Promise<ActionResult> {
+  const parsed = createUserByAdminSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados do usuário inválidos" };
+  }
+
+  const { user, isAdmin } = await requireAdmin();
+  if (!user || !isAdmin) {
+    return { error: "Apenas o Administrador pode criar contas." };
+  }
+
+  const serviceClient = createServiceRoleClient();
+  const syntheticEmail = `${parsed.data.username}@internal.plataformapet`;
+
+  const { data: created, error: createError } = await serviceClient.auth.admin.createUser({
+    email: syntheticEmail,
+    password: parsed.data.password,
+    email_confirm: true,
+    user_metadata: { full_name: parsed.data.fullName },
+  });
+
+  if (createError || !created.user) {
+    return { error: "Não foi possível criar a conta. O usuário já pode estar em uso." };
+  }
+
+  const newProfileId = created.user.id;
+
+  const { error: profileError } = await serviceClient
+    .from("profiles")
+    .update({
+      full_name: parsed.data.fullName,
+      internal_username: parsed.data.username,
+      phone_verified_at: new Date().toISOString(),
+      email_verified_at: new Date().toISOString(),
+    })
+    .eq("id", newProfileId);
+
+  if (profileError) {
+    return { error: "Conta criada, mas houve um erro ao completar o perfil." };
+  }
+
+  const { error: roleError } = await serviceClient
+    .from("account_roles")
+    .insert({ profile_id: newProfileId, role: parsed.data.role });
+
+  if (roleError) {
+    return { error: "Conta criada, mas houve um erro ao atribuir o papel." };
+  }
+
+  await serviceClient.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: "criar_usuario",
+    target_profile_id: newProfileId,
+    details: { username: parsed.data.username, role: parsed.data.role },
+  });
+
+  revalidatePath("/admin/usuarios");
+  return { error: null };
+}
+
+/**
+ * Ativa/desativa um papel já existente de uma conta. Protegido contra
+ * autoexclusão e contra desativar o último Administrador ativo do
+ * sistema — sem isso seria possível travar o próprio acesso admin.
+ */
+export async function setUserRoleActive(
+  profileId: string,
+  role: AppRole,
+  active: boolean
+): Promise<ActionResult> {
+  const { user, isAdmin } = await requireAdmin();
+  if (!user || !isAdmin) {
+    return { error: "Apenas o Administrador pode alterar papéis." };
+  }
+
+  if (!active && role === "administrador") {
+    if (profileId === user.id) {
+      return { error: "Você não pode desativar seu próprio papel de Administrador." };
+    }
+    const guardError = await lastActiveAdminGuard(createServiceRoleClient(), profileId);
+    if (guardError) return guardError;
+  }
+
+  const serviceClient = createServiceRoleClient();
+  const { error } = await serviceClient
+    .from("account_roles")
+    .update({ active })
+    .eq("profile_id", profileId)
+    .eq("role", role);
+
+  if (error) return { error: "Não foi possível atualizar o papel." };
+
+  await serviceClient.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: active ? "ativar_papel" : "desativar_papel",
+    target_profile_id: profileId,
+    details: { role },
+  });
+
+  revalidatePath(`/admin/usuarios/${profileId}`);
+  revalidatePath("/admin/usuarios");
+  return { error: null };
+}
+
+/**
+ * Concede um papel novo pra uma conta que ainda não tem (ex.: tornar um
+ * Tutor existente também Administrador). Se a conta já teve esse papel
+ * antes (desativado), reativa em vez de duplicar a linha — a tabela tem
+ * unique (profile_id, role).
+ */
+export async function addUserRole(profileId: string, role: AppRole): Promise<ActionResult> {
+  const { user, isAdmin } = await requireAdmin();
+  if (!user || !isAdmin) {
+    return { error: "Apenas o Administrador pode conceder papéis." };
+  }
+
+  const serviceClient = createServiceRoleClient();
+  const { error: insertError } = await serviceClient
+    .from("account_roles")
+    .insert({ profile_id: profileId, role });
+
+  if (insertError) {
+    const { error: reactivateError } = await serviceClient
+      .from("account_roles")
+      .update({ active: true })
+      .eq("profile_id", profileId)
+      .eq("role", role);
+    if (reactivateError) return { error: "Não foi possível conceder o papel." };
+  }
+
+  await serviceClient.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: "conceder_papel",
+    target_profile_id: profileId,
+    details: { role },
+  });
+
+  revalidatePath(`/admin/usuarios/${profileId}`);
+  return { error: null };
+}
+
+/** Edita nome/telefone de qualquer conta — o Admin já podia ler qualquer
+ * `profiles` (RLS 0009), isso só formaliza a escrita com auditoria. */
+export async function updateUserProfileByAdmin(input: unknown): Promise<ActionResult> {
+  const parsed = updateUserProfileSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const { user, isAdmin } = await requireAdmin();
+  if (!user || !isAdmin) {
+    return { error: "Apenas o Administrador pode editar contas." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ full_name: parsed.data.fullName, phone: parsed.data.phone || null })
+    .eq("id", parsed.data.profileId);
+
+  if (error) return { error: "Não foi possível salvar as alterações." };
+
+  const serviceClient = createServiceRoleClient();
+  await serviceClient.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: "editar_perfil",
+    target_profile_id: parsed.data.profileId,
+  });
+
+  revalidatePath(`/admin/usuarios/${parsed.data.profileId}`);
+  return { error: null };
+}
+
+/**
+ * "Excluir" uma conta aqui nunca é DELETE físico — o perfil é referenciado
+ * por dezenas de tabelas, várias compartilhadas com OUTRA pessoa (uma
+ * avaliação que um Tutor escreveu sobre o Profissional, o histórico de
+ * mensagens de uma conversa, um pagamento). Decisão explícita: anonimizar
+ * o lado da conta excluída (nome/e-mail/telefone/CPF/endereço somem, vira
+ * "Usuário removido") e bloquear o acesso pra sempre (suspensão aprovada,
+ * mesmo mecanismo que já barra login no middleware) — o histórico
+ * compartilhado com outras contas continua intacto, só sem os dados
+ * pessoais de quem saiu. Bloqueia se houver pendência financeira (repasse
+ * ou pagamento ainda não concluído) — dinheiro em trânsito não pode virar
+ * órfão no meio do caminho.
+ */
+export async function deleteUserAccount(profileId: string): Promise<ActionResult> {
+  const { user, isAdmin } = await requireAdmin();
+  if (!user || !isAdmin) {
+    return { error: "Apenas o Administrador pode excluir contas." };
+  }
+
+  if (profileId === user.id) {
+    return { error: "Você não pode excluir sua própria conta." };
+  }
+
+  const serviceClient = createServiceRoleClient();
+
+  const guardError = await lastActiveAdminGuard(serviceClient, profileId);
+  if (guardError) return guardError;
+
+  const hasPendency = await hasPendingFinancialActivity(serviceClient, profileId);
+  if (hasPendency) {
+    return {
+      error: "Essa conta tem pendências financeiras (pagamento ou repasse ainda não concluído) — resolva antes de excluir.",
+    };
+  }
+
+  const tombstoneEmail = `removido-${profileId}@deleted.plataformapet`;
+  const { error: scrubError } = await serviceClient
+    .from("profiles")
+    .update({
+      full_name: "Usuário removido",
+      email: tombstoneEmail,
+      phone: null,
+      cpf_cnpj: null,
+      birth_date: null,
+      internal_username: null,
+      address_zip: null,
+      address_lat: null,
+      address_lng: null,
+    })
+    .eq("id", profileId);
+
+  if (scrubError) return { error: "Não foi possível excluir a conta." };
+
+  await serviceClient
+    .from("professional_profiles")
+    .update({ bio: null, avatar_url: null, policies: null })
+    .eq("profile_id", profileId);
+
+  await serviceClient.from("tutor_favorites").delete().eq("tutor_profile_id", profileId);
+
+  const suspendError = await suspendAccount(serviceClient, {
+    targetProfileId: profileId,
+    actorId: user.id,
+    reason: "Conta excluída pelo Administrador — dados pessoais removidos, histórico compartilhado preservado.",
+  });
+  if (suspendError) return { error: suspendError };
+
+  await serviceClient.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: "excluir_usuario",
+    target_profile_id: profileId,
+  });
+
+  revalidatePath("/admin/usuarios");
+  return { error: null };
+}
+
+/**
+ * Pendência financeira = qualquer pagamento ainda não resolvido (numa
+ * solicitação onde essa conta é tutor ou profissional) ou repasse ainda
+ * não pago — dinheiro em trânsito não pode virar órfão numa exclusão.
+ */
+async function hasPendingFinancialActivity(
+  serviceClient: SupabaseClient<Database>,
+  profileId: string
+): Promise<boolean> {
+  const { data: requestsInvolved } = await serviceClient
+    .from("requests")
+    .select("id")
+    .or(`tutor_id.eq.${profileId},professional_id.eq.${profileId}`);
+
+  const requestIds = (requestsInvolved ?? []).map((r) => r.id);
+
+  if (requestIds.length > 0) {
+    const { count: pendingPayments } = await serviceClient
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .in("request_id", requestIds)
+      .in("status", ["pendente", "processando", "contestado"]);
+    if ((pendingPayments ?? 0) > 0) return true;
+  }
+
+  const { count: pendingPayouts } = await serviceClient
+    .from("payouts")
+    .select("id", { count: "exact", head: true })
+    .eq("professional_id", profileId)
+    .neq("status", "pago");
+  if ((pendingPayouts ?? 0) > 0) return true;
+
+  return false;
 }
