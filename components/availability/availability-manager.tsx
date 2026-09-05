@@ -204,43 +204,7 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
           Dias ou horários em que você não vai trabalhar. Só edita/arrasta por aqui — na Agenda aparece
           fixo.
         </p>
-        <ul className="flex flex-col gap-2 mb-3">
-          {blockedDates.map((slot) => {
-            const type = (slot.block_type as BlockType) ?? "bloqueio";
-            const color = BLOCK_TYPE_COLOR[type];
-            return editingBlockId === slot.id ? (
-              <li key={slot.id}>
-                <BlockEditForm
-                  slot={slot}
-                  onDone={() => setEditingBlockId(null)}
-                />
-              </li>
-            ) : (
-              <li
-                key={slot.id}
-                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
-              >
-                <button
-                  onClick={() => setEditingBlockId(slot.id)}
-                  className="flex flex-col gap-1 text-left flex-1"
-                >
-                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${color.bg} ${color.text}`}>
-                    {BLOCK_TYPE_LABEL[type]}
-                  </span>
-                  <span className="text-sm text-black">
-                    {slot.date_override}
-                    {slot.start_time ? ` · ${slot.start_time.slice(0, 5)}–${slot.end_time?.slice(0, 5)}` : " · dia inteiro"}
-                    {slot.reason ? ` — ${slot.reason}` : ""}
-                  </span>
-                </button>
-                <button onClick={() => handleRemove(slot.id)} className="text-gray-400 hover:text-red-600">
-                  <Trash2 size={16} />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <form onSubmit={handleBlockDate} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3">
+        <form onSubmit={handleBlockDate} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 mb-3">
           <label className="flex items-center gap-2 text-sm text-black">
             <input type="checkbox" checked={multiDay} onChange={(e) => setMultiDay(e.target.checked)} />
             Vários dias seguidos (período de férias, por exemplo)
@@ -295,6 +259,42 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
             Salvar
           </button>
         </form>
+        <ul className="flex flex-col gap-2">
+          {blockedDates.map((slot) => {
+            const type = (slot.block_type as BlockType) ?? "bloqueio";
+            const color = BLOCK_TYPE_COLOR[type];
+            return editingBlockId === slot.id ? (
+              <li key={slot.id}>
+                <BlockEditForm
+                  slot={slot}
+                  onDone={() => setEditingBlockId(null)}
+                />
+              </li>
+            ) : (
+              <li
+                key={slot.id}
+                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
+              >
+                <button
+                  onClick={() => setEditingBlockId(slot.id)}
+                  className="flex flex-col gap-1 text-left flex-1"
+                >
+                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${color.bg} ${color.text}`}>
+                    {BLOCK_TYPE_LABEL[type]}
+                  </span>
+                  <span className="text-sm text-black">
+                    {slot.date_override}
+                    {slot.start_time ? ` · ${slot.start_time.slice(0, 5)}–${slot.end_time?.slice(0, 5)}` : " · dia inteiro"}
+                    {slot.reason ? ` — ${slot.reason}` : ""}
+                  </span>
+                </button>
+                <button onClick={() => handleRemove(slot.id)} className="text-gray-400 hover:text-red-600">
+                  <Trash2 size={16} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}

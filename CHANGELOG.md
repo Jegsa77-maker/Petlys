@@ -4,6 +4,14 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-06 — Bloqueios: lista vai pra baixo do formulário
+
+`components/availability/availability-manager.tsx`: a lista de bloqueios já criados (aba "Configurar horários") passa a vir **depois** do formulário de criar um novo, não antes — pedido do usuário, só reordenação de JSX, sem mudança de lógica.
+
+**Verificação:** testado ao vivo — formulário (terminando em "Salvar") aparece primeiro, lista de bloqueios logo abaixo. `tsc`/`eslint`/`next build` limpos.
+
+---
+
 ## 2026-09-06 — Bloqueios: reordena o formulário e "Dia inteiro" some desmarcado
 
 **Contexto:** ajuste pontual no formulário de criar bloqueio (aba "Configurar horários"): usuário quer o fluxo mais direto — decidir se é vários dias antes de escolher a data, e não começar com "Dia inteiro" pré-marcado escondendo os campos de hora.
