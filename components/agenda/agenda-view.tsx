@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Ban, Plus, Trash2 } from "lucide-react";
@@ -19,8 +19,16 @@ import {
 } from "@/lib/domain/agenda-calendar";
 import { occurrenceStageLabel } from "@/lib/domain/occurrence-pipeline";
 import { SERVICE_CATEGORY_LABEL } from "@/lib/domain/service-catalog";
-import { blockDateSchema, updateBlockSchema, BLOCK_TYPES, type BlockType } from "@/lib/validations/services";
+import { blockDateSchema, updateBlockSchema, type BlockType } from "@/lib/validations/services";
 import type { OccurrenceStatus, ServiceCategory } from "@/types/database";
+
+// Só "compromisso" é criado/editado/arrastado pela Agenda (2026-09-06) —
+// bloqueio só mexe em "Configurar horários".
+const AGENDA_BLOCK_TYPE: BlockType = "compromisso";
+
+// Hora em que a lista do dia abre posicionada (pedido de 2026-09-06) —
+// evita ter que rolar passando pela madrugada pra ver o horário útil.
+const DEFAULT_SCROLL_HOUR = 7;
 
 type OccurrenceItem = {
   id: string;
@@ -91,15 +99,12 @@ function minutesToTime(minutes: number): string {
  * a seleção do dia é só estado local, já que todas as ocorrências do mês
  * visível já chegaram prontas por props.
  *
- * Ajustes de 2026-09-05: arrastar um atendimento OU um bloqueio/folga/
- * compromisso pra outro horário do mesmo dia reagenda de verdade (o
- * segundo caso não funcionava antes — só o de atendimento tinha handler
- * de drop). A lista do dia mostra as 24h sempre "abertas" (sem esmaecer
- * nada) — o horário de trabalho só é usado pra restringir o que o Tutor
- * consegue pedir (`lib/domain/availability-check.ts`), não pra colorir a
- * própria Agenda do profissional. Clicar num atendimento leva pro card
- * dele no Kanban; clicar num bloqueio/folga/compromisso abre edição
- * inline.
+ * Ajustes de 2026-09-06 (usuário revisou o comportamento antes de eu
+ * mexer, ver conversa do dia): bloqueio só cria/edita/arrasta em
+ * "Configurar horários" — na Agenda aparece fixo, sem interação nenhuma.
+ * Compromisso é o oposto: só existe pelo atalho "+" daqui, arrastável e
+ * editável só na Agenda, nunca aparece na tela de configuração. Lista do
+ * dia abre rolada até as 7h.
  */
 export function AgendaView({
   year,
@@ -129,6 +134,8 @@ export function AgendaView({
   const [dragOverHour, setDragOverHour] = useState<number | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const hourListRef = useRef<HTMLDivElement>(null);
+  const hourRowRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const weeks = getMonthMatrix(year, month);
   const prev = addMonths(year, month, -1);
@@ -155,10 +162,12 @@ export function AgendaView({
   const wholeDayBlocks = selectedDayBlocks.filter((b) => !b.startTime);
   const timedBlocks = selectedDayBlocks.filter((b) => b.startTime && b.endTime);
 
-  // Só pra mostrar o horário de trabalho como referência no topo do
-  // painel do dia — as 7 linhas de weekday sempre têm o mesmo range agora
-  // (ver setWorkingHours), então qualquer uma serve.
-  const workingHours = recurringWindows[0];
+  // Horário de trabalho pode ter mais de um range agora (turno partido) —
+  // as 7 linhas de weekday sempre têm o mesmo CONJUNTO (ver
+  // setWorkingHours), então dá pra pegar só as de um weekday qualquer.
+  const workingHourRanges = recurringWindows
+    .filter((w) => w.weekday === recurringWindows[0]?.weekday)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const hours = Array.from({ length: 24 }, (_, h) => h);
   const occurrencesByHour = new Map<number, OccurrenceItem[]>();
@@ -177,6 +186,21 @@ export function AgendaView({
       blocksByHour.set(h, list);
     }
   }
+
+  // Abre a lista já posicionada às 7h, sem precisar rolar pela madrugada.
+  // `offsetTop` sozinho não serve aqui: é relativo ao offsetParent (o
+  // ancestral posicionado mais próximo), que pode ser lá em cima na
+  // página, não o próprio container rolável — daria um scroll bem maior
+  // que o esperado. getBoundingClientRect() mede contra o container certo.
+  useEffect(() => {
+    if (!selectedDate) return;
+    const container = hourListRef.current;
+    const row = hourRowRefs.current[DEFAULT_SCROLL_HOUR];
+    if (container && row) {
+      const offset = row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      container.scrollTop += offset;
+    }
+  }, [selectedDate]);
 
   async function handleDropOnHour(hour: number) {
     const dragged = draggedItem;
@@ -207,8 +231,9 @@ export function AgendaView({
       return;
     }
 
-    // Bloqueio/folga/compromisso — preserva a duração, só muda o início.
-    const block = timedBlocks.find((b) => b.id === dragged.id);
+    // Compromisso — preserva a duração, só muda o início. Bloqueio nunca
+    // chega aqui (não é draggable, ver render abaixo).
+    const block = timedBlocks.find((b) => b.id === dragged.id && b.blockType === AGENDA_BLOCK_TYPE);
     if (!block) return;
     const durationMinutes = timeToMinutes(block.endTime!) - timeToMinutes(block.startTime!);
     const newStart = hour * 60;
@@ -362,16 +387,17 @@ export function AgendaView({
                 <button
                   onClick={() => setShowQuickAdd((v) => !v)}
                   className="flex items-center gap-1 rounded-full bg-teal/10 text-teal text-xs font-semibold px-2 py-1 hover:bg-teal/20"
-                  aria-label="Adicionar compromisso, folga ou bloqueio nesse dia"
+                  aria-label="Adicionar compromisso nesse dia"
                 >
                   <Plus size={14} />
                   Adicionar
                 </button>
               </div>
 
-              {workingHours && (
+              {workingHourRanges.length > 0 && (
                 <p className="text-xs text-gray-400 mb-2">
-                  Horário de trabalho: {workingHours.startTime.slice(0, 5)}–{workingHours.endTime.slice(0, 5)}
+                  Horário de trabalho:{" "}
+                  {workingHourRanges.map((w) => `${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)}`).join(", ")}
                 </p>
               )}
 
@@ -385,28 +411,45 @@ export function AgendaView({
                 />
               )}
 
-              {wholeDayBlocks.map((block) =>
-                editingBlockId === block.id ? (
-                  <BlockEditForm
-                    key={block.id}
-                    block={block}
-                    onDone={() => {
-                      setEditingBlockId(null);
-                      router.refresh();
-                    }}
-                  />
-                ) : (
-                  <button
-                    key={block.id}
-                    onClick={() => setEditingBlockId(block.id)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 mb-2 text-sm text-left ${BLOCK_TYPE_COLOR[block.blockType].bg} ${BLOCK_TYPE_COLOR[block.blockType].text}`}
-                  >
+              {wholeDayBlocks.map((block) => {
+                const color = BLOCK_TYPE_COLOR[block.blockType];
+                const editable = block.blockType === AGENDA_BLOCK_TYPE;
+                if (editingBlockId === block.id) {
+                  return (
+                    <BlockEditForm
+                      key={block.id}
+                      block={block}
+                      onDone={() => {
+                        setEditingBlockId(null);
+                        router.refresh();
+                      }}
+                    />
+                  );
+                }
+                const content = (
+                  <>
                     <Ban size={16} />
                     {BLOCK_TYPE_LABEL[block.blockType]} — dia inteiro
                     {block.reason ? ` — ${block.reason}` : ""}
+                  </>
+                );
+                return editable ? (
+                  <button
+                    key={block.id}
+                    onClick={() => setEditingBlockId(block.id)}
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 mb-2 text-sm text-left ${color.bg} ${color.text}`}
+                  >
+                    {content}
                   </button>
-                )
-              )}
+                ) : (
+                  <div
+                    key={block.id}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2 mb-2 text-sm ${color.bg} ${color.text}`}
+                  >
+                    {content}
+                  </div>
+                );
+              })}
 
               {dragError && (
                 <p className="text-xs text-red-600 mb-2" role="alert">
@@ -415,16 +458,19 @@ export function AgendaView({
               )}
 
               <p className="text-xs text-gray-400 mb-1">
-                Arraste um card pra outro horário pra mover — clique pra abrir.
+                Arraste um compromisso pra outro horário pra mover — clique pra abrir.
               </p>
 
-              <div className="flex flex-col divide-y divide-gray-100 max-h-96 overflow-y-auto">
+              <div ref={hourListRef} className="flex flex-col divide-y divide-gray-100 max-h-96 overflow-y-auto">
                 {hours.map((h) => {
                   const items = occurrencesByHour.get(h) ?? [];
                   const blocks = blocksByHour.get(h) ?? [];
                   return (
                     <div
                       key={h}
+                      ref={(el) => {
+                        hourRowRefs.current[h] = el;
+                      }}
                       onDragOver={(e) => {
                         e.preventDefault();
                         setDragOverHour(h);
@@ -440,36 +486,53 @@ export function AgendaView({
                         {String(h).padStart(2, "0")}:00
                       </p>
                       <div className="flex flex-col gap-1 flex-1">
-                        {blocks.map((block) =>
-                          editingBlockId === block.id ? (
-                            <BlockEditForm
-                              key={block.id}
-                              block={block}
-                              onDone={() => {
-                                setEditingBlockId(null);
-                                router.refresh();
-                              }}
-                            />
-                          ) : (
+                        {blocks.map((block) => {
+                          const color = BLOCK_TYPE_COLOR[block.blockType];
+                          const editable = block.blockType === AGENDA_BLOCK_TYPE;
+
+                          if (editingBlockId === block.id) {
+                            return (
+                              <BlockEditForm
+                                key={block.id}
+                                block={block}
+                                onDone={() => {
+                                  setEditingBlockId(null);
+                                  router.refresh();
+                                }}
+                              />
+                            );
+                          }
+
+                          const content = (
+                            <>
+                              <p className={`text-xs font-semibold ${color.text}`}>
+                                {BLOCK_TYPE_LABEL[block.blockType]}
+                                {block.reason ? ` — ${block.reason}` : ""}
+                              </p>
+                              <p className={`text-xs ${color.text}`}>
+                                {block.startTime?.slice(0, 5)}–{block.endTime?.slice(0, 5)}
+                              </p>
+                            </>
+                          );
+
+                          return editable ? (
                             <button
                               key={block.id}
                               draggable
                               onDragStart={() => setDraggedItem({ type: "block", id: block.id })}
                               onClick={() => setEditingBlockId(block.id)}
-                              className={`rounded-lg px-2 py-1 text-left cursor-grab active:cursor-grabbing ${BLOCK_TYPE_COLOR[block.blockType].bg} ${
+                              className={`rounded-lg px-2 py-1 text-left cursor-grab active:cursor-grabbing ${color.bg} ${
                                 draggedItem?.id === block.id ? "opacity-40" : ""
                               }`}
                             >
-                              <p className={`text-xs font-semibold ${BLOCK_TYPE_COLOR[block.blockType].text}`}>
-                                {BLOCK_TYPE_LABEL[block.blockType]}
-                                {block.reason ? ` — ${block.reason}` : ""}
-                              </p>
-                              <p className={`text-xs ${BLOCK_TYPE_COLOR[block.blockType].text}`}>
-                                {block.startTime?.slice(0, 5)}–{block.endTime?.slice(0, 5)}
-                              </p>
+                              {content}
                             </button>
-                          )
-                        )}
+                          ) : (
+                            <div key={block.id} className={`rounded-lg px-2 py-1 ${color.bg}`}>
+                              {content}
+                            </div>
+                          );
+                        })}
                         {items.map((occ) => (
                           <button
                             key={occ.id}
@@ -501,14 +564,11 @@ export function AgendaView({
 }
 
 /**
- * Atalho pedido em 2026-09-05: criar um bloqueio/folga/compromisso rápido
- * sem sair da Agenda pra aba "Configurar horários" — mesma ação
- * (`blockDate`) e mesmas regras, só que já com a data do dia selecionado.
- * "Compromisso" só existe por aqui — a aba "Configurar horários" só
- * oferece bloqueio/folga (ver CONFIG_BLOCK_TYPES).
+ * Atalho da Agenda pra criar um compromisso rápido (2026-09-06: só
+ * compromisso — bloqueio saiu daqui, cria/edita só em "Configurar
+ * horários"; sem seletor de tipo porque só sobrou um).
  */
 function QuickAddForm({ date, onDone }: { date: string; onDone: () => void }) {
-  const [blockType, setBlockType] = useState<BlockType>("compromisso");
   const [allDay, setAllDay] = useState(false);
   const [startTime, setStartTime] = useState("12:00");
   const [endTime, setEndTime] = useState("13:00");
@@ -522,7 +582,7 @@ function QuickAddForm({ date, onDone }: { date: string; onDone: () => void }) {
 
     const parsed = blockDateSchema.safeParse({
       dateOverride: date,
-      blockType,
+      blockType: AGENDA_BLOCK_TYPE,
       startTime: allDay ? undefined : startTime,
       endTime: allDay ? undefined : endTime,
       reason: reason || undefined,
@@ -541,11 +601,6 @@ function QuickAddForm({ date, onDone }: { date: string; onDone: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 mb-3">
-      <select value={blockType} onChange={(e) => setBlockType(e.target.value as BlockType)} className="input">
-        {BLOCK_TYPES.map((type) => (
-          <option key={type} value={type}>{BLOCK_TYPE_LABEL[type]}</option>
-        ))}
-      </select>
       <label className="flex items-center gap-2 text-sm text-black">
         <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
         Dia inteiro
@@ -568,7 +623,7 @@ function QuickAddForm({ date, onDone }: { date: string; onDone: () => void }) {
         disabled={isSubmitting}
         className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
       >
-        {isSubmitting ? "Salvando..." : "Salvar"}
+        {isSubmitting ? "Salvando..." : "Salvar compromisso"}
       </button>
       {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
     </form>
@@ -576,12 +631,13 @@ function QuickAddForm({ date, onDone }: { date: string; onDone: () => void }) {
 }
 
 /**
- * Editar um bloqueio/folga/compromisso já existente — clicar num item da
- * lista da Agenda abre isso no lugar do card (pedido de 2026-09-05:
- * "qdo clicar no agendamento deve permitir atualizar caso compromisso").
+ * Editar um compromisso já existente (2026-09-06: só compromisso chega
+ * aqui — bloqueio não é clicável na Agenda). Sem seletor de tipo, sem
+ * opção de remover por aqui pra manter simples (dá pra "esvaziar" o
+ * compromisso arrastando pra fora de propósito não existe — se quiser
+ * apagar, esse botão faz isso).
  */
 function BlockEditForm({ block, onDone }: { block: BlockedDate; onDone: () => void }) {
-  const [blockType, setBlockType] = useState<BlockType>(block.blockType);
   const [allDay, setAllDay] = useState(!block.startTime);
   const [startTime, setStartTime] = useState(block.startTime?.slice(0, 5) ?? "09:00");
   const [endTime, setEndTime] = useState(block.endTime?.slice(0, 5) ?? "18:00");
@@ -595,7 +651,7 @@ function BlockEditForm({ block, onDone }: { block: BlockedDate; onDone: () => vo
 
     const parsed = updateBlockSchema.safeParse({
       id: block.id,
-      blockType,
+      blockType: block.blockType,
       startTime: allDay ? undefined : startTime,
       endTime: allDay ? undefined : endTime,
       reason: reason || undefined,
@@ -621,11 +677,6 @@ function BlockEditForm({ block, onDone }: { block: BlockedDate; onDone: () => vo
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 mb-2">
-      <select value={blockType} onChange={(e) => setBlockType(e.target.value as BlockType)} className="input">
-        {BLOCK_TYPES.map((type) => (
-          <option key={type} value={type}>{BLOCK_TYPE_LABEL[type]}</option>
-        ))}
-      </select>
       <label className="flex items-center gap-2 text-sm text-black">
         <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
         Dia inteiro

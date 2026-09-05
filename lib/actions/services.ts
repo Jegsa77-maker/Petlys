@@ -106,13 +106,15 @@ export async function toggleServiceActive(serviceId: string, active: boolean): P
 }
 
 /**
- * Horário de trabalho (ajuste de 2026-09-05: virou UM range só pra semana
- * inteira, não mais uma janela por dia — "o profissional vai por que
- * trabalha das 9 às 18", ponto; folga num dia específico é bloqueio, não
- * uma exceção no horário recorrente). Substitui as 7 linhas de weekday de
- * uma vez só. A decisão final de horário permanece com o profissional —
- * isso só alimenta o aviso/restrição na tela de solicitação do Tutor
- * (`lib/domain/availability-check.ts`), nunca trava nada aqui.
+ * Horário de trabalho (ajuste de 2026-09-06: vira uma LISTA de ranges pra
+ * semana inteira — turno partido, ex. 9h-12h e 15h-18h, precisa dos dois;
+ * não é mais uma janela por dia da semana). Substitui as linhas de
+ * weekday de uma vez só — um weekday agora pode ter N linhas (uma por
+ * range escolhido), a tabela sempre permitiu isso, não tem unique
+ * constraint em (professional_id, weekday). A decisão final de horário
+ * permanece com o profissional — isso só alimenta o aviso/restrição na
+ * tela de solicitação do Tutor (`lib/domain/availability-check.ts`),
+ * nunca trava nada aqui.
  */
 export async function setWorkingHours(input: unknown): Promise<ActionResult> {
   const parsed = workingHoursSchema.safeParse(input);
@@ -139,15 +141,17 @@ export async function setWorkingHours(input: unknown): Promise<ActionResult> {
     return { error: "Não foi possível salvar o horário." };
   }
 
-  const { error } = await supabase.from("professional_availability").insert(
-    Array.from({ length: 7 }, (_, weekday) => ({
+  const rows = Array.from({ length: 7 }, (_, weekday) =>
+    parsed.data.ranges.map((range) => ({
       professional_id: user.id,
       weekday,
-      start_time: parsed.data.startTime,
-      end_time: parsed.data.endTime,
+      start_time: range.startTime,
+      end_time: range.endTime,
       blocked: false,
     }))
-  );
+  ).flat();
+
+  const { error } = await supabase.from("professional_availability").insert(rows);
 
   if (error) {
     return { error: "Não foi possível salvar o horário." };

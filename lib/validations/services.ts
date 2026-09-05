@@ -56,13 +56,15 @@ export const createServiceSchema = z
   });
 export type CreateServiceValues = z.infer<typeof createServiceSchema>;
 
-// Ajuste de 2026-09-05: "horário de trabalho" deixou de ser uma lista de
-// janelas por dia da semana — virou um único range que vale pra semana
-// inteira (o profissional trabalha das 9 às 18, ponto — quem tira um dia
-// de folga registra isso como bloqueio/folga na data específica, não
-// editando o horário recorrente). `setWorkingHours` (lib/actions/services.ts)
-// grava esse range nas 7 linhas de weekday de uma vez.
-export const workingHoursSchema = z
+// Horário de trabalho (ajuste de 2026-09-06: virou uma LISTA de ranges,
+// não mais um único — profissional com turno partido, ex. 9h-12h e
+// 15h-18h, precisa dos dois). Vale pra semana inteira (não mais por dia
+// da semana); quem não trabalha num dia específico registra isso como
+// bloqueio na data, não editando o horário recorrente.
+// `setWorkingHours` (lib/actions/services.ts) grava essa lista nas 7
+// linhas de weekday de uma vez (um weekday pode ter N linhas agora, uma
+// por range — a tabela sempre permitiu isso, não tem unique constraint).
+export const workingHoursRangeSchema = z
   .object({
     startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido"),
     endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido"),
@@ -71,15 +73,32 @@ export const workingHoursSchema = z
     message: "O horário de início precisa ser antes do fim",
     path: ["endTime"],
   });
+export type WorkingHoursRangeValues = z.infer<typeof workingHoursRangeSchema>;
+
+export const workingHoursSchema = z
+  .object({
+    ranges: z.array(workingHoursRangeSchema).min(1, "Adicione pelo menos um horário"),
+  })
+  .refine(
+    (data) => {
+      const sorted = [...data.ranges].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].startTime < sorted[i - 1].endTime) return false;
+      }
+      return true;
+    },
+    { message: "Os horários não podem se sobrepor", path: ["ranges"] }
+  );
 export type WorkingHoursValues = z.infer<typeof workingHoursSchema>;
 
 export const BLOCK_TYPES = ["bloqueio", "folga", "compromisso"] as const;
 export type BlockType = (typeof BLOCK_TYPES)[number];
 
-// "Configurar horários" só oferece bloqueio/folga (pedido de 2026-09-05:
-// compromisso passa a existir só pelo atalho "+" da Agenda, não faz
-// sentido cadastrar um compromisso avulso na tela de configuração).
-export const CONFIG_BLOCK_TYPES = ["bloqueio", "folga"] as const satisfies readonly BlockType[];
+// "Configurar horários" só cria bloqueio (ajuste de 2026-09-06: "folga"
+// saiu — só sobrou "Bloqueios" na tela; compromisso já não estava aqui,
+// só existe pelo atalho "+" da Agenda). "folga" continua um BlockType
+// válido só pra exibir/editar linhas antigas, sem jeito novo de criar uma.
+export const CONFIG_BLOCK_TYPES = ["bloqueio"] as const satisfies readonly BlockType[];
 
 // Horário é opcional (ajuste pedido depois do calendário mensal — antes só
 // dava pra bloquear o dia inteiro): os dois campos vêm juntos (dia inteiro)

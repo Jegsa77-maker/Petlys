@@ -4,6 +4,19 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-06 — Agenda: horário de trabalho com turno partido, bloqueio×compromisso separados de vez
+
+**Contexto:** usuário observou o comportamento da entrega anterior antes de pedir qualquer ajuste (juntou vários pontos numa conversa só, só mandou implementar no final). Resultado: 5 mudanças.
+
+- **Horário de trabalho vira lista de ranges** (`workingHoursSchema`/`setWorkingHours`, sem migration — a tabela nunca teve unique constraint em `(professional_id, weekday)`, então um weekday já podia ter várias linhas): profissional com turno partido (9h–12h e 15h–18h) adiciona quantos horários precisar, um "+ Adicionar horário" por vez.
+- **Bloqueio e compromisso ficaram em mundos separados, sem meio-termo**: bloqueio só cria/edita em "Configurar horários" (`CONFIG_BLOCK_TYPES` virou só `["bloqueio"]` — "Folga" saiu da lista, a seção virou só "Bloqueios") e aparece **fixo** na Agenda (sem arrastar, sem clicar — virou `<div>`, não `<button>`). Compromisso é o espelho: só existe pelo atalho "+" da Agenda (sem seletor de tipo — só sobrou uma opção), arrastável/editável só ali, e nunca aparece na lista de "Configurar horários".
+- **Lista do dia abre rolada até as 7h** (`DEFAULT_SCROLL_HOUR`), sem precisar passar pela madrugada pra achar o horário útil.
+- **Bug de fronteira achado implementando o scroll**: `element.offsetTop` sozinho não serve pra calcular posição dentro de um container rolável — é relativo ao `offsetParent` (o ancestral mais próximo com `position` definido), que aqui era lá em cima na página, não a lista de horas em si. Descoberto ao testar: o scroll pulava até quase o fim da lista em vez de parar às 7h. Corrigido com `getBoundingClientRect()`, que mede contra o container certo.
+
+**Verificação:** testado ao vivo de ponta a ponta (fixtures removidas depois, horário de trabalho restaurado pro padrão de fábrica) — "Adicionar horário" criou um segundo range, salvou as 2×7 linhas certas no banco, e a Agenda mostrou "09:00–12:00, 15:00–18:00"; bloqueio aparece cinza fixo na Agenda (sem `draggable`, sem clique) e editável normalmente em "Configurar horários"; compromisso aparece como botão arrastável só na Agenda e sumiu da lista de bloqueios; lista do dia abriu de verdade na hora 7 depois da correção do bug de scroll. `tsc`/`eslint`/`next build` limpos; suíte de testes com a mesma falha conhecida de rate-limit do Supabase Auth (104 passaram).
+
+---
+
 ## 2026-09-05 — Agenda: redesenho depois do primeiro teste do usuário
 
 **Contexto:** usuário testou a Agenda ao vivo e achou "estranha" — pediu pra simplificar o horário de trabalho pra um único range (em vez de configurar dia por dia), tirar "compromisso" da tela de configuração (só existe pelo atalho "+"), corrigir o drag de compromisso (não funcionava), e fazer clicar num item da lista abrir edição (bloqueio/folga/compromisso) ou levar pro card do atendimento (serviço).
