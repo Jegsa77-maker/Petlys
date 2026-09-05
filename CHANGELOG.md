@@ -4,6 +4,19 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-05 — "Horários recorrentes" vira "Horários de trabalho" e reflete na Agenda
+
+**Contexto:** depois de explicar pro usuário o que a seção fazia (janela semanal de referência, sem efeito visível em lugar nenhum), ele pediu pra renomear pra algo mais claro e fazer isso refletir de verdade na Agenda.
+
+- **`components/availability/availability-manager.tsx`**: "Horários recorrentes" → "Horários de trabalho".
+- **Agenda (`agenda-view.tsx`)**: hora fora da janela de trabalho declarada pro dia da semana em questão aparece esmaecida na lista de horas do dia selecionado. Só esmaece quando existe pelo menos uma janela declarada pra aquele dia da semana — sem nenhuma janela configurada (a maioria dos profissionais hoje), nenhuma hora fica esmaecida, pra não sugerir "indisponível o dia todo" de quem nunca mexeu nessa tela.
+
+**Ainda não fechado, decisão do usuário pendente:** ele também pediu que o tutor não consiga ver/pedir horário fora dessa janela nem dentro de bloqueios — isso é uma mudança bem maior (mexe no formulário de nova solicitação, que hoje é um `datetime-local` livre, sem nenhuma noção de disponibilidade do profissional) e traz um risco real: a maioria dos profissionais nunca configurou horário de trabalho nenhum, então uma restrição literal ("só reserva dentro da janela declarada") deixaria ESSA maioria sem nenhum horário reservável até configurar algo. Registrado como próximo passo, não implementado ainda — ver conversa com o usuário no dia.
+
+**Verificação:** testado ao vivo com uma janela sábado 09h–18h cadastrada — horas 00h–08h aparecem com fundo cinza na lista, 09h em diante volta ao normal; sem nenhuma janela cadastrada, nenhuma hora fica cinza. `tsc`/`eslint`/`next build` limpos.
+
+---
+
 ## 2026-09-05 — Agenda: reagendar arrastando, bloqueios com horário e cores por tipo
 
 **Contexto:** usuário testou o calendário mensal (entrada anterior) e pediu 4 ajustes: (1) arrastar um atendimento pra outro horário do mesmo dia pra reagendar; (2) "Bloqueios e folgas" só deixava marcar o dia inteiro, precisava de horário específico — "nesse caso é agendamento de folgas, compromissos e bloqueios"; (3) não entendeu pra que serve "Horários recorrentes"; (4) cores diferentes na lista pra bloqueio/compromisso/folga.

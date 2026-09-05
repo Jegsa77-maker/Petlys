@@ -87,10 +87,9 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <h2 className="text-sm font-semibold text-black mb-1">Horários recorrentes</h2>
+        <h2 className="text-sm font-semibold text-black mb-1">Horários de trabalho</h2>
         <p className="text-xs text-gray-500 mb-3">
-          Sua janela de atendimento de referência, semana a semana — pra você se organizar. Hoje é só
-          informativo: a plataforma não impede um tutor de pedir um serviço fora desses horários.
+          Sua disponibilidade semanal — aparece esmaecida no calendário da Agenda fora desses horários.
         </p>
         <ul className="flex flex-col gap-2 mb-3">
           {weekdaySlots.map((slot) => (

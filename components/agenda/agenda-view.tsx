@@ -48,6 +48,8 @@ type Slot = {
   reason: string | null;
 };
 
+type RecurringWindow = { weekday: number; startTime: string; endTime: string };
+
 function statusLabel(occ: OccurrenceItem): string {
   if (occ.status === "agendado") return "Agendado";
   return occ.category ? occurrenceStageLabel(occ.category, occ.status) : occ.status;
@@ -79,19 +81,24 @@ function hoursCovered(startTime: string, endTime: string): number[] {
  * "nunca bloqueia", qualquer parte pode mover uma ocorrência ainda não
  * iniciada, sem depender de aprovação prévia); bloqueios/folgas/
  * compromissos ganharam horário específico (antes só dia inteiro) e cor
- * própria na lista.
+ * própria na lista; hora fora do "Horário de trabalho" (janela recorrente
+ * semanal) fica esmaecida na lista do dia — só quando o profissional
+ * declarou pelo menos uma janela pra aquele dia da semana, pra não sugerir
+ * "indisponível o dia todo" de quem nunca configurou nada.
  */
 export function AgendaView({
   year,
   month,
   occurrences: initialOccurrences,
   blockedDates,
+  recurringWindows,
   slots,
 }: {
   year: number;
   month: number;
   occurrences: OccurrenceItem[];
   blockedDates: BlockedDate[];
+  recurringWindows: RecurringWindow[];
   slots: Slot[];
 }) {
   const [tab, setTab] = useState<"calendario" | "horarios">("calendario");
@@ -147,6 +154,17 @@ export function AgendaView({
       blocksByHour.set(h, list);
     }
   }
+
+  // Horas fora do horário de trabalho declarado ficam esmaecidas — só
+  // quando o profissional declarou pelo menos uma janela pra esse dia da
+  // semana; sem nenhuma janela declarada, nenhuma hora fica esmaecida (não
+  // dava pra presumir "indisponível o dia todo" de quem nunca configurou
+  // nada, pedido de 2026-09-05).
+  const selectedWeekday = selectedDate ? new Date(selectedDate + "T00:00:00").getDay() : null;
+  const dayWindows = recurringWindows.filter((w) => w.weekday === selectedWeekday);
+  const isWithinWorkingHours = (h: number) =>
+    dayWindows.length === 0 ||
+    dayWindows.some((w) => h >= Number(w.startTime.slice(0, 2)) && h < Number(w.endTime.slice(0, 2)));
 
   async function handleDropOnHour(hour: number) {
     const id = draggedId;
@@ -315,9 +333,15 @@ export function AgendaView({
                         e.preventDefault();
                         handleDropOnHour(h);
                       }}
-                      className={`flex gap-3 py-1.5 ${dragOverHour === h ? "bg-teal/5" : ""}`}
+                      className={`flex gap-3 py-1.5 ${
+                        dragOverHour === h ? "bg-teal/5" : !isWithinWorkingHours(h) ? "bg-gray-50" : ""
+                      }`}
                     >
-                      <p className="w-12 shrink-0 text-xs text-gray-400 pt-0.5">
+                      <p
+                        className={`w-12 shrink-0 text-xs pt-0.5 ${
+                          isWithinWorkingHours(h) ? "text-gray-400" : "text-gray-300"
+                        }`}
+                      >
                         {String(h).padStart(2, "0")}:00
                       </p>
                       <div className="flex flex-col gap-1 flex-1">

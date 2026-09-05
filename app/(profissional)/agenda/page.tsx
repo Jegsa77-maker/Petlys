@@ -78,6 +78,10 @@ export default async function AgendaPage({
       reason: s.reason,
     }));
 
+  const recurringWindows = (slots ?? [])
+    .filter((s) => s.weekday !== null)
+    .map((s) => ({ weekday: s.weekday!, startTime: s.start_time!, endTime: s.end_time! }));
+
   return (
     <main className="min-h-screen bg-offwhite px-4 py-8">
       <div className="max-w-md mx-auto">
@@ -90,6 +94,7 @@ export default async function AgendaPage({
           month={month}
           occurrences={occurrenceItems}
           blockedDates={blockedDates}
+          recurringWindows={recurringWindows}
           slots={slots ?? []}
         />
       </div>
