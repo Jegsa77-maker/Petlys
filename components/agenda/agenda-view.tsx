@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Ban } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, Ban, Plus } from "lucide-react";
 import { AvailabilityManager } from "@/components/availability/availability-manager";
 import { rescheduleOccurrence } from "@/lib/actions/requests";
+import { blockDate } from "@/lib/actions/services";
 import {
   WEEKDAY_SHORT_LABEL,
   MONTH_LABEL,
@@ -17,7 +19,7 @@ import {
 } from "@/lib/domain/agenda-calendar";
 import { occurrenceStageLabel } from "@/lib/domain/occurrence-pipeline";
 import { SERVICE_CATEGORY_LABEL } from "@/lib/domain/service-catalog";
-import type { BlockType } from "@/lib/validations/services";
+import { blockDateSchema, BLOCK_TYPES, type BlockType } from "@/lib/validations/services";
 import type { OccurrenceStatus, ServiceCategory } from "@/types/database";
 
 type OccurrenceItem = {
@@ -101,6 +103,7 @@ export function AgendaView({
   recurringWindows: RecurringWindow[];
   slots: Slot[];
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<"calendario" | "horarios">("calendario");
   const [occurrences, setOccurrences] = useState(initialOccurrences);
   const [dragError, setDragError] = useState<string | null>(null);
@@ -111,6 +114,7 @@ export function AgendaView({
   );
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverHour, setDragOverHour] = useState<number | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   const weeks = getMonthMatrix(year, month);
   const prev = addMonths(year, month, -1);
@@ -162,9 +166,17 @@ export function AgendaView({
   // nada, pedido de 2026-09-05).
   const selectedWeekday = selectedDate ? new Date(selectedDate + "T00:00:00").getDay() : null;
   const dayWindows = recurringWindows.filter((w) => w.weekday === selectedWeekday);
+  // Fim às XX:59 (ex.: o padrão "dia inteiro" 00:00-23:59) precisa contar
+  // a própria hora XX como coberta — só "< endHour" excluiria a última
+  // hora do dia inteiro.
   const isWithinWorkingHours = (h: number) =>
     dayWindows.length === 0 ||
-    dayWindows.some((w) => h >= Number(w.startTime.slice(0, 2)) && h < Number(w.endTime.slice(0, 2)));
+    dayWindows.some((w) => {
+      const startHour = Number(w.startTime.slice(0, 2));
+      const endHour = Number(w.endTime.slice(0, 2));
+      const endMinute = Number(w.endTime.slice(3, 5));
+      return h >= startHour && (h < endHour || (h === endHour && endMinute > 0));
+    });
 
   async function handleDropOnHour(hour: number) {
     const id = draggedId;
@@ -227,9 +239,28 @@ export function AgendaView({
               >
                 <ChevronLeft size={20} />
               </Link>
-              <p className="text-sm font-semibold text-black">
-                {MONTH_LABEL[month]} de {year}
-              </p>
+              <div className="flex items-center gap-1">
+                <select
+                  value={month}
+                  onChange={(e) => router.push(`/agenda?mes=${monthParam(year, Number(e.target.value))}`)}
+                  className="text-sm font-semibold text-black bg-transparent border-none"
+                  aria-label="Mês"
+                >
+                  {MONTH_LABEL.map((label, i) => (
+                    <option key={i} value={i}>{label}</option>
+                  ))}
+                </select>
+                <select
+                  value={year}
+                  onChange={(e) => router.push(`/agenda?mes=${monthParam(Number(e.target.value), month)}`)}
+                  className="text-sm font-semibold text-black bg-transparent border-none"
+                  aria-label="Ano"
+                >
+                  {Array.from({ length: 6 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
               <Link
                 href={`/agenda?mes=${monthParam(next.year, next.month)}`}
                 className="p-1 text-gray-500 hover:text-teal"
@@ -259,7 +290,10 @@ export function AgendaView({
                   return (
                     <button
                       key={key}
-                      onClick={() => setSelectedDate(key)}
+                      onClick={() => {
+                        setSelectedDate(key);
+                        setShowQuickAdd(false);
+                      }}
                       className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-sm ${
                         isSelected
                           ? "bg-teal text-white font-semibold"
@@ -285,13 +319,33 @@ export function AgendaView({
 
           {selectedDate && (
             <div className="rounded-lg border border-gray-200 bg-white p-3">
-              <p className="text-sm font-semibold text-black mb-2">
-                {new Date(selectedDate + "T00:00:00").toLocaleDateString("pt-BR", {
-                  weekday: "long",
-                  day: "2-digit",
-                  month: "long",
-                })}
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-black">
+                  {new Date(selectedDate + "T00:00:00").toLocaleDateString("pt-BR", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                  })}
+                </p>
+                <button
+                  onClick={() => setShowQuickAdd((v) => !v)}
+                  className="flex items-center gap-1 rounded-full bg-teal/10 text-teal text-xs font-semibold px-2 py-1 hover:bg-teal/20"
+                  aria-label="Adicionar compromisso, folga ou bloqueio nesse dia"
+                >
+                  <Plus size={14} />
+                  Adicionar
+                </button>
+              </div>
+
+              {showQuickAdd && (
+                <QuickAddForm
+                  date={selectedDate}
+                  onDone={() => {
+                    setShowQuickAdd(false);
+                    router.refresh();
+                  }}
+                />
+              )}
 
               {wholeDayBlocks.map((block) => {
                 const color = BLOCK_TYPE_COLOR[block.blockType];
@@ -385,5 +439,78 @@ export function AgendaView({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Atalho pedido em 2026-09-05: criar um bloqueio/folga/compromisso rápido
+ * sem sair da Agenda pra aba "Configurar horários" — mesma ação
+ * (`blockDate`) e mesmas regras, só que já com a data do dia selecionado.
+ */
+function QuickAddForm({ date, onDone }: { date: string; onDone: () => void }) {
+  const [blockType, setBlockType] = useState<BlockType>("compromisso");
+  const [allDay, setAllDay] = useState(false);
+  const [startTime, setStartTime] = useState("12:00");
+  const [endTime, setEndTime] = useState("13:00");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    const parsed = blockDateSchema.safeParse({
+      dateOverride: date,
+      blockType,
+      startTime: allDay ? undefined : startTime,
+      endTime: allDay ? undefined : endTime,
+      reason: reason || undefined,
+    });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Dados inválidos");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const result = await blockDate(parsed.data);
+    setIsSubmitting(false);
+    if (result?.error) setError(result.error);
+    else onDone();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 mb-3">
+      <select value={blockType} onChange={(e) => setBlockType(e.target.value as BlockType)} className="input">
+        {BLOCK_TYPES.map((type) => (
+          <option key={type} value={type}>{BLOCK_TYPE_LABEL[type]}</option>
+        ))}
+      </select>
+      <label className="flex items-center gap-2 text-sm text-black">
+        <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
+        Dia inteiro
+      </label>
+      {!allDay && (
+        <div className="grid grid-cols-2 gap-2">
+          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input" />
+          <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="input" />
+        </div>
+      )}
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Ex: almoço, médico"
+        className="input"
+      />
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+      >
+        {isSubmitting ? "Salvando..." : "Salvar"}
+      </button>
+      {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+    </form>
   );
 }

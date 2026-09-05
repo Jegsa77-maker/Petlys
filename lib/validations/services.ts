@@ -68,10 +68,13 @@ export type BlockType = (typeof BLOCK_TYPES)[number];
 
 // Horário é opcional (ajuste pedido depois do calendário mensal — antes só
 // dava pra bloquear o dia inteiro): os dois campos vêm juntos (dia inteiro)
-// ou nenhum dos dois (horário específico).
+// ou nenhum dos dois (horário específico). `untilDate` também é opcional —
+// bloquear um período inteiro (semana de folga, mês de férias) de uma vez
+// em vez de criar linha por linha (pedido de 2026-09-05).
 export const blockDateSchema = z
   .object({
     dateOverride: z.string().min(1, "Informe a data"),
+    untilDate: z.string().optional(),
     blockType: z.enum(BLOCK_TYPES).default("bloqueio"),
     startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido").optional(),
     endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido").optional(),
@@ -84,5 +87,17 @@ export const blockDateSchema = z
   .refine((data) => !data.startTime || !data.endTime || data.startTime < data.endTime, {
     message: "O horário de início precisa ser antes do fim",
     path: ["endTime"],
-  });
+  })
+  .refine((data) => !data.untilDate || data.untilDate >= data.dateOverride, {
+    message: "A data final precisa ser igual ou depois da inicial",
+    path: ["untilDate"],
+  })
+  .refine(
+    (data) => {
+      if (!data.untilDate) return true;
+      const days = (new Date(data.untilDate).getTime() - new Date(data.dateOverride).getTime()) / 86_400_000;
+      return days <= 366;
+    },
+    { message: "O período não pode passar de 1 ano", path: ["untilDate"] }
+  );
 export type BlockDateValues = z.infer<typeof blockDateSchema>;

@@ -155,15 +155,36 @@ export async function blockDate(input: unknown): Promise<ActionResult> {
     return { error: "Sessão expirada. Faça login novamente." };
   }
 
-  const { error } = await supabase.from("professional_availability").insert({
-    professional_id: user.id,
-    date_override: parsed.data.dateOverride,
-    start_time: parsed.data.startTime ?? null,
-    end_time: parsed.data.endTime ?? null,
-    block_type: parsed.data.blockType,
-    reason: parsed.data.reason ?? null,
-    blocked: true,
-  });
+  // Um dia só ou um período inteiro (semana de folga, mês de férias) —
+  // uma linha por dia, mesmo mecanismo de sempre, só que em lote. Formata
+  // a data manualmente (não .toISOString(), que converte pra UTC e pode
+  // voltar um dia em fusos à frente de UTC) — mesmo padrão de
+  // lib/domain/agenda-calendar.ts:toDateKey.
+  const dates: string[] = [parsed.data.dateOverride];
+  if (parsed.data.untilDate) {
+    const cursor = new Date(parsed.data.dateOverride + "T00:00:00");
+    const end = new Date(parsed.data.untilDate + "T00:00:00");
+    dates.length = 0;
+    while (cursor <= end) {
+      const y = cursor.getFullYear();
+      const m = String(cursor.getMonth() + 1).padStart(2, "0");
+      const d = String(cursor.getDate()).padStart(2, "0");
+      dates.push(`${y}-${m}-${d}`);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
+  const { error } = await supabase.from("professional_availability").insert(
+    dates.map((date) => ({
+      professional_id: user.id,
+      date_override: date,
+      start_time: parsed.data.startTime ?? null,
+      end_time: parsed.data.endTime ?? null,
+      block_type: parsed.data.blockType,
+      reason: parsed.data.reason ?? null,
+      blocked: true,
+    }))
+  );
 
   if (error) {
     return { error: "Não foi possível bloquear a data." };

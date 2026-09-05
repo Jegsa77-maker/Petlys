@@ -14,6 +14,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { trackEventServer } from "@/lib/analytics/track-server";
+import { seedDefaultAvailability } from "@/lib/domain/availability-defaults";
 
 type ActionResult = { error: string | null };
 type SignUpResult = { error: string | null; needsEmailConfirmation?: boolean };
@@ -233,6 +234,10 @@ export async function chooseProfile(input: ChooseProfileValues): Promise<ActionR
 
     if (rolesError) {
       return { error: "Não foi possível salvar seu(s) perfil(is). Tente novamente." };
+    }
+
+    if (newRoles.includes("profissional")) {
+      await seedDefaultAvailability(supabase, user.id);
     }
   }
 

@@ -35,6 +35,8 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
   const [allDay, setAllDay] = useState(true);
   const [blockStartTime, setBlockStartTime] = useState("09:00");
   const [blockEndTime, setBlockEndTime] = useState("18:00");
+  const [multiDay, setMultiDay] = useState(false);
+  const [blockUntilDate, setBlockUntilDate] = useState("");
   const [blockReason, setBlockReason] = useState("");
 
   async function handleAddSlot(e: React.FormEvent) {
@@ -63,6 +65,7 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
 
     const parsed = blockDateSchema.safeParse({
       dateOverride: blockDateValue,
+      untilDate: multiDay ? blockUntilDate || undefined : undefined,
       blockType,
       startTime: allDay ? undefined : blockStartTime,
       endTime: allDay ? undefined : blockEndTime,
@@ -77,7 +80,10 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
     const result = await blockDate(parsed.data);
     setIsSubmitting(false);
     if (result?.error) setError(result.error);
-    else setBlockDateValue("");
+    else {
+      setBlockDateValue("");
+      setBlockUntilDate("");
+    }
   }
 
   async function handleRemove(id: string) {
@@ -166,6 +172,19 @@ export function AvailabilityManager({ slots }: { slots: Slot[] }) {
             onChange={(e) => setBlockDateValue(e.target.value)}
             className="input"
           />
+          <label className="flex items-center gap-2 text-sm text-black">
+            <input type="checkbox" checked={multiDay} onChange={(e) => setMultiDay(e.target.checked)} />
+            Vários dias seguidos (período de férias, por exemplo)
+          </label>
+          {multiDay && (
+            <input
+              type="date"
+              value={blockUntilDate}
+              onChange={(e) => setBlockUntilDate(e.target.value)}
+              placeholder="Até"
+              className="input"
+            />
+          )}
           <label className="flex items-center gap-2 text-sm text-black">
             <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
             Dia inteiro

@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import type { AppRole, Database } from "@/types/database";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { suspendAccount, lastActiveAdminGuard } from "@/lib/actions/suspension-helpers";
+import { seedDefaultAvailability } from "@/lib/domain/availability-defaults";
 
 type ActionResult = { error: string | null };
 
@@ -422,6 +423,10 @@ export async function createUserByAdmin(input: unknown): Promise<ActionResult> {
     return { error: "Conta criada, mas houve um erro ao atribuir o papel." };
   }
 
+  if (parsed.data.role === "profissional") {
+    await seedDefaultAvailability(serviceClient, newProfileId);
+  }
+
   await serviceClient.from("admin_audit_log").insert({
     actor_id: user.id,
     action: "criar_usuario",
@@ -465,6 +470,10 @@ export async function setUserRoleActive(
 
   if (error) return { error: "Não foi possível atualizar o papel." };
 
+  if (active && role === "profissional") {
+    await seedDefaultAvailability(serviceClient, profileId);
+  }
+
   await serviceClient.from("admin_audit_log").insert({
     actor_id: user.id,
     action: active ? "ativar_papel" : "desativar_papel",
@@ -501,6 +510,10 @@ export async function addUserRole(profileId: string, role: AppRole): Promise<Act
       .eq("profile_id", profileId)
       .eq("role", role);
     if (reactivateError) return { error: "Não foi possível conceder o papel." };
+  }
+
+  if (role === "profissional") {
+    await seedDefaultAvailability(serviceClient, profileId);
   }
 
   await serviceClient.from("admin_audit_log").insert({

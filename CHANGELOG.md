@@ -4,6 +4,22 @@ Este arquivo é a fonte de verdade sobre decisões, achados e ajustes do projeto
 
 ---
 
+## 2026-09-05 — Agenda: disponibilidade padrão, período de bloqueio, atalho "+" e navegação por mês/ano
+
+**Contexto:** sequência de pedidos depois de renomear "Horários recorrentes" — usuário definiu como resolver o risco de restringir reserva sem quebrar profissional nenhum, pediu bloqueio de período inteiro (férias), um atalho "+" pra criar compromisso/bloqueio rápido na Agenda, e navegação direta por mês/ano (hoje só dava pra ir mês a mês).
+
+- **Disponibilidade padrão pro profissional novo**: `lib/domain/availability-defaults.ts` (novo) — todo profissional passa a nascer com os 7 dias da semana marcados como disponível o dia inteiro (00:00–23:59). Não é jornada de 24h — é só pra ninguém ficar sem nenhum horário reservável até configurar de verdade. Chamado nos 4 pontos onde o papel "profissional" é concedido: `chooseProfile` (auto-cadastro), `createUserByAdmin`, `addUserRole` e `setUserRoleActive` (reativação) — todos em `lib/actions/admin.ts`/`auth.ts`. Migration `0077` faz o backfill pros profissionais que já existiam sem nenhuma janela (36 contas).
+- **Bloquear um período inteiro de uma vez** (`blockDateSchema`/`blockDate`, `lib/validations/services.ts` + `lib/actions/services.ts`): campo "Até" opcional — sem mudar o modelo de dados (continua uma linha por dia em `professional_availability`), só insere em lote. Limite de 1 ano pra evitar lote gigante por engano.
+- **Atalho "+" na Agenda** (`QuickAddForm` em `components/agenda/agenda-view.tsx`): cria bloqueio/folga/compromisso direto no dia selecionado do calendário, sem trocar de aba — mesma ação `blockDate`, só que pré-preenchida com a data e um `router.refresh()` no final pra já aparecer na lista.
+- **Navegação de mês/ano** (`agenda-view.tsx`): as setas de mês anterior/seguinte continuam, mas agora tem dois `<select>` (mês e ano, ±2 anos) que pulam direto via `router.push`, sem precisar clicar mês a mês.
+- **Correção de limite**: a janela "dia inteiro" (00:00–23:59) tinha um bug de fronteira — a comparação `hora < horaFim` excluía a própria hora 23 (`23 < 23` é falso), esmaecendo a última hora do dia mesmo dentro do período "disponível o dia todo". Corrigido considerando o minuto do horário final.
+
+**Verificação:** testado ao vivo de ponta a ponta (fixtures removidas depois) — atalho "+" salvou um compromisso "Almoço rápido" 12h–13h no dia certo; bloqueio de período 20–22/09 criou as 3 linhas esperadas com a mesma descrição; navegação por mês (dezembro) e confirmação de que o backfill rodou (36 profissionais, 0 restantes sem disponibilidade). `tsc`/`eslint`/`next build` limpos; suíte de testes com a mesma falha conhecida de rate-limit do Supabase Auth (arquivos diferentes a cada rodada).
+
+**Ainda não fechado:** restringir o que o tutor consegue ver/pedir na tela de nova solicitação (só dentro da disponibilidade real do profissional, escondendo bloqueios) — combinado com o usuário, mas é a peça maior (mexe no formulário de solicitação, que hoje é um campo de data/hora livre) e fica pro próximo passo.
+
+---
+
 ## 2026-09-05 — "Horários recorrentes" vira "Horários de trabalho" e reflete na Agenda
 
 **Contexto:** depois de explicar pro usuário o que a seção fazia (janela semanal de referência, sem efeito visível em lugar nenhum), ele pediu pra renomear pra algo mais claro e fazer isso refletir de verdade na Agenda.
